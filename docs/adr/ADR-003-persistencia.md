@@ -1,11 +1,11 @@
 # ADR-003 · Persistencia
 
-| | |
-|---|---|
-| **Estado** | Aceptada (versión inicial) · Entrega 1. Se valida en la Entrega 2. |
-| **Fecha** | 09/10/2026 |
-| **Decisión de la consigna** | D3 · Persistencia |
-| **Relacionadas** | [ADR-001](ADR-001-limites-de-los-servicios.md) (límites y dueños de los datos), [ADR-005](ADR-005-comunicacion.md) (outbox e idempotencia), [ADR-008](ADR-008-contrato-propio.md) (datos de la capacidad publicada) |
+|                             |                                                                                                                                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Estado**                  | Aceptada (versión inicial) · Entrega 1. Se valida en la Entrega 2.                                                                                                                                                  |
+| **Fecha**                   | 09/10/2026                                                                                                                                                                                                          |
+| **Decisión de la consigna** | D3 · Persistencia                                                                                                                                                                                                   |
+| **Relacionadas**            | [ADR-001](ADR-001-limites-de-los-servicios.md) (límites y dueños de los datos), [ADR-005](ADR-005-comunicacion.md) (outbox e idempotencia), [ADR-008](ADR-008-contrato-propio.md) (datos de la capacidad publicada) |
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
@@ -32,18 +32,18 @@ Las operaciones que no pueden duplicarse ni perder información son la **reserva
 
 Cada servicio tiene **su propia instancia** de base de datos, en su propio contenedor.
 
-| Servicio | Almacenamiento | Qué guarda | Patrones de acceso | Por qué |
-|---|---|---|---|---|
-| **Catálogo** | **MongoDB** (documental, no relacional) | Un documento por producto, con sus variantes, sus fotos (referencias) y su categoría. Promociones en una colección aparte. | Muchas lecturas del producto completo (ficha, listados). Pocas escrituras, hechas por un solo administrador. Atributos que pueden variar por categoría. | El producto se lee y se edita como una unidad: un documento lo devuelve completo sin joins. Las escrituras tocan un solo producto, así que alcanzan las operaciones atómicas sobre un documento. |
-| **Inventario** | **MySQL** (relacional) | Stock por variante y canal, reservas y sus ítems, movimientos, transferencias, claves de idempotencia, outbox y mensajes procesados. Con la opción A de la capacidad, los cupos y reservas de cada grupo consumidor, en tablas propias. | Escrituras concurrentes sobre las mismas filas (las últimas unidades). Una reserva toca varias variantes a la vez. Consultas por id de variante. | Necesita transacciones que abarquen varias filas (todo o nada), actualizaciones condicionales (`stock − reservado ≥ cantidad`), bloqueo de filas y restricciones únicas para la idempotencia. |
-| **Ventas** | **MySQL** (relacional) | Ventas, ítems (con copia de nombre, talle, color y precio **[propuesta]**), pagos, registro de mails, claves de idempotencia, outbox y mensajes procesados. Con la opción B, los emails de cada grupo consumidor, en una tabla propia. | Transiciones de estado que no pueden aplicarse dos veces. Consultas por estado, por comprador y por fecha (HU-14, HU-16). | Relaciones claras (venta, ítems, pagos), transiciones condicionales (`UPDATE … WHERE estado = …`) y restricciones únicas para no duplicar pagos ni avisos. |
-| **Usuarios** | **MySQL** (relacional) | Usuarios, hash de contraseña y rol. | Búsqueda por email al iniciar sesión. Pocas escrituras. | El email único se garantiza con una restricción de la base (HU-18.1). |
+| Servicio       | Almacenamiento                          | Qué guarda                                                                                                                                                                                                                              | Patrones de acceso                                                                                                                                      | Por qué                                                                                                                                                                                          |
+| -------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Catálogo**   | **MongoDB** (documental, no relacional) | Un documento por producto, con sus variantes, sus fotos (referencias) y su categoría. Promociones en una colección aparte.                                                                                                              | Muchas lecturas del producto completo (ficha, listados). Pocas escrituras, hechas por un solo administrador. Atributos que pueden variar por categoría. | El producto se lee y se edita como una unidad: un documento lo devuelve completo sin joins. Las escrituras tocan un solo producto, así que alcanzan las operaciones atómicas sobre un documento. |
+| **Inventario** | **MySQL** (relacional)                  | Stock por variante y canal, reservas y sus ítems, movimientos, transferencias, claves de idempotencia, outbox y mensajes procesados. Con la opción A de la capacidad, los cupos y reservas de cada grupo consumidor, en tablas propias. | Escrituras concurrentes sobre las mismas filas (las últimas unidades). Una reserva toca varias variantes a la vez. Consultas por id de variante.        | Necesita transacciones que abarquen varias filas (todo o nada), actualizaciones condicionales (`stock − reservado ≥ cantidad`), bloqueo de filas y restricciones únicas para la idempotencia.    |
+| **Ventas**     | **MySQL** (relacional)                  | Ventas, ítems (con copia de nombre, talle, color y precio **[propuesta]**), pagos, registro de mails, claves de idempotencia, outbox y mensajes procesados. Con la opción B, los emails de cada grupo consumidor, en una tabla propia.  | Transiciones de estado que no pueden aplicarse dos veces. Consultas por estado, por comprador y por fecha (HU-14, HU-16).                               | Relaciones claras (venta, ítems, pagos), transiciones condicionales (`UPDATE … WHERE estado = …`) y restricciones únicas para no duplicar pagos ni avisos.                                       |
+| **Usuarios**   | **MySQL** (relacional)                  | Usuarios, hash de contraseña y rol.                                                                                                                                                                                                     | Búsqueda por email al iniciar sesión. Pocas escrituras.                                                                                                 | El email único se garantiza con una restricción de la base (HU-18.1).                                                                                                                            |
 
 **Almacenamiento derivado** (no es fuente de verdad; se puede perder y reconstruir):
 
-| Componente | Qué guarda | Se decide en |
-|---|---|---|
-| Redis (caché) | Lecturas del catálogo | ADR-007 (D7) |
+| Componente        | Qué guarda                                                  | Se decide en |
+| ----------------- | ----------------------------------------------------------- | ------------ |
+| Redis (caché)     | Lecturas del catálogo                                       | ADR-007 (D7) |
 | Motor de búsqueda | Índice de productos publicados con su disponibilidad online | ADR-006 (D6) |
 
 **Cómo se cumplen las garantías:**
@@ -53,19 +53,19 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 - **No perder eventos:** el evento se guarda en la tabla outbox **en la misma transacción** que el cambio de datos, y se publica después (ADR-005).
 - **No procesar dos veces un evento:** el consumidor registra el id del mensaje en una tabla de procesados, en la misma transacción que su efecto (ADR-005).
 
-**MySQL para los tres servicios relacionales:** usar un solo motor relacional reduce lo que hay que aprender, configurar y observar. **[?]** El equipo completa si hubo otro motivo (por ejemplo, experiencia previa) frente a PostgreSQL, que ofrece las mismas garantías.
+**MySQL para los tres servicios relacionales:** usar un solo motor relacional reduce lo que hay que aprender, configurar y observar. Además el equipo tiene experiencia previa en MySQL.
 
 ## Alternativas consideradas
 
-| Alternativa | Por qué se descartó |
-|---|---|
-| **Todo en MySQL** | No cumple el requisito de dos tipos de almacenamiento. Además, el producto con variantes y atributos variables se modela mejor como documento. |
-| **Inventario en MongoDB** | Una reserva toca varias variantes a la vez. MongoDB lo permite con transacciones multi-documento, pero la actualización condicional con transacción y bloqueo de filas en SQL es más directa y más fácil de probar ante concurrencia. |
-| **Ventas en MongoDB** | La venta tiene relaciones (ítems, pagos) y se consulta por estado y fecha. Las transiciones condicionales y las restricciones únicas son más simples en SQL. |
-| **Una base compartida, con esquemas separados** | La prohíbe la cátedra (RNF-08). Además, la caída o la carga de la base afectaría a todos los servicios. |
-| **Una sola instancia de MySQL con tres bases lógicas** | Ahorra recursos, pero la caída de la instancia tumba a tres servicios a la vez y rompe el aislamiento de fallas previsto (ARCHITECTURE §8). |
-| **PostgreSQL en lugar de MySQL** | Equivalente en garantías para este uso. Ver **[?]** en la decisión. |
-| **Redis o el motor de búsqueda como el almacenamiento no relacional** | Son copias derivadas, no la fuente de verdad de ningún servicio. **[?]** Consultado a la cátedra. |
+| Alternativa                                                           | Por qué se descartó                                                                                                                                                                                                                   |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Todo en MySQL**                                                     | No cumple el requisito de dos tipos de almacenamiento. Además, el producto con variantes y atributos variables se modela mejor como documento.                                                                                        |
+| **Inventario en MongoDB**                                             | Una reserva toca varias variantes a la vez. MongoDB lo permite con transacciones multi-documento, pero la actualización condicional con transacción y bloqueo de filas en SQL es más directa y más fácil de probar ante concurrencia. |
+| **Ventas en MongoDB**                                                 | La venta tiene relaciones (ítems, pagos) y se consulta por estado y fecha. Las transiciones condicionales y las restricciones únicas son más simples en SQL.                                                                          |
+| **Una base compartida, con esquemas separados**                       | La prohíbe la cátedra (RNF-08). Además, la caída o la carga de la base afectaría a todos los servicios.                                                                                                                               |
+| **Una sola instancia de MySQL con tres bases lógicas**                | Ahorra recursos, pero la caída de la instancia tumba a tres servicios a la vez y rompe el aislamiento de fallas previsto (ARCHITECTURE §8).                                                                                           |
+| **PostgreSQL en lugar de MySQL**                                      | Equivalente en garantías para este uso. Ver **[?]** en la decisión.                                                                                                                                                                   |
+| **Redis o el motor de búsqueda como el almacenamiento no relacional** | Son copias derivadas, no la fuente de verdad de ningún servicio. **[?]** Consultado a la cátedra.                                                                                                                                     |
 
 ## Consecuencias
 
