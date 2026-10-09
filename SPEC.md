@@ -1,8 +1,12 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.5 (borrador para la Entrega 1)** · 08/10/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.7 (borrador para la Entrega 1)** · 09/10/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
+>
+> **Cambios en 0.7:** la capacidad publicada deja de ser la reserva de stock de FAV. Se proponen dos opciones independientes del dominio, A (reserva de cupos) y B (envío de emails), y se elige una según el grupo consumidor (§11). El diagrama de estados (§7) pasa de Mermaid a `docs/diagrams/estados.png`.
+>
+> **Cambios en 0.6** (ADR-001): el carrito se guarda en el navegador (HU-10); el filtro de poco stock por umbral se reemplaza por una vista de stock por producto (HU-09); se descarta HU-18.4; el comprador registrado usa el email de su cuenta, que llega en el token.
 
 ---
 
@@ -23,9 +27,10 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 - Compra online con o sin cuenta, pagando con Mercado Pago o transferencia, con reserva temporal del stock.
 - Seguimiento del pedido con estados visibles para el comprador registrado, actualizados a mano por el administrador. El comprador sin cuenta se entera por mail (RN-24).
 - Registro de las ventas del local (efectivo, transferencia o Mercado Pago).
-- Panel de administración: productos, precios y promociones, stock, ventas y estados, y variantes con poco stock.
+- Panel de administración: productos, precios y promociones, stock por variante, ventas y estados, y variantes con stock a corregir.
 - Mails al comprador y al administrador.
 - Usuarios con roles de comprador y administrador.
+- Una capacidad publicada para que la use otro grupo de la materia (§11).
 
 ### Fuera del alcance
 | Qué | Motivo |
@@ -36,8 +41,9 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | Promociones 2x1 y promociones bancarias | No entran en v1 (RN-05). |
 | Pagos con tarjeta y bancos | No entran en v1. Es una evolución futura: el medio de pago se modela como un dato que pueda ampliarse. |
 | Facturación | Hoy el cliente no factura. Posible evolución futura |
-| Alerta de poco stock por mail | Reemplazada por un filtro en el panel (HU-09). |
+| Alerta o filtro de poco stock | Con el volumen actual no justifica su costo (ADR-001). El administrador controla el stock desde la vista por producto (HU-09). Posible evolución futura. |
 | Mails de promociones | Descartados (HU-22). |
+| Ver como registrado las compras hechas antes como invitado | Requiere verificar el email para no exponer pedidos ajenos (HU-18.4, ADR-001). |
 
 ## 3. Contexto de uso (según el cliente)
 
@@ -58,6 +64,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | Administrador | Rol de gestión que usa el cliente. Único rol de administración (RN-23). |
 | Mercado Pago | Sistema externo que procesa los pagos online y avisa el resultado. |
 | Sistema | Procesos automáticos: vencimiento de reservas y envío de mails. |
+| Grupo consumidor | Sistema de otro grupo de la materia que usa la capacidad publicada por FAV (§11). |
 
 ## 5. Glosario
 
@@ -73,6 +80,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | Transferencia de stock | Movimiento de unidades de una variante de un canal al otro. No es una transferencia bancaria. |
 | Venta | Compra online o venta del local, con su canal, monto y medio de pago. |
 | Medio de pago | Mercado Pago, transferencia bancaria o efectivo. |
+| Carrito | Lista de variantes y cantidades que el comprador arma antes de comprar. Se guarda en su navegador y no reserva stock. |
 
 ## 6. Reglas de negocio
 
@@ -88,7 +96,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | RN-08 | La reserva de una compra con Mercado Pago se libera a los 20 minutos o por cancelación explícita. Cerrar la sesión no libera la reserva porque no es detectable. | Equipo |
 | RN-09 | La reserva de una compra por transferencia dura hasta 48 horas o hasta que el administrador confirme el pago. Pasado ese plazo se libera. | Cliente |
 | RN-10 | Una transferencia de stock no puede mover más unidades que las disponibles (sin contar las reservadas). Queda registrada: quién, cuándo, cuánto, origen y destino. | Equipo |
-| RN-11 | La compra sin cuenta exige como mínimo el email. Los datos de envío se incorporan cuando se implementen los envíos (RN-16). | Cliente + equipo |
+| RN-11 | La compra sin cuenta exige como mínimo el email. El comprador registrado usa el email de su cuenta. Los datos de envío se incorporan cuando se implementen los envíos (RN-16). | Cliente + equipo |
 | RN-12 | Toda venta registra canal, monto cobrado y medio de pago. | Equipo |
 | RN-13 | No hay mínimo ni máximo de unidades ni de monto por compra. | Equipo |
 | RN-14 | Si una transferencia se confirma cuando la reserva ya venció, la venta no se confirma sola: pasa a *A verificar* y el administrador recibe un aviso. Se aplica lo mismo a un pago de Mercado Pago aprobado con la reserva vencida. | Cliente (transferencia). **[propuesta]** (Mercado Pago). **[?]** cómo se resuelve |
@@ -106,20 +114,9 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 
 ## 7. Estados de la venta online
 
-```mermaid
-stateDiagram-v2
-    state "Pendiente de pago" as Pendiente
-    state "Entregada al correo" as AlCorreo
-    state "A verificar" as AVerificar
+![Estados de la venta online: Comprar lleva a Pendiente de pago (con la reserva de stock activa). Desde ahí, el pago aprobado o la transferencia confirmada lleva a Pagada; el comprador puede cancelar (Cancelada); o vence la reserva sin pago (Vencida). Si se confirma un pago tarde, Vencida pasa a A verificar. Pagada pasa a Entregada al correo cuando el administrador despacha, y después a Entregada.](docs/diagrams/estados.png)
 
-    [*] --> Pendiente: Comprar (se reserva el stock)
-    Pendiente --> Pagada: pago aprobado o transferencia confirmada
-    Pendiente --> Cancelada: el comprador cancela
-    Pendiente --> Vencida: vence la reserva sin pago
-    Vencida --> AVerificar: se confirma un pago tarde
-    Pagada --> AlCorreo: el administrador despacha
-    AlCorreo --> Entregada
-```
+Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 
 - El vencimiento depende del medio de pago: 20 minutos con Mercado Pago y 48 horas con transferencia (RN-08, RN-09).
 - La resolución de una venta *A verificar* es manual. **[?]** cómo se resuelve (reintegro o reasignación).
@@ -185,21 +182,21 @@ stateDiagram-v2
 2. Cuando no indica un motivo, entonces se rechaza. **[propuesta]**
 3. Cuando el ajuste dejaría el stock por debajo de lo reservado, entonces se rechaza.
 
-**HU-09 · Ver variantes con poco stock (admin).** Como administrador quiero filtrar las variantes con poco stock en el panel, para saber qué reponer, sin recibir mails. *(RN-01)*
-1. Cuando activa el filtro, entonces ve los productos cuyo stock disponible (sin reservas) es menor o igual al umbral, en el canal elegido.
-2. Los productos agotados se incluyen.
-3. Cada fila muestra producto, talle y stock disponible.
-4. Solo es accesible con el rol de administrador.
-5. Umbral por categoria (no por prenda o global) del stock online.
-6. **[?]** de dónde salen nombre, talle y color, porque Inventario solo conoce el identificador de la variante (D1/D5).
-7. Hay un segundo filtro, *stock a corregir*, que muestra las variantes con stock físico negativo (RN-25).
+**HU-09 · Ver el stock y las variantes a corregir (admin).** Como administrador quiero ver el stock de cada variante y cuáles tienen el stock físico mal registrado, para decidir qué reponer y qué corregir. *(RN-01, RN-25 · ADR-001)*
+1. Cuando abre un producto en el panel, entonces ve cada variante (talle y color) con su stock online, su stock físico y las unidades reservadas.
+2. Cuando activa el filtro *stock a corregir*, entonces ve las variantes con stock físico negativo, con producto, talle, color y stock físico.
+3. Solo es accesible con el rol de administrador.
+4. Dado que Catálogo no responde, cuando abre la vista, entonces ve un error claro en lugar de datos incompletos.
+
+> La versión anterior de esta historia pedía un filtro de poco stock con umbral por categoría. Se descartó en ADR-001: con el volumen actual no justifica su costo y el cliente controla el stock desde esta vista. Queda como posible evolución futura.
 
 ### Compra online
 
-**HU-10 · Carrito.** Como comprador quiero agregar prendas a un carrito, para comprar varias juntas. *(RN-07)*
+**HU-10 · Carrito.** Como comprador quiero agregar prendas a un carrito, para comprar varias juntas. *(RN-07 · ADR-001)*
 1. Cuando agrega una variante, entonces queda en el carrito sin reservar stock.
 2. Cuando pide más unidades que el stock online disponible, entonces ve un aviso.
 3. Dado un producto despublicado o sin stock en el carrito, cuando va a comprar, entonces se le avisa y no puede comprarlo.
+4. El carrito se guarda en el navegador del comprador: se conserva al recargar la página, pero no se comparte entre dispositivos.
 
 **HU-11 · Comprar con Mercado Pago.** Como comprador, registrado o invitado, quiero pagar con Mercado Pago, para comprar sin ir al local. *(RN-06, RN-07, RN-08, RN-11, RN-14, RN-18 · CU-01)*
 1. Cuando aprieta "Comprar", entonces las unidades quedan reservadas por 20 minutos y se crea la venta en *Pendiente de pago*.
@@ -222,7 +219,7 @@ stateDiagram-v2
 2. Dada una venta *Pagada*, cuando intenta cancelarla, entonces no puede. Debe contactar al cliente por mail o teléfono.
 
 **HU-14 · Ver mis compras.** Como comprador registrado quiero ver mis compras y su estado. *(RN-19)*
-1. Dado un comprador registrado, cuando entra a "Mis compras", entonces ve solo las suyas con su estado actual.
+1. Dado un comprador registrado, cuando entra a "Mis compras", entonces ve solo las compras hechas con su cuenta, con su estado actual.
 2. Dado un comprador sin sesión, cuando intenta acceder, entonces se le pide iniciar sesión.
 
 **HU-15 · Confirmar una transferencia (admin).** Como administrador quiero confirmar que llegó la transferencia, para cerrar esa venta. *(RN-09, RN-14 · CU-02)*
@@ -255,8 +252,8 @@ stateDiagram-v2
 **HU-18 · Registro e inicio de sesión.** Como comprador quiero registrarme e iniciar sesión, para ver mis compras.
 1. Cuando se registra con un email que ya existe, entonces se rechaza.
 2. Las contraseñas se guardan con hash y nunca se devuelven en ninguna respuesta.
-3. Cuando inicia sesión con datos correctos, entonces recibe un token. Con datos incorrectos recibe un error genérico que no revela si el email existe.
-4. Dado un invitado que compró con un email, cuando después se registra con ese email, entonces ve esas compras. **[propuesta]**
+3. Cuando inicia sesión con datos correctos, entonces recibe un token con vencimiento. Con datos incorrectos recibe un error genérico que no revela si el email existe.
+4. ~~Dado un invitado que compró con un email, cuando después se registra con ese email, entonces ve esas compras.~~ **Descartado** (ADR-001): sin verificación de email, cualquiera podría registrarse con un email ajeno y ver esos pedidos.
 
 **HU-19 · Acceso de administración.** Como administrador quiero que las funciones de administración solo se accedan con el rol de administrador. *(RN-23)*
 1. Dado un usuario con rol comprador, cuando llama a una operación de administración, entonces recibe "no autorizado".
@@ -270,6 +267,7 @@ stateDiagram-v2
 3. Cuando la venta pasa a *Entregada al correo*, entonces recibe un mail de pedido despachado.
 4. Dado un evento duplicado, entonces no se reenvía el mail, salvo en la ventana de falla entre el envío y su registro (limitación a documentar en D5).
 5. Dado que el servidor de mail falla, entonces se reintenta y, agotados los intentos, el mail queda registrado como fallido sin afectar la venta.
+6. Los mails se envían al email guardado en la venta al momento de comprar: el del invitado o el de la cuenta del comprador registrado.
 
 **HU-21 · Mails al administrador.** Como administrador quiero enterarme de las ventas y de lo que está pendiente.
 1. Cuando una venta pasa a *Pagada*, entonces recibe un mail de venta nueva. **[propuesta]** en ese momento.
@@ -293,10 +291,10 @@ stateDiagram-v2
 **Precondición:** hay stock online disponible de cada variante del carrito.
 
 **Flujo principal**
-1. El comprador, registrado o invitado, revisa el carrito y aprieta "Comprar".
-2. Completa sus datos (como mínimo el email, RN-11) y elige Mercado Pago.
+1. El comprador, registrado o invitado, revisa el carrito y aprieta "Comprar". El frontend envía el contenido del carrito a Ventas.
+2. El invitado completa sus datos (como mínimo el email, RN-11). El registrado usa el email de su cuenta, que llega en el token. Elige Mercado Pago.
 3. Ventas obtiene de Catálogo el precio vigente de cada variante. **[propuesta]**
-4. Ventas crea la venta en *Pendiente de pago*, con una clave de idempotencia.
+4. Ventas crea la venta en *Pendiente de pago*, con una clave de idempotencia, y guarda el email del comprador.
 5. Ventas le pide a Inventario reservar las unidades por 20 minutos (llamada síncrona, con timeout).
 6. Ventas crea el pago en Mercado Pago y redirige al comprador.
 7. Mercado Pago avisa que el pago fue aprobado.
@@ -362,8 +360,26 @@ stateDiagram-v2
 
 ## 11. Integración con otros grupos
 
-- **Capacidad a publicar:** se propone la reserva de stock, de Inventario. Se confirma al coordinar en clase. El contrato va en `docs/contracts/`.
-- **Capacidad a consumir:** **[?]** la asigna la cátedra.
+### Capacidad a publicar
+
+El grupo consumidor tiene otro dominio, así que la capacidad no depende de la ropa. Se proponen dos opciones y se publica **una sola**, elegida según el grupo que asigne la cátedra **[?]**.
+
+| Opción | Qué ofrece | Servicio | Contrato |
+|---|---|---|---|
+| **A · Reserva de cupos** | El consumidor registra cupos (un identificador y una cantidad), los reserva por un tiempo y los confirma o libera. Si no hace nada, vencen solos. Nunca se reserva más de lo disponible. | Inventario | `docs/contracts/cupos-v1.openapi.yaml` |
+| **B · Envío de emails** | El consumidor manda destinatario, asunto y texto ya armados, para enviar ya o programado. FAV lo envía con reintentos; el consumidor consulta el estado o lo cancela antes del envío. | Ventas | `docs/contracts/emails-v1.openapi.yaml` |
+
+Reglas comunes:
+- Cada grupo consumidor tiene una clave propia y solo ve y opera lo suyo **[propuesta]**.
+- Un reintento por un error de red no duplica reservas ni emails (clave de idempotencia).
+- No se suman servicios: la capacidad es una entrada aparte de un servicio existente.
+- Existe por la materia: al terminar la cursada se puede quitar y entregar al cliente el sistema sin ella.
+
+El uso de cada opción está en `docs/contracts/README.md` y la decisión se justifica en el ADR-008 (D8).
+
+### Capacidad a consumir
+
+**[?]** La asigna la cátedra.
 
 ## 12. Pendientes
 
@@ -374,15 +390,14 @@ stateDiagram-v2
 | Cómo se resuelve una venta *A verificar* (reintegro o reasignación) | RN-14 |
 | Cómo cobra con Mercado Pago en el local (fuera del sistema o desde el sistema) | RN-18 |
 | Datos de contacto (mail y teléfono) | RN-21, HU-24 |
-| Valor del umbral de poco stock para cada categoría | HU-09 |
+| Avisarle que el filtro de poco stock no entra en v1 y que se reemplaza por la vista de stock por producto | HU-09 |
 | Cuántos productos piensa tener | Dimensionamiento (D13) |
 | Una versión del Excel de stock, para ver la estructura | Carga inicial |
 
 ### Del equipo
 | Tema | Dónde se resuelve |
 |---|---|
-| De dónde salen nombre, talle y color en el listado de poco stock | D1 / D5 |
-| Cómo obtiene Ventas el email de un comprador registrado | D1 |
 | Cómo se dispara el envío de mails sin bloquear la venta | D5 |
-| Autenticación del consumidor externo de la capacidad publicada | D8 |
+| Elegir la capacidad a publicar (A o B) según el grupo consumidor | D8 |
+| Cómo se entrega y se rota la clave de cada grupo consumidor | D8 |
 | Retraso máximo del índice de búsqueda | D6 |
