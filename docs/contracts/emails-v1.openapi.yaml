@@ -1,0 +1,440 @@
+openapi: 3.0.3
+info:
+  title: FAV · Envío de emails (Opción B)
+  version: 1.0.0
+  description: |
+    Capacidad propuesta por el grupo FAV, servida por su servicio **Ventas**
+    (entrada aparte para otros grupos, que reutiliza el envío de mails de FAV).
+
+    El consumidor manda destinatario, asunto y texto **ya armados**, para enviar ahora
+    o en una fecha programada. FAV lo entrega con reintentos e informa su estado.
+    FAV no decide ni interpreta el contenido. No hay plantillas en esta versión [propuesta].
+
+    El envío es **asincrónico**: el pedido se responde con `202` apenas se registra,
+    sin esperar al proveedor de mail. El estado se consulta después.
+
+    `ENVIADO` significa que el proveedor de mail aceptó el mensaje; no garantiza que
+    llegue a la bandeja de entrada.
+
+    Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
+    **[?]** proveedor de mail, dirección remitente y tiempo de conservación de los mensajes.
+servers:
+  - url: http://localhost:8091
+    description: Mock local (`mocks/emails-v1/`). Puerto [propuesta].
+  - url: https://pendiente.example
+    description: Entorno desplegado. [?] proveedor de nube.
+security:
+  - ClaveDeGrupo: []
+tags:
+  - name: Emails
+
+paths:
+  /v1/emails:
+    post:
+      tags: [Emails]
+      operationId: enviarEmail
+      summary: Pedir el envío de un email (inmediato o programado)
+      description: |
+        Registra el email y responde enseguida. Idempotente con `Idempotency-Key`:
+        repetir el pedido con la misma clave y el mismo cuerpo devuelve el mismo email,
+        sin enviarlo dos veces.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoEmail'
+            examples:
+              programado:
+                summary: Recordatorio programado
+                value:
+                  destinatario: paciente@example.com
+                  asunto: Recordatorio de turno
+                  texto: Tu turno es mañana a las 10:00.
+                  enviarEn: '2026-10-14T12:00:00Z'
+                  referenciaExterna: turno-981
+              inmediato:
+                summary: Envío inmediato
+                value:
+                  destinatario: cliente@example.com
+                  asunto: Pedido confirmado
+                  texto: Tu pedido 4521 fue confirmado.
+      responses:
+        '202':
+          description: Email registrado (o el mismo, si se repite la clave de idempotencia).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Email'
+              examples:
+                programado:
+                  $ref: '#/components/examples/EmailProgramado'
+        '400':
+          $ref: '#/components/responses/PedidoInvalido'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '409':
+          description: '`CLAVE_IDEMPOTENCIA_REUTILIZADA`: la clave ya se usó con un cuerpo distinto.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              example:
+                type: https://fav.example/errores/clave-idempotencia-reutilizada
+                title: Clave de idempotencia reutilizada
+                status: 409
+                codigo: CLAVE_IDEMPOTENCIA_REUTILIZADA
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /v1/emails/{emailId}:
+    get:
+      tags: [Emails]
+      operationId: consultarEmail
+      summary: Consultar el estado de un email
+      parameters:
+        - $ref: '#/components/parameters/EmailId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Estado actual del email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Email'
+              examples:
+                enviado:
+                  $ref: '#/components/examples/EmailEnviado'
+                fallido:
+                  $ref: '#/components/examples/EmailFallido'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          $ref: '#/components/responses/EmailInexistente'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /v1/emails/{emailId}/cancelar:
+    post:
+      tags: [Emails]
+      operationId: cancelarEmail
+      summary: Cancelar un email que todavía no se envió
+      description: |
+        Solo se cancela un email `PROGRAMADO`. Cancelar uno ya cancelado devuelve `200`
+        sin efecto adicional.
+      parameters:
+        - $ref: '#/components/parameters/EmailId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Email cancelado (o ya estaba cancelado).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Email'
+              examples:
+                cancelado:
+                  $ref: '#/components/examples/EmailCancelado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          $ref: '#/components/responses/EmailInexistente'
+        '409':
+          description: '`EMAIL_NO_CANCELABLE`: el email ya se envió o ya falló.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              example:
+                type: https://fav.example/errores/email-no-cancelable
+                title: El email no se puede cancelar
+                status: 409
+                detail: El email ya fue enviado.
+                codigo: EMAIL_NO_CANCELABLE
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+components:
+  securitySchemes:
+    ClaveDeGrupo:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Clave propia de cada grupo consumidor, entregada por FAV. Cada grupo ve solo sus emails.
+        **[propuesta]** mecanismo; **[?]** cómo se entrega y se rota.
+
+  parameters:
+    EmailId:
+      name: emailId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: 9b2e7c41-0d3a-4f6e-8a51-2c7d9e0f1a23
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Clave única por email lógico (se recomienda un UUID). Ante timeout, `500` o `503`,
+        reintentar con la misma clave. Vigencia [propuesta]: 48 horas.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 100
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Identificador para seguir la operación en los logs de ambos sistemas. Se devuelve en la respuesta.
+      schema:
+        type: string
+        maxLength: 100
+
+  schemas:
+    PedidoEmail:
+      type: object
+      additionalProperties: false
+      required: [destinatario, asunto, texto]
+      properties:
+        destinatario:
+          type: string
+          format: email
+          maxLength: 254
+          description: Un solo destinatario por email.
+        asunto:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Límite [propuesta].
+        texto:
+          type: string
+          minLength: 1
+          maxLength: 10000
+          description: Texto plano, sin HTML. Límite [propuesta].
+        enviarEn:
+          type: string
+          format: date-time
+          description: |
+            Momento de envío (UTC). Si se omite, se envía lo antes posible.
+            Debe ser futuro y a no más de 30 días [propuesta]; si no, `PEDIDO_INVALIDO`.
+        referenciaExterna:
+          type: string
+          maxLength: 100
+          description: Identificador en el sistema consumidor. Se guarda y se devuelve.
+
+    Email:
+      type: object
+      required: [id, estado, destinatario, asunto, creadoEn, intentos]
+      properties:
+        id:
+          type: string
+          format: uuid
+        estado:
+          type: string
+          enum: [PROGRAMADO, ENVIADO, FALLIDO, CANCELADO]
+          description: |
+            - `PROGRAMADO`: registrado, pendiente de envío (inmediato o en `enviarEn`). Se puede cancelar.
+            - `ENVIADO`: el proveedor de mail lo aceptó. Final.
+            - `FALLIDO`: se agotaron los reintentos. Final.
+            - `CANCELADO`: cancelado por el consumidor antes del envío. Final.
+        destinatario:
+          type: string
+        asunto:
+          type: string
+        referenciaExterna:
+          type: string
+        enviarEn:
+          type: string
+          format: date-time
+        creadoEn:
+          type: string
+          format: date-time
+        enviadoEn:
+          type: string
+          format: date-time
+          description: Solo en `ENVIADO`.
+        intentos:
+          type: integer
+          description: Intentos de envío realizados. Máximo [propuesta] 5.
+        motivoFalla:
+          type: string
+          description: Solo en `FALLIDO`. Texto informativo; no interpretarlo.
+
+    Problema:
+      type: object
+      description: Error en formato Problem Details (RFC 9457) con un `codigo` estable. Decidir siempre por `codigo`.
+      required: [type, title, status, codigo]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        codigo:
+          type: string
+          enum:
+            - PEDIDO_INVALIDO
+            - NO_AUTENTICADO
+            - CLAVE_IDEMPOTENCIA_REUTILIZADA
+            - EMAIL_INEXISTENTE
+            - EMAIL_NO_CANCELABLE
+            - LIMITE_EXCEDIDO
+            - ERROR_INTERNO
+            - NO_DISPONIBLE
+        correlationId:
+          type: string
+        errores:
+          type: array
+          description: Solo en `PEDIDO_INVALIDO`.
+          items:
+            type: object
+            required: [campo, mensaje]
+            properties:
+              campo:
+                type: string
+              mensaje:
+                type: string
+
+  responses:
+    PedidoInvalido:
+      description: '`PEDIDO_INVALIDO`: falta un header obligatorio, el email no es válido, un campo excede su límite o `enviarEn` está fuera de rango. No reintentar.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/pedido-invalido
+            title: Pedido inválido
+            status: 400
+            codigo: PEDIDO_INVALIDO
+            errores:
+              - campo: destinatario
+                mensaje: no es una dirección de email válida
+    NoAutenticado:
+      description: '`NO_AUTENTICADO`: falta la clave del grupo o no es válida.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/no-autenticado
+            title: No autenticado
+            status: 401
+            codigo: NO_AUTENTICADO
+    EmailInexistente:
+      description: '`EMAIL_INEXISTENTE`: el email no existe o no pertenece a este grupo.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/email-inexistente
+            title: El email no existe
+            status: 404
+            codigo: EMAIL_INEXISTENTE
+    LimiteExcedido:
+      description: '`LIMITE_EXCEDIDO`: demasiados pedidos del grupo. Reintentar después de `Retry-After`. [?] valor del límite.'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/limite-excedido
+            title: Límite de pedidos excedido
+            status: 429
+            codigo: LIMITE_EXCEDIDO
+    ErrorInterno:
+      description: '`ERROR_INTERNO`: error inesperado. Se puede reintentar con la misma `Idempotency-Key`.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/error-interno
+            title: Error interno
+            status: 500
+            codigo: ERROR_INTERNO
+    NoDisponible:
+      description: '`NO_DISPONIBLE`: el servicio no está disponible. Se puede reintentar con la misma `Idempotency-Key`.'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/no-disponible
+            title: Servicio no disponible
+            status: 503
+            codigo: NO_DISPONIBLE
+
+  examples:
+    EmailProgramado:
+      value:
+        id: 9b2e7c41-0d3a-4f6e-8a51-2c7d9e0f1a23
+        estado: PROGRAMADO
+        destinatario: paciente@example.com
+        asunto: Recordatorio de turno
+        referenciaExterna: turno-981
+        enviarEn: '2026-10-14T12:00:00Z'
+        creadoEn: '2026-10-09T17:00:00Z'
+        intentos: 0
+    EmailEnviado:
+      value:
+        id: 9b2e7c41-0d3a-4f6e-8a51-2c7d9e0f1a23
+        estado: ENVIADO
+        destinatario: paciente@example.com
+        asunto: Recordatorio de turno
+        referenciaExterna: turno-981
+        enviarEn: '2026-10-14T12:00:00Z'
+        creadoEn: '2026-10-09T17:00:00Z'
+        enviadoEn: '2026-10-14T12:00:03Z'
+        intentos: 1
+    EmailFallido:
+      value:
+        id: 9b2e7c41-0d3a-4f6e-8a51-2c7d9e0f1a23
+        estado: FALLIDO
+        destinatario: paciente@example.com
+        asunto: Recordatorio de turno
+        referenciaExterna: turno-981
+        enviarEn: '2026-10-14T12:00:00Z'
+        creadoEn: '2026-10-09T17:00:00Z'
+        intentos: 5
+        motivoFalla: El proveedor de mail rechazó el destinatario.
+    EmailCancelado:
+      value:
+        id: 9b2e7c41-0d3a-4f6e-8a51-2c7d9e0f1a23
+        estado: CANCELADO
+        destinatario: paciente@example.com
+        asunto: Recordatorio de turno
+        referenciaExterna: turno-981
+        enviarEn: '2026-10-14T12:00:00Z'
+        creadoEn: '2026-10-09T17:00:00Z'
+        intentos: 0

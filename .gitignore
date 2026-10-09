@@ -1,0 +1,32 @@
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Documentos de la cátedra y notas internas (no se suben)
+Enunciado*.pdf
+preguntas-catedra.md
+
+# Go
+bin/
+*.exe
+*.test
+*.out
+coverage.*
+go.work.sum
+
+# Node (frontend)
+node_modules/
+dist/
+build/
+
+# IDE y sistema
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Datos locales de los contenedores
+.data/

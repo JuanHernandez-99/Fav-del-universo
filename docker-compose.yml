@@ -1,0 +1,106 @@
+# Arranque local (previsto). En la Entrega 1 solo está la infraestructura:
+# los servicios están comentados hasta que existan su código y su Dockerfile.
+# Uso: cp .env.example .env  →  docker compose up
+# Versiones de las imágenes y puertos: [propuesta]
+
+services:
+  # ---------- Bases de datos: una por servicio ----------
+  mongo-catalogo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    volumes: [mongo-catalogo-data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-inventario:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${INVENTARIO_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${INVENTARIO_DB_NAME}
+      MYSQL_USER: ${INVENTARIO_DB_USER}
+      MYSQL_PASSWORD: ${INVENTARIO_DB_PASSWORD}
+    volumes: [mysql-inventario-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mysql-ventas:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${VENTAS_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${VENTAS_DB_NAME}
+      MYSQL_USER: ${VENTAS_DB_USER}
+      MYSQL_PASSWORD: ${VENTAS_DB_PASSWORD}
+    volumes: [mysql-ventas-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mysql-usuarios:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${USUARIOS_DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${USUARIOS_DB_NAME}
+      MYSQL_USER: ${USUARIOS_DB_USER}
+      MYSQL_PASSWORD: ${USUARIOS_DB_PASSWORD}
+    volumes: [mysql-usuarios-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------- Mensajería ----------
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "15672:15672" # consola web
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------- Servicios (previstos: descomentar al crear cada Dockerfile) ----------
+  # catalogo:
+  #   build: ./services/catalogo
+  #   deploy: { replicas: 2 } # [propuesta] dos réplicas (D12)
+  #   depends_on: { mongo-catalogo: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+  #
+  # inventario:
+  #   build: ./services/inventario
+  #   depends_on: { mysql-inventario: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+  #
+  # ventas:
+  #   build: ./services/ventas
+  #   depends_on: { mysql-ventas: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+  #
+  # usuarios:
+  #   build: ./services/usuarios
+  #   depends_on: { mysql-usuarios: { condition: service_healthy } }
+  #
+  # gateway:
+  #   build: ./gateway
+  #   ports: ["8080:8080"] # [propuesta]
+  #
+  # frontend:
+  #   build: ./frontend
+  #   ports: ["3000:3000"] # [propuesta]
+
+volumes:
+  mongo-catalogo-data:
+  mysql-inventario-data:
+  mysql-ventas-data:
+  mysql-usuarios-data:

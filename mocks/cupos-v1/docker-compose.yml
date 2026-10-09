@@ -1,0 +1,10 @@
+# Mock del contrato cupos-v1 (opción A). Responde con los ejemplos del contrato.
+# Uso: docker compose up   →   http://localhost:8090
+services:
+  mock-cupos-v1:
+    image: stoplight/prism:5 # versión [propuesta]
+    command: mock -h 0.0.0.0 -p 4010 /contracts/cupos-v1.openapi.yaml
+    volumes:
+      - ../../docs/contracts:/contracts:ro
+    ports:
+      - "8090:4010"

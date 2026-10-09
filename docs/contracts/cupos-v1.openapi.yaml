@@ -1,0 +1,627 @@
+openapi: 3.0.3
+info:
+  title: FAV · Reserva de cupos con vencimiento (Opción A)
+  version: 1.0.0
+  description: |
+    Capacidad propuesta por el grupo FAV, servida por su servicio **Inventario**.
+
+    Permite a otro sistema registrar **cupos** (algo limitado, con una cantidad) y
+    **reservarlos** durante un tiempo. La reserva se **confirma** (las unidades se
+    consumen), se **libera** (vuelven a estar disponibles) o **vence** sola.
+
+    FAV no interpreta qué representa un cupo: para FAV es solo un identificador y un número.
+    Cada grupo consumidor ve y opera únicamente sus propios cupos y reservas.
+
+    Disponible = capacidad − reservado − confirmado. Nunca se reserva más de lo disponible.
+
+    Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
+servers:
+  - url: http://localhost:8090
+    description: Mock local (`mocks/cupos-v1/`). Puerto [propuesta].
+  - url: https://pendiente.example
+    description: Entorno desplegado. [?] proveedor de nube.
+security:
+  - ClaveDeGrupo: []
+tags:
+  - name: Cupos
+    description: Registrar cupos y consultar su disponibilidad.
+  - name: Reservas
+    description: Reservar, confirmar y liberar cupos.
+
+paths:
+  /v1/cupos/{cupoId}:
+    parameters:
+      - $ref: '#/components/parameters/CupoId'
+      - $ref: '#/components/parameters/CorrelationId'
+    put:
+      tags: [Cupos]
+      operationId: registrarCupo
+      summary: Registrar un cupo o ajustar su capacidad
+      description: |
+        Crea el cupo si no existe o cambia su capacidad total si ya existe.
+        Repetir la misma llamada no tiene efecto adicional (idempotente).
+
+        No se puede bajar la capacidad por debajo de lo que ya está reservado o confirmado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoCupo'
+            example:
+              descripcion: Tortas del sábado 10/10
+              capacidad: 10
+      responses:
+        '200':
+          description: Cupo actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cupo'
+              examples:
+                ejemplo:
+                  $ref: '#/components/examples/CupoConReservas'
+        '201':
+          description: Cupo creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cupo'
+              examples:
+                ejemplo:
+                  $ref: '#/components/examples/CupoNuevo'
+        '400':
+          $ref: '#/components/responses/PedidoInvalido'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '409':
+          description: '`CAPACIDAD_MENOR_QUE_EN_USO`: la nueva capacidad es menor que lo reservado más lo confirmado.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              example:
+                type: https://fav.example/errores/capacidad-menor-que-en-uso
+                title: Capacidad menor que la que está en uso
+                status: 409
+                detail: Hay 6 unidades reservadas o confirmadas; la capacidad no puede ser menor que 6.
+                codigo: CAPACIDAD_MENOR_QUE_EN_USO
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+    get:
+      tags: [Cupos]
+      operationId: consultarCupo
+      summary: Consultar la disponibilidad de un cupo
+      responses:
+        '200':
+          description: Estado actual del cupo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cupo'
+              examples:
+                ejemplo:
+                  $ref: '#/components/examples/CupoConReservas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          $ref: '#/components/responses/CupoInexistente'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /v1/reservas:
+    post:
+      tags: [Reservas]
+      operationId: reservar
+      summary: Reservar unidades de uno o más cupos
+      description: |
+        Reserva **todas** las unidades pedidas o **ninguna**.
+
+        Idempotente con el header `Idempotency-Key`: repetir el pedido con la misma clave
+        y el mismo cuerpo devuelve la misma reserva, sin reservar dos veces.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoReserva'
+            example:
+              referenciaExterna: pedido-4521
+              vencimientoMinutos: 1440
+              items:
+                - cupoId: tortas-2026-10-10
+                  cantidad: 1
+      responses:
+        '201':
+          description: Reserva creada (o la misma, si se repite la clave de idempotencia).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reserva'
+              examples:
+                ejemplo:
+                  $ref: '#/components/examples/ReservaActiva'
+        '400':
+          $ref: '#/components/responses/PedidoInvalido'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '409':
+          description: |
+            - `CUPO_INSUFICIENTE`: algún cupo no alcanza. `faltantes` indica cuáles. No se reservó nada.
+            - `CLAVE_IDEMPOTENCIA_REUTILIZADA`: la clave ya se usó con un cuerpo distinto.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              examples:
+                cupoInsuficiente:
+                  value:
+                    type: https://fav.example/errores/cupo-insuficiente
+                    title: Cupo insuficiente
+                    status: 409
+                    detail: Al menos un cupo no alcanza. No se reservó ninguna unidad.
+                    codigo: CUPO_INSUFICIENTE
+                    faltantes:
+                      - cupoId: tortas-2026-10-10
+                        solicitada: 1
+                        disponible: 0
+                claveReutilizada:
+                  value:
+                    type: https://fav.example/errores/clave-idempotencia-reutilizada
+                    title: Clave de idempotencia reutilizada
+                    status: 409
+                    codigo: CLAVE_IDEMPOTENCIA_REUTILIZADA
+        '422':
+          description: '`CUPO_INEXISTENTE`: algún cupo no existe (o no es de este grupo). No se reservó nada.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              example:
+                type: https://fav.example/errores/cupo-inexistente
+                title: Cupo inexistente
+                status: 422
+                detail: El cupo tortas-2026-10-11 no existe.
+                codigo: CUPO_INEXISTENTE
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /v1/reservas/{reservaId}/confirmar:
+    post:
+      tags: [Reservas]
+      operationId: confirmarReserva
+      summary: Confirmar una reserva (las unidades se consumen)
+      description: |
+        Solo se confirma una reserva `ACTIVA`. Confirmar una ya confirmada devuelve `200`
+        sin efecto adicional. Si la confirmación coincide con el vencimiento, gana una sola.
+      parameters:
+        - $ref: '#/components/parameters/ReservaId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Reserva confirmada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reserva'
+              examples:
+                ejemplo:
+                  $ref: '#/components/examples/ReservaConfirmada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          $ref: '#/components/responses/ReservaInexistente'
+        '409':
+          description: |
+            - `RESERVA_VENCIDA`: venció antes de confirmarse.
+            - `RESERVA_LIBERADA`: se liberó antes de confirmarse.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              example:
+                type: https://fav.example/errores/reserva-vencida
+                title: La reserva venció
+                status: 409
+                codigo: RESERVA_VENCIDA
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /v1/reservas/{reservaId}/liberar:
+    post:
+      tags: [Reservas]
+      operationId: liberarReserva
+      summary: Liberar una reserva antes de que venza
+      description: |
+        Las unidades vuelven a estar disponibles. Liberar una reserva ya liberada o vencida
+        devuelve `200` con su estado actual, sin efecto adicional.
+      parameters:
+        - $ref: '#/components/parameters/ReservaId'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Reserva liberada (o ya estaba liberada o vencida).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reserva'
+              examples:
+                ejemplo:
+                  $ref: '#/components/examples/ReservaLiberada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          $ref: '#/components/responses/ReservaInexistente'
+        '409':
+          description: '`RESERVA_CONFIRMADA`: ya se confirmó y no se puede liberar.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              example:
+                type: https://fav.example/errores/reserva-confirmada
+                title: La reserva ya fue confirmada
+                status: 409
+                codigo: RESERVA_CONFIRMADA
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+components:
+  securitySchemes:
+    ClaveDeGrupo:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        Clave propia de cada grupo consumidor, entregada por FAV. Separa los cupos y reservas
+        de cada grupo. **[propuesta]** mecanismo; **[?]** cómo se entrega y se rota.
+
+  parameters:
+    CupoId:
+      name: cupoId
+      in: path
+      required: true
+      description: Identificador del cupo, elegido por el consumidor. Único dentro de su grupo.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9._-]{1,100}$'
+      example: tortas-2026-10-10
+    ReservaId:
+      name: reservaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Clave única por intento lógico (se recomienda un UUID). Ante timeout, `500` o `503`,
+        reintentar con la misma clave. Vigencia [propuesta]: 48 horas.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 100
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Identificador para seguir la operación en los logs de ambos sistemas. Se devuelve en la respuesta.
+      schema:
+        type: string
+        maxLength: 100
+
+  schemas:
+    PedidoCupo:
+      type: object
+      additionalProperties: false
+      required: [capacidad]
+      properties:
+        descripcion:
+          type: string
+          maxLength: 200
+          description: Texto libre para el consumidor. FAV no lo interpreta.
+        capacidad:
+          type: integer
+          minimum: 0
+          description: Cantidad total de unidades del cupo.
+
+    Cupo:
+      type: object
+      required: [cupoId, capacidad, reservado, confirmado, disponible]
+      properties:
+        cupoId:
+          type: string
+        descripcion:
+          type: string
+        capacidad:
+          type: integer
+        reservado:
+          type: integer
+          description: Unidades en reservas activas.
+        confirmado:
+          type: integer
+          description: Unidades ya consumidas por reservas confirmadas.
+        disponible:
+          type: integer
+          description: capacidad − reservado − confirmado.
+
+    PedidoReserva:
+      type: object
+      additionalProperties: false
+      required: [vencimientoMinutos, items]
+      properties:
+        referenciaExterna:
+          type: string
+          maxLength: 100
+          description: Identificador del pedido en el sistema consumidor. Se guarda y se devuelve.
+        vencimientoMinutos:
+          type: integer
+          minimum: 1
+          maximum: 2880
+          description: Duración de la reserva. Rango [propuesta] de 1 minuto a 48 horas.
+        items:
+          type: array
+          minItems: 1
+          description: Un cupo no puede repetirse.
+          items:
+            $ref: '#/components/schemas/Item'
+
+    Item:
+      type: object
+      additionalProperties: false
+      required: [cupoId, cantidad]
+      properties:
+        cupoId:
+          type: string
+        cantidad:
+          type: integer
+          minimum: 1
+
+    Reserva:
+      type: object
+      required: [id, estado, items, creadaEn, venceEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        estado:
+          type: string
+          enum: [ACTIVA, CONFIRMADA, LIBERADA, VENCIDA]
+          description: |
+            - `ACTIVA`: unidades apartadas; se puede confirmar o liberar.
+            - `CONFIRMADA`: unidades consumidas. Final.
+            - `LIBERADA`: liberada por el consumidor. Final.
+            - `VENCIDA`: pasó `venceEn` sin confirmarse. Final.
+        referenciaExterna:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+        creadaEn:
+          type: string
+          format: date-time
+        venceEn:
+          type: string
+          format: date-time
+
+    Problema:
+      type: object
+      description: Error en formato Problem Details (RFC 9457) con un `codigo` estable. Decidir siempre por `codigo`.
+      required: [type, title, status, codigo]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        codigo:
+          type: string
+          enum:
+            - PEDIDO_INVALIDO
+            - NO_AUTENTICADO
+            - CUPO_INEXISTENTE
+            - CUPO_INSUFICIENTE
+            - CAPACIDAD_MENOR_QUE_EN_USO
+            - CLAVE_IDEMPOTENCIA_REUTILIZADA
+            - RESERVA_INEXISTENTE
+            - RESERVA_VENCIDA
+            - RESERVA_LIBERADA
+            - RESERVA_CONFIRMADA
+            - LIMITE_EXCEDIDO
+            - ERROR_INTERNO
+            - NO_DISPONIBLE
+        correlationId:
+          type: string
+        faltantes:
+          type: array
+          description: Solo en `CUPO_INSUFICIENTE`.
+          items:
+            type: object
+            required: [cupoId, solicitada, disponible]
+            properties:
+              cupoId:
+                type: string
+              solicitada:
+                type: integer
+              disponible:
+                type: integer
+        errores:
+          type: array
+          description: Solo en `PEDIDO_INVALIDO`.
+          items:
+            type: object
+            required: [campo, mensaje]
+            properties:
+              campo:
+                type: string
+              mensaje:
+                type: string
+
+  responses:
+    PedidoInvalido:
+      description: '`PEDIDO_INVALIDO`: falta un header obligatorio, el cuerpo no cumple el esquema o un cupo está repetido. No reintentar.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/pedido-invalido
+            title: Pedido inválido
+            status: 400
+            codigo: PEDIDO_INVALIDO
+            errores:
+              - campo: items[0].cantidad
+                mensaje: debe ser mayor o igual a 1
+    NoAutenticado:
+      description: '`NO_AUTENTICADO`: falta la clave del grupo o no es válida.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/no-autenticado
+            title: No autenticado
+            status: 401
+            codigo: NO_AUTENTICADO
+    CupoInexistente:
+      description: '`CUPO_INEXISTENTE`: el cupo no existe o no pertenece a este grupo.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/cupo-inexistente
+            title: Cupo inexistente
+            status: 404
+            codigo: CUPO_INEXISTENTE
+    ReservaInexistente:
+      description: '`RESERVA_INEXISTENTE`: la reserva no existe o no pertenece a este grupo.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/reserva-inexistente
+            title: La reserva no existe
+            status: 404
+            codigo: RESERVA_INEXISTENTE
+    LimiteExcedido:
+      description: '`LIMITE_EXCEDIDO`: demasiados pedidos del grupo. Reintentar después de `Retry-After`. [?] valor del límite.'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/limite-excedido
+            title: Límite de pedidos excedido
+            status: 429
+            codigo: LIMITE_EXCEDIDO
+    ErrorInterno:
+      description: '`ERROR_INTERNO`: error inesperado. Se puede reintentar (en reservar, con la misma `Idempotency-Key`).'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/error-interno
+            title: Error interno
+            status: 500
+            codigo: ERROR_INTERNO
+    NoDisponible:
+      description: '`NO_DISPONIBLE`: el servicio o una dependencia no está disponible. Se puede reintentar.'
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://fav.example/errores/no-disponible
+            title: Servicio no disponible
+            status: 503
+            codigo: NO_DISPONIBLE
+
+  examples:
+    CupoNuevo:
+      value:
+        cupoId: tortas-2026-10-10
+        descripcion: Tortas del sábado 10/10
+        capacidad: 10
+        reservado: 0
+        confirmado: 0
+        disponible: 10
+    CupoConReservas:
+      value:
+        cupoId: tortas-2026-10-10
+        descripcion: Tortas del sábado 10/10
+        capacidad: 10
+        reservado: 2
+        confirmado: 4
+        disponible: 4
+    ReservaActiva:
+      value:
+        id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        estado: ACTIVA
+        referenciaExterna: pedido-4521
+        items:
+          - cupoId: tortas-2026-10-10
+            cantidad: 1
+        creadaEn: '2026-10-09T15:00:00Z'
+        venceEn: '2026-10-10T15:00:00Z'
+    ReservaConfirmada:
+      value:
+        id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        estado: CONFIRMADA
+        referenciaExterna: pedido-4521
+        items:
+          - cupoId: tortas-2026-10-10
+            cantidad: 1
+        creadaEn: '2026-10-09T15:00:00Z'
+        venceEn: '2026-10-10T15:00:00Z'
+    ReservaLiberada:
+      value:
+        id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
+        estado: LIBERADA
+        referenciaExterna: pedido-4521
+        items:
+          - cupoId: tortas-2026-10-10
+            cantidad: 1
+        creadaEn: '2026-10-09T15:00:00Z'
+        venceEn: '2026-10-10T15:00:00Z'
