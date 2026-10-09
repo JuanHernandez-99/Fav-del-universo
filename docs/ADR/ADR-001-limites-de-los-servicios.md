@@ -44,8 +44,7 @@ Cuatro microservicios, cada uno con su base de datos, detrás de un API Gateway,
 | Relación | Tipo | Para qué |
 |---|---|---|
 | Ventas → Catálogo | Síncrona | Precio vigente y datos de la variante, al comprar o al registrar una venta del local. |
-| Ventas → Inventario | Síncrona | Reservar, liberar y descontar stock. |
-| Ventas → Inventario | Evento `VentaPagada` | Convertir la reserva en descuento definitivo. **[?]** Puede pasar a ser síncrona; se decide en ADR-005. |
+| Ventas → Inventario | Síncrona | Reservar, liberar, confirmar (descuento definitivo al pagar) y descontar stock. La confirmación es síncrona para que Inventario decida la carrera entre pago y vencimiento (ADR-005). |
 | Inventario → Ventas | Evento `ReservaVencida` | Pasar la venta a *Vencida*. |
 | Catálogo → Inventario | Evento `VarianteCreada` | Registrar la variante con stock 0 en ambos canales. |
 | Usuarios | Ninguna | El gateway valida el token con la clave pública de Usuarios, sin llamarlo. |
@@ -146,7 +145,6 @@ En las dos, el consumidor externo depende de un solo servicio y la capacidad es 
 ## Pendientes
 
 - **Qué capacidad se publica (A o B).** Se elige según el grupo consumidor que asigne la cátedra. Cambia qué servicio la expone, no los límites (ADR-008).
-- **Confirmación de la reserva:** evento `VentaPagada` o llamada síncrona. Cambia una fila de la tabla de relaciones, no los límites (ADR-005).
 - **Firma y vencimiento del token, y dónde lo guarda el frontend:** se confirman al implementar el gateway y el frontend.
 
 ## Validación prevista (Entrega 2)

@@ -6,7 +6,7 @@
 >
 > El alcance funcional (reglas, historias y casos de uso) está en [`SPEC.md`](../SPEC.md). Las decisiones se justifican en [`docs/adr/`](adr/).
 >
-> **Cambios en 0.5:** la capacidad publicada pasa a ser una de dos opciones, A (reserva de cupos, en Inventario) o B (envío de emails, en Ventas), sin servicios nuevos (§6).
+> **Cambios en 0.5:** la capacidad publicada pasa a ser una de dos opciones, A (reserva de cupos, en Inventario) o B (envío de emails, en Ventas), sin servicios nuevos (§6). La reserva se confirma con una llamada síncrona a Inventario y desaparece el evento `VentaPagada` (ADR-005).
 >
 > **Cambios en 0.4** (ADR-001): identidad del comprador en el token, carrito en el navegador y vista de stock del panel compuesta en el frontend.
 
@@ -105,7 +105,7 @@ Al iniciar sesión, Usuarios emite un JWT con `sub` (id), `email`, `role`, `iat`
 | Frontend → Gateway → servicios                           | Todas las operaciones del usuario                                                                 | Token validado en el gateway; rate limiting                                         | Error claro en la interfaz                                   |
 | Frontend (panel) → Catálogo e Inventario                 | Vista de stock por producto y filtro _stock a corregir_: el frontend junta variantes y cantidades | Token de administrador                                                              | Si falla Catálogo, error claro en lugar de datos incompletos |
 | Ventas → Catálogo                                        | Precio vigente al comprar **[propuesta]**                                                         | Timeout                                                                             | No se puede iniciar la compra; error claro                   |
-| Ventas → Inventario                                      | Reservar, liberar y descontar stock                                                               | Timeout, reintento acotado solo ante fallas transitorias, clave de idempotencia     | Error claro; no queda una venta ni una reserva a medias      |
+| Ventas → Inventario                                      | Reservar, liberar, confirmar al pagar y descontar stock                                            | Timeout, reintento acotado solo ante fallas transitorias, clave de idempotencia     | Error claro; no queda una venta ni una reserva a medias      |
 | Ventas → Mercado Pago                                    | Crear el pago                                                                                     | Timeout y circuit breaker                                                           | La compra no avanza y la reserva vence sola                  |
 | Mercado Pago → Gateway → Ventas                          | Aviso del resultado del pago                                                                      | Procesamiento idempotente                                                           | Mercado Pago reintenta el aviso                              |
 | Ventas → proveedor de mail                               | Enviar mails                                                                                      | Envío fuera de la transacción de la venta, con reintentos **[propuesta]**           | Se registra como fallido; la venta no se afecta              |
@@ -129,7 +129,6 @@ Uso, errores y ejemplos en [`contracts/README.md`](contracts/README.md). La elec
 
 | Evento                                         | Publica               | Consume                              | Efecto                                                                                                  |
 | ---------------------------------------------- | --------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `VentaPagada`                                  | Ventas                | Inventario                           | Convierte la reserva en descuento definitivo. **[?]** puede reemplazarse por una llamada síncrona (D5). |
 | `ReservaVencida`                               | Inventario            | Ventas                               | Pasa la venta a _Vencida_.                                                                              |
 | `VarianteCreada` **[propuesta]**               | Catálogo              | Inventario                           | Registra la variante con stock 0 en ambos canales.                                                      |
 | Cambios de producto y de stock **[propuesta]** | Catálogo e Inventario | Actualización del índice de búsqueda | Mantiene la búsqueda sincronizada (D6).                                                                 |
@@ -161,7 +160,7 @@ Si algo se cae, lo demás tiene que seguir funcionando y tiene que poder saberse
 | Ventas                                  | Navegar, buscar, gestionar productos y stock                                                                                             | Comprar, registrar ventas, ver pedidos; la capacidad publicada si es la opción B                        | El gateway devuelve un error claro                                  |
 | Un pico de pedidos del grupo consumidor | Todo                                                                                                                                     | —                                                                                                       | Límite de pedidos por grupo **[propuesta]**: el exceso recibe `429` |
 | Usuarios                                | Navegar, buscar, comprar como invitado y las sesiones ya iniciadas, porque el gateway valida el token sin consultar a Usuarios (ADR-001) | Iniciar sesión y registrarse                                                                            | —                                                                   |
-| RabbitMQ                                | Todo lo síncrono                                                                                                                         | Los efectos asíncronos se demoran: descuento definitivo, vencimientos, índice                           | Outbox: los eventos se publican cuando vuelve                       |
+| RabbitMQ                                | Todo lo síncrono                                                                                                                         | Los efectos asíncronos se demoran: paso a _Vencida_, variantes nuevas en Inventario, índice                           | Outbox: los eventos se publican cuando vuelve                       |
 | Mercado Pago                            | Navegar; comprar por transferencia                                                                                                       | Pagar con Mercado Pago                                                                                  | Timeout y circuit breaker; se ofrece la transferencia               |
 | Proveedor de mail                       | Todo                                                                                                                                     | Los mails se demoran                                                                                    | Reintentos y registro de mails fallidos                             |
 | Redis (caché)                           | Todo, más lento                                                                                                                          | —                                                                                                       | Las lecturas van directo a la fuente                                |
@@ -269,13 +268,14 @@ services/ventas/                # hexagonal
 
 ## 14. Decisiones registradas
 
-| ADR                               | Decisión                                            | Estado               |
-| --------------------------------- | --------------------------------------------------- | -------------------- |
-| ADR-001                           | D1 · Límites de los servicios                       | Aceptada · Entrega 1 |
-| ADR-003                           | D3 · Persistencia (versión inicial)                 | Entrega 1            |
-| ADR-005                           | D5 · Comunicación entre servicios (versión inicial) | Entrega 1            |
-| ADR-008                           | D8 · Contrato propio                                | Entrega 1            |
-| ADR-002, 004, 006, 007, 009 a 013 | D2, D4, D6, D7, D9 a D13                            | Entregas siguientes  |
+| ADR | Decisión | Estado |
+| --- | --- | --- |
+| [ADR-000](adr/ADR-000-plantilla.md) | Plantilla | — |
+| [ADR-001](adr/ADR-001-limites-de-los-servicios.md) | D1 · Límites de los servicios | Aceptada · Entrega 1 |
+| [ADR-003](adr/ADR-003-persistencia.md) | D3 · Persistencia | Aceptada (versión inicial) · Entrega 1 |
+| [ADR-005](adr/ADR-005-comunicacion.md) | D5 · Comunicación entre servicios | Aceptada (versión inicial) · Entrega 1 |
+| [ADR-008](adr/ADR-008-contrato-propio.md) | D8 · Contrato propio | Propuesta · se acepta al elegir la capacidad (A o B) |
+| ADR-002, 004, 006, 007, 009 a 013 | D2, D4, D6, D7, D9 a D13 | Entregas siguientes |
 
 ## 15. Pendientes de arquitectura
 
@@ -289,7 +289,6 @@ services/ventas/                # hexagonal
 | Elegir la capacidad publicada (A o B) según el grupo consumidor                               | D8                                        |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
 | Opción B: cuánto tiempo se conservan los emails de otros grupos y dirección remitente         | D8                                        |
-| Confirmación de la reserva: evento `VentaPagada` o llamada síncrona                           | D5                                        |
 | Dónde se almacenan las fotos de los productos                                                 | D3                                        |
 | Firma y vencimiento del token, y dónde lo guarda el frontend                                  | Implementación del gateway y del frontend |
 | Proveedor de mail y de nube                                                                   | D5 / D13                                  |

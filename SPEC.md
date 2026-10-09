@@ -4,7 +4,7 @@
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
 >
-> **Cambios en 0.7:** la capacidad publicada deja de ser la reserva de stock de FAV. Se proponen dos opciones independientes del dominio, A (reserva de cupos) y B (envío de emails), y se elige una según el grupo consumidor (§11). El diagrama de estados (§7) pasa de Mermaid a `docs/diagrams/estados.png`.
+> **Cambios en 0.7:** la capacidad publicada deja de ser la reserva de stock de FAV. Se proponen dos opciones independientes del dominio, A (reserva de cupos) y B (envío de emails), y se elige una según el grupo consumidor (§11). El diagrama de estados (§7) pasa de Mermaid a `docs/diagrams/estados.png`. CU-01: la reserva se confirma con una llamada síncrona a Inventario en lugar del evento `VentaPagada` (ADR-005).
 >
 > **Cambios en 0.6** (ADR-001): el carrito se guarda en el navegador (HU-10); el filtro de poco stock por umbral se reemplaza por una vista de stock por producto (HU-09); se descarta HU-18.4; el comprador registrado usa el email de su cuenta, que llega en el token.
 
@@ -265,7 +265,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 1. Cuando se crea la venta, entonces recibe un mail de compra realizada.
 2. Cuando la venta pasa a *Pagada*, entonces recibe un mail de pago aprobado.
 3. Cuando la venta pasa a *Entregada al correo*, entonces recibe un mail de pedido despachado.
-4. Dado un evento duplicado, entonces no se reenvía el mail, salvo en la ventana de falla entre el envío y su registro (limitación a documentar en D5).
+4. Dado un evento duplicado, entonces no se reenvía el mail, salvo en la ventana de falla entre el envío y su registro (limitación aceptada en ADR-005).
 5. Dado que el servidor de mail falla, entonces se reintenta y, agotados los intentos, el mail queda registrado como fallido sin afectar la venta.
 6. Los mails se envían al email guardado en la venta al momento de comprar: el del invitado o el de la cuenta del comprador registrado.
 
@@ -298,8 +298,8 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 5. Ventas le pide a Inventario reservar las unidades por 20 minutos (llamada síncrona, con timeout).
 6. Ventas crea el pago en Mercado Pago y redirige al comprador.
 7. Mercado Pago avisa que el pago fue aprobado.
-8. Ventas pasa la venta a *Pagada* y publica `VentaPagada`.
-9. Inventario convierte la reserva en descuento definitivo.
+8. Ventas registra el pago aprobado y le pide a Inventario confirmar la reserva (llamada síncrona, con reintentos; ADR-005).
+9. Inventario confirma la reserva, que pasa a descuento definitivo, y Ventas pasa la venta a *Pagada*.
 10. Ventas envía los mails.
 
 **Flujos alternativos**
@@ -307,7 +307,8 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 - **5b.** Inventario no responde: timeout, reintento acotado y error claro al comprador. No queda una reserva a medias.
 - **7a.** El pago es rechazado: se libera la reserva.
 - **7b.** No llega aviso en 20 minutos: la reserva vence, Inventario publica `ReservaVencida` y la venta pasa a *Vencida*.
-- **7c.** El pago llega con la reserva vencida: la venta queda *A verificar* (RN-14).
+- **7c.** El pago llega con la reserva vencida: Inventario rechaza la confirmación y la venta queda *A verificar* (RN-14).
+- **8a.** Inventario no responde al confirmar: Ventas reintenta hasta que responda y la venta sigue *Pendiente de pago*. Si mientras tanto vence la reserva, sigue como 7c.
 - **7d.** El aviso de Mercado Pago llega duplicado: se procesa una sola vez.
 
 ### CU-02 · Comprar con transferencia y confirmar *(HU-12, HU-15)*
@@ -397,7 +398,6 @@ El uso de cada opción está en `docs/contracts/README.md` y la decisión se jus
 ### Del equipo
 | Tema | Dónde se resuelve |
 |---|---|
-| Cómo se dispara el envío de mails sin bloquear la venta | D5 |
 | Elegir la capacidad a publicar (A o B) según el grupo consumidor | D8 |
 | Cómo se entrega y se rota la clave de cada grupo consumidor | D8 |
 | Retraso máximo del índice de búsqueda | D6 |
