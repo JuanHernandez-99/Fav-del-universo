@@ -1,6 +1,6 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.2 (borrador para la Entrega 1)** · 08/10/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.4 (borrador para la Entrega 1)** · 08/10/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
 
@@ -21,7 +21,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 - Stock separado en **online** y **físico** por variante, con ingresos, ajustes y transferencias entre canales.
 - Búsqueda de productos con filtros, orden y paginación.
 - Compra online con o sin cuenta, pagando con Mercado Pago o transferencia, con reserva temporal del stock.
-- Seguimiento del pedido con estados visibles para el comprador, actualizados a mano por el administrador. El comprador recibe por mail un número de seguimiento.
+- Seguimiento del pedido con estados visibles para el comprador registrado, actualizados a mano por el administrador. El comprador sin cuenta se entera por mail (RN-24).
 - Registro de las ventas del local (efectivo, transferencia o Mercado Pago).
 - Panel de administración: productos, precios y promociones, stock, ventas y estados, y variantes con poco stock.
 - Mails al comprador y al administrador.
@@ -30,18 +30,18 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 ### Fuera del alcance
 | Qué | Motivo |
 |---|---|
-| Envíos: datos de envío, costos e integración con Correo Argentino | Se implementan en una etapa posterior. En v1 la entrega se acuerda con el vendedor (RN-16). |
+| Envíos: datos de envío, costos e integración con Correo Argentino | Se implementan en una etapa posterior a esta materia. En v1 la entrega se acuerda con el vendedor (RN-16). |
 | Cambios, devoluciones y saldo a favor | Se gestionan por mail o teléfono. La política del cliente se publica como página informativa (RN-21). |
 | Reclamos | Se gestionan por mail o teléfono (RN-21). |
 | Promociones 2x1 y promociones bancarias | No entran en v1 (RN-05). |
 | Pagos con tarjeta y bancos | No entran en v1. Es una evolución futura: el medio de pago se modela como un dato que pueda ampliarse. |
-| Facturación | Hoy el cliente no factura. |
+| Facturación | Hoy el cliente no factura. Posible evolución futura |
 | Alerta de poco stock por mail | Reemplazada por un filtro en el panel (HU-09). |
 | Mails de promociones | Descartados (HU-22). |
 
 ## 3. Contexto de uso (según el cliente)
 
-- **Volumen:** entre 10 y 20 prendas por semana, a veces menos según la temporada.
+- **Volumen:** entre 10 y 20 prendas por semana, según temporada.
 - **Picos:** cambio de temporada y todo diciembre.
 - **Mercadería nueva:** suele estar activa primero en el local y unos días después en la web.
 - **Pérdidas y fallas:** pueden ocurrir y obligan a corregir el stock a mano.
@@ -54,7 +54,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | Actor | Descripción |
 |---|---|
 | Comprador registrado | Tiene cuenta y puede consultar sus compras. |
-| Comprador invitado | Compra sin cuenta, con el email como mínimo. Sigue su pedido con el número de seguimiento que recibe por mail (RN-11, RN-24). |
+| Comprador invitado | Compra sin cuenta, con el email como mínimo. Se entera del estado de su pedido por mail o consultando al local (RN-11, RN-24). |
 | Administrador | Rol de gestión que usa el cliente. Único rol de administración (RN-23). |
 | Mercado Pago | Sistema externo que procesa los pagos online y avisa el resultado. |
 | Sistema | Procesos automáticos: vencimiento de reservas y envío de mails. |
@@ -73,7 +73,6 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | Transferencia de stock | Movimiento de unidades de una variante de un canal al otro. No es una transferencia bancaria. |
 | Venta | Compra online o venta del local, con su canal, monto y medio de pago. |
 | Medio de pago | Mercado Pago, transferencia bancaria o efectivo. |
-| Número de seguimiento | Identificador de una venta online que el comprador recibe por mail para consultar su estado. |
 
 ## 6. Reglas de negocio
 
@@ -97,12 +96,12 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | RN-16 | Los envíos se implementan en una etapa posterior. En v1 la entrega se acuerda con el vendedor: el sistema no pide datos de envío, no calcula costos ni se integra con el correo. | Cliente |
 | RN-17 | Las categorías son una lista fija: tops, bodys, remeras, buzos, camperas, jeans, pantalones, polleras, shorts, vestidos, conjuntos, abanicos y accesorios. | Equipo. **[propuesta]** una categoría por producto |
 | RN-18 | Medios de pago por canal. **Online:** Mercado Pago o transferencia. **Local:** efectivo, transferencia o Mercado Pago. En el local el cobro ocurre fuera del sistema, que solo registra el medio usado. | Cliente + equipo. **[propuesta]** que el cobro con Mercado Pago en el local sea solo un registro |
-| RN-19 | La venta online pasa por: *Pendiente de pago → Pagada → Entregada al correo → En camino → Entregada*. Los estados son visibles para el comprador. Los pasos posteriores al pago los actualiza el administrador a mano. Otros finales: *Cancelada*, *Vencida* y *A verificar*. | Cliente + equipo |
+| RN-19 | La venta online pasa por: *Pendiente de pago → Pagada → Entregada al correo → Entregada*. Los estados son visibles para el comprador. Los pasos posteriores al pago los actualiza el administrador a mano. Otros finales: *Cancelada*, *Vencida* y *A verificar*. | Cliente + equipo |
 | RN-20 | El comprador solo puede cancelar una compra pendiente de pago. Después del pago, cualquier cambio se gestiona por mail o teléfono. | Cliente |
 | RN-21 | El sistema no gestiona cambios, devoluciones, saldo a favor ni reclamos. La política de cambios y devoluciones del cliente y los datos de contacto se publican como página informativa. | Cliente + equipo. **[?]** datos de contacto |
 | RN-22 | En la venta online el precio lo calcula el servidor al comprar y el comprador no puede modificarlo. En la venta del local el sistema sugiere el monto con la promoción vigente para el medio de pago, y el administrador registra el monto efectivamente cobrado. | Equipo |
 | RN-23 | Hay un único rol de administración. En v1 se usa una sola cuenta de administrador. | Cliente |
-| RN-24 | Cada venta online tiene un número de seguimiento que se envía por mail al comprador. Con él, un comprador sin cuenta puede consultar el estado de su pedido. | Cliente |
+| RN-24 | El comprador sin cuenta no consulta el estado en el sitio: se entera por los mails de compra realizada y de pedido despachado, y para cualquier otra consulta se comunica con el local. No hay número de seguimiento en v1: el seguimiento del envío llega con la integración de envíos (RN-16). | Cliente |
 
 ## 7. Estados de la venta online
 
@@ -110,7 +109,6 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 stateDiagram-v2
     state "Pendiente de pago" as Pendiente
     state "Entregada al correo" as AlCorreo
-    state "En camino" as EnCamino
     state "A verificar" as AVerificar
 
     [*] --> Pendiente: Comprar (se reserva el stock)
@@ -119,8 +117,7 @@ stateDiagram-v2
     Pendiente --> Vencida: vence la reserva sin pago
     Vencida --> AVerificar: se confirma un pago tarde
     Pagada --> AlCorreo: el administrador despacha
-    AlCorreo --> EnCamino
-    EnCamino --> Entregada
+    AlCorreo --> Entregada
 ```
 
 - El vencimiento depende del medio de pago: 20 minutos con Mercado Pago y 48 horas con transferencia (RN-08, RN-09).
@@ -188,11 +185,11 @@ stateDiagram-v2
 3. Cuando el ajuste dejaría el stock por debajo de lo reservado, entonces se rechaza.
 
 **HU-09 · Ver variantes con poco stock (admin).** Como administrador quiero filtrar las variantes con poco stock en el panel, para saber qué reponer, sin recibir mails. *(RN-01)*
-1. Cuando activa el filtro, entonces ve las variantes cuyo stock disponible (sin reservas) es menor o igual al umbral, en el canal elegido.
-2. Las variantes agotadas se incluyen.
-3. Cada fila muestra producto, talle, color y stock disponible.
+1. Cuando activa el filtro, entonces ve los productos cuyo stock disponible (sin reservas) es menor o igual al umbral, en el canal elegido.
+2. Los productos agotados se incluyen.
+3. Cada fila muestra producto, talle y stock disponible.
 4. Solo es accesible con el rol de administrador.
-5. **[?]** umbral (global o por prenda, y si cambia entre online y local).
+5. Umbral por categoria (no por prenda o global) del stock online.
 6. **[?]** de dónde salen nombre, talle y color, porque Inventario solo conoce el identificador de la variante (D1/D5).
 
 ### Compra online
@@ -202,8 +199,8 @@ stateDiagram-v2
 2. Cuando pide más unidades que el stock online disponible, entonces ve un aviso.
 3. Dado un producto despublicado o sin stock en el carrito, cuando va a comprar, entonces se le avisa y no puede comprarlo.
 
-**HU-11 · Comprar con Mercado Pago.** Como comprador, registrado o invitado, quiero pagar con Mercado Pago, para comprar sin ir al local. *(RN-06, RN-07, RN-08, RN-11, RN-14, RN-18, RN-24 · CU-01)*
-1. Cuando aprieta "Comprar", entonces las unidades quedan reservadas por 20 minutos y se crea la venta en *Pendiente de pago* con su número de seguimiento.
+**HU-11 · Comprar con Mercado Pago.** Como comprador, registrado o invitado, quiero pagar con Mercado Pago, para comprar sin ir al local. *(RN-06, RN-07, RN-08, RN-11, RN-14, RN-18 · CU-01)*
+1. Cuando aprieta "Comprar", entonces las unidades quedan reservadas por 20 minutos y se crea la venta en *Pendiente de pago*.
 2. Dado un invitado sin email, cuando intenta comprar, entonces no puede continuar.
 3. Cuando Mercado Pago aprueba el pago dentro de los 20 minutos, entonces la venta pasa a *Pagada*, el stock se descuenta definitivamente y se envían los mails.
 4. Cuando el pago es rechazado, entonces la reserva se libera.
@@ -214,7 +211,7 @@ stateDiagram-v2
 9. Dado que Inventario no responde, cuando aprieta "Comprar", entonces ve un error claro y no queda ninguna venta a medias.
 
 **HU-12 · Comprar con transferencia.** Como comprador quiero pagar por transferencia y que me aparten la prenda mientras pago. *(RN-09, RN-18 · CU-02)*
-1. Cuando elige transferencia, entonces la reserva dura hasta 48 horas, la venta queda en *Pendiente de pago* y ve los datos para transferir. **[?]** alias o CBU del cliente.
+1. Cuando elige transferencia, entonces la reserva dura hasta 48 horas, la venta queda en *Pendiente de pago* y ve los datos para transferir. Faltan alias/cbu del cliente.
 2. Cuando pasan 48 horas sin confirmación, entonces la reserva se libera y la venta pasa a *Vencida*.
 3. Cuando se crea la venta, entonces el administrador recibe un mail de transferencia pendiente.
 
@@ -235,13 +232,11 @@ stateDiagram-v2
 1. Cuando filtra por estado, entonces ve las ventas de ese estado con fecha, comprador, canal y monto.
 
 **HU-23 · Actualizar el estado del pedido (admin).** Como administrador quiero avanzar el estado de un pedido pagado, para que el comprador sepa dónde está. *(RN-16, RN-19)*
-1. Dada una venta *Pagada*, cuando el administrador avanza el estado, entonces pasa por *Entregada al correo*, *En camino* y *Entregada*, en ese orden.
+1. Dada una venta *Pagada*, cuando el administrador avanza el estado, entonces pasa a *Entregada al correo* y después a *Entregada*, en ese orden.
 2. Cuando intenta saltar un estado o retroceder, entonces se rechaza. **[propuesta]**
 3. Cuando el estado cambia, entonces el comprador lo ve en su pedido.
 
-**HU-25 · Seguir un pedido sin cuenta.** Como comprador invitado quiero consultar el estado de mi pedido con el número de seguimiento que recibí por mail. *(RN-24)*
-1. Cuando ingresa el número de seguimiento y el email de la compra, entonces ve el estado del pedido. **[propuesta]** pedir también el email, para que no alcance con adivinar un número.
-2. Cuando el número o el email no coinciden, entonces ve un mensaje genérico que no revela si el pedido existe. **[propuesta]**
+~~**HU-25 · Seguir un pedido sin cuenta.**~~ **Descartada.** No hay número de seguimiento en v1: el comprador sin cuenta se informa por mail o consultando al local (RN-24).
 
 ### Ventas del local
 
@@ -251,7 +246,7 @@ stateDiagram-v2
 3. El sistema sugiere el monto con la promoción vigente para el medio de pago, y el administrador puede registrar un monto distinto.
 4. Dado un medio de pago distinto de efectivo, transferencia o Mercado Pago, entonces se rechaza.
 5. Si falta el monto o el medio de pago, entonces se rechaza.
-6. **[?]** qué pasa si no hay stock físico registrado de esa variante.
+6. Si no hay stock fisico de esa variante pero sí stock online se permite la venta dando una alerta al admin. **[propuesta]**. Si no hay stock online no permite hacer la venta.
 
 ### Usuarios
 
@@ -268,9 +263,9 @@ stateDiagram-v2
 ### Mails (enviados desde Ventas)
 
 **HU-20 · Mails al comprador.** Como comprador quiero recibir mails sobre mi compra. *(RN-19, RN-24)*
-1. Cuando se crea la venta, entonces recibe un mail de compra recibida con el número de seguimiento.
+1. Cuando se crea la venta, entonces recibe un mail de compra realizada.
 2. Cuando la venta pasa a *Pagada*, entonces recibe un mail de pago aprobado.
-3. Cuando la venta pasa a *Entregada al correo*, entonces recibe un mail de pedido listo y despachado.
+3. Cuando la venta pasa a *Entregada al correo*, entonces recibe un mail de pedido despachado.
 4. Dado un evento duplicado, entonces no se reenvía el mail, salvo en la ventana de falla entre el envío y su registro (limitación a documentar en D5).
 5. Dado que el servidor de mail falla, entonces se reintenta y, agotados los intentos, el mail queda registrado como fallido sin afectar la venta.
 
@@ -299,7 +294,7 @@ stateDiagram-v2
 1. El comprador, registrado o invitado, revisa el carrito y aprieta "Comprar".
 2. Completa sus datos (como mínimo el email, RN-11) y elige Mercado Pago.
 3. Ventas obtiene de Catálogo el precio vigente de cada variante. **[propuesta]**
-4. Ventas crea la venta en *Pendiente de pago*, con su número de seguimiento y una clave de idempotencia.
+4. Ventas crea la venta en *Pendiente de pago*, con una clave de idempotencia.
 5. Ventas le pide a Inventario reservar las unidades por 20 minutos (llamada síncrona, con timeout).
 6. Ventas crea el pago en Mercado Pago y redirige al comprador.
 7. Mercado Pago avisa que el pago fue aprobado.
@@ -346,27 +341,39 @@ stateDiagram-v2
 4. Inventario descuenta el stock físico de forma inmediata, sin reserva.
 
 **Flujo alternativo**
-- **a.** No hay stock físico registrado de una variante: **[?]** rechazar o permitir.
+- **a.** No hay stock físico registrado de una variante: Si no hay stock fisico de esa variante pero sí stock online se permite la venta dando una alerta al admin. **[propuesta]**. Si no hay stock online no permite hacer la venta.
 
 ---
 
-## 10. Integración con otros grupos
+## 10. Requisitos no funcionales
+
+| ID | Requisito | Cómo se verifica | Origen |
+|---|---|---|---|
+| RNF-01 | **Resiliencia:** si un servicio o una dependencia falla, el resto del sistema sigue funcionando y el usuario ve un mensaje claro de lo que no está disponible. | Caída provocada de cada dependencia relevante, documentada en `docs/POSTMORTEM.md`. Comportamiento esperado en ARCHITECTURE.md, sección 8. | Cátedra |
+| RNF-02 | **Diagnóstico:** ante una falla se puede determinar qué pasó siguiendo la operación entre servicios, sin revisar cada componente a mano. | Logs estructurados con identificador de correlación y trazas del flujo de compra. | Cátedra |
+| RNF-03 | **Métricas con historial:** se mide todo (pedidos, errores por código HTTP, latencia, dependencias) y se puede consultar el pasado, por ejemplo cuántos errores 404 hubo la semana pasada, en un tablero. | Tablero con métricas históricas y al menos una alerta. **[propuesta]** retención de al menos dos semanas. | Cátedra |
+| RNF-04 | **Comunicación:** toda llamada síncrona tiene timeout, manejo de errores y política de reintentos definidos. Todo mensaje asíncrono que no se puede procesar queda en una cola de mensajes fallidos. | Tests de integración y caídas provocadas. Valores en el D5. | Cátedra / consigna |
+| RNF-05 | **Caché y búsqueda con herramientas existentes:** se usan bibliotecas y motores existentes, no implementaciones propias. La caché se invalida ante cambios y se mide su aprovechamiento. | Métricas de aciertos de caché antes y después (D7). | Cátedra |
+| RNF-06 | **Picos de demanda:** el sistema se prueba con un escenario de pico (cambio de temporada, diciembre) y se documenta cómo se comporta y cuál es su principal límite. | Test de carga con resultados analizados (D13). | Cátedra / consigna |
+| RNF-07 | **Portabilidad:** el sistema se levanta con un solo comando mediante Docker, en cualquier computadora y sin configuración manual. | Arranque en una computadora limpia siguiendo el README. | Cátedra / consigna |
+| RNF-08 | **Una base de datos por servicio:** ningún servicio accede a la base de otro. | Revisión de la configuración de Docker Compose y del código. | Cátedra |
+
+## 11. Integración con otros grupos
 
 - **Capacidad a publicar:** se propone la reserva de stock, de Inventario. Se confirma al coordinar en clase. El contrato va en `docs/contracts/`.
 - **Capacidad a consumir:** **[?]** la asigna la cátedra.
 
-## 11. Pendientes
+## 12. Pendientes
 
 ### Con el cliente
 | Tema | Afecta a |
 |---|---|
 | Alcance de las promociones (producto, categoría o toda la tienda) y si se acumulan | RN-05, HU-05 |
-| Alias o CBU para las transferencias | HU-12 |
 | Cómo se resuelve una venta *A verificar* (reintegro o reasignación) | RN-14 |
 | Cómo cobra con Mercado Pago en el local (fuera del sistema o desde el sistema) | RN-18 |
 | Datos de contacto (mail y teléfono) | RN-21, HU-24 |
-| Venta del local de una variante sin stock físico registrado | HU-17, CU-04 |
-| Umbral de poco stock | HU-09 |
+| Validar la regla propuesta para la venta del local sin stock físico. **Contradice RN-06**: hay que definir qué stock se descuenta en ese caso (el online, o el físico quedando negativo) | HU-17, CU-04, RN-06 |
+| Valor del umbral de poco stock para cada categoría | HU-09 |
 | Cuántos productos piensa tener | Dimensionamiento (D13) |
 | Una versión del Excel de stock, para ver la estructura | Carga inicial |
 
