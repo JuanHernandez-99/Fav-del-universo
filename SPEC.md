@@ -1,6 +1,6 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.4 (borrador para la Entrega 1)** · 08/10/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.5 (borrador para la Entrega 1)** · 08/10/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
 
@@ -83,7 +83,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | RN-03 | Un producto puede tener varias fotos, opcionalmente asociadas a un color. | Cliente |
 | RN-04 | Un producto puede estar publicado o no online, sin importar su stock. | Equipo |
 | RN-05 | Las promociones se gestionan aparte del precio base. En v1 hay dos tipos: (a) descuento porcentual y (b) descuento por medio de pago (por ejemplo, un porcentaje pagando en efectivo). Toda promoción tiene fecha de inicio y de fin. Valen online y en el local. Fuera de v1: 2x1 y promociones bancarias. | Cliente + equipo. **[?]** alcance (producto, categoría o toda la tienda) y si se acumulan |
-| RN-06 | Una compra online usa solo el stock online. Una venta del local usa solo el stock físico. | Equipo |
+| RN-06 | Una compra online usa solo el stock online. Una venta del local usa solo el stock físico. La venta del local no se bloquea si el stock físico registrado es insuficiente: se registra igual y el stock físico de esa variante puede quedar en negativo (RN-25). | Equipo |
 | RN-07 | Al pasar a pagar se reservan las unidades. Las unidades reservadas no están disponibles para nadie más. | Equipo |
 | RN-08 | La reserva de una compra con Mercado Pago se libera a los 20 minutos o por cancelación explícita. Cerrar la sesión no libera la reserva porque no es detectable. | Equipo |
 | RN-09 | La reserva de una compra por transferencia dura hasta 48 horas o hasta que el administrador confirme el pago. Pasado ese plazo se libera. | Cliente |
@@ -102,6 +102,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | RN-22 | En la venta online el precio lo calcula el servidor al comprar y el comprador no puede modificarlo. En la venta del local el sistema sugiere el monto con la promoción vigente para el medio de pago, y el administrador registra el monto efectivamente cobrado. | Equipo |
 | RN-23 | Hay un único rol de administración. En v1 se usa una sola cuenta de administrador. | Cliente |
 | RN-24 | El comprador sin cuenta no consulta el estado en el sitio: se entera por los mails de compra realizada y de pedido despachado, y para cualquier otra consulta se comunica con el local. No hay número de seguimiento en v1: el seguimiento del envío llega con la integración de envíos (RN-16). | Cliente |
+| RN-25 | Si el stock físico de una variante queda en negativo, el sistema la marca como *stock a corregir*. El administrador la ve en un filtro del panel (sin mail) y la corrige con un ajuste de stock (HU-08). El stock físico negativo no afecta al stock online ni a las compras de la web. | Equipo |
 
 ## 7. Estados de la venta online
 
@@ -191,6 +192,7 @@ stateDiagram-v2
 4. Solo es accesible con el rol de administrador.
 5. Umbral por categoria (no por prenda o global) del stock online.
 6. **[?]** de dónde salen nombre, talle y color, porque Inventario solo conoce el identificador de la variante (D1/D5).
+7. Hay un segundo filtro, *stock a corregir*, que muestra las variantes con stock físico negativo (RN-25).
 
 ### Compra online
 
@@ -246,7 +248,7 @@ stateDiagram-v2
 3. El sistema sugiere el monto con la promoción vigente para el medio de pago, y el administrador puede registrar un monto distinto.
 4. Dado un medio de pago distinto de efectivo, transferencia o Mercado Pago, entonces se rechaza.
 5. Si falta el monto o el medio de pago, entonces se rechaza.
-6. Si no hay stock fisico de esa variante pero sí stock online se permite la venta dando una alerta al admin. **[propuesta]**. Si no hay stock online no permite hacer la venta.
+6. Dada una variante sin stock físico registrado suficiente (por un error de carga, pero con la prenda en el local), cuando registra la venta, entonces se registra igual, el stock físico queda en negativo y la variante se marca como *stock a corregir* (RN-25). La venta nunca se bloquea por esto.
 
 ### Usuarios
 
@@ -341,7 +343,7 @@ stateDiagram-v2
 4. Inventario descuenta el stock físico de forma inmediata, sin reserva.
 
 **Flujo alternativo**
-- **a.** No hay stock físico registrado de una variante: Si no hay stock fisico de esa variante pero sí stock online se permite la venta dando una alerta al admin. **[propuesta]**. Si no hay stock online no permite hacer la venta.
+- **a.** El stock físico registrado de una variante es insuficiente: la venta se registra igual, el stock físico queda en negativo y la variante se marca como *stock a corregir* (RN-25). El flujo continúa normalmente.
 
 ---
 
@@ -372,7 +374,6 @@ stateDiagram-v2
 | Cómo se resuelve una venta *A verificar* (reintegro o reasignación) | RN-14 |
 | Cómo cobra con Mercado Pago en el local (fuera del sistema o desde el sistema) | RN-18 |
 | Datos de contacto (mail y teléfono) | RN-21, HU-24 |
-| Validar la regla propuesta para la venta del local sin stock físico. **Contradice RN-06**: hay que definir qué stock se descuenta en ese caso (el online, o el físico quedando negativo) | HU-17, CU-04, RN-06 |
 | Valor del umbral de poco stock para cada categoría | HU-09 |
 | Cuántos productos piensa tener | Dimensionamiento (D13) |
 | Una versión del Excel de stock, para ver la estructura | Carga inicial |
