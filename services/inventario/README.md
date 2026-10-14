@@ -7,7 +7,7 @@ Cuántas unidades hay y dónde: stock por variante y canal (online y físico), r
 | | |
 |---|---|
 | **Base de datos** | MySQL ([ADR-003](../../docs/adr/ADR-003-persistencia.md)) |
-| **Estilo interno** | **[?]** a definir en el D2 |
+| **Estilo interno** | Hexagonal **[propuesta]**: dominio, aplicación, puertos y adaptadores (http, mysql, rabbitmq, proceso de vencimiento) |
 | **Operaciones críticas** | Reserva de stock online y transferencia entre stocks: sin sobreventa, sin duplicados, sin stock online negativo |
 
 ## Qué no hace
@@ -21,10 +21,12 @@ No conoce precios, compradores ni nombres de productos: solo ids de variante, ca
 | Ventas → Inventario | HTTP, con clave de idempotencia | Reservar, liberar, confirmar al pagar y descontar |
 | Inventario → Ventas | Evento `ReservaVencida` | Pasar la venta a *Vencida* |
 | Catálogo → Inventario | Evento `VarianteCreada` **[propuesta]** | Registrar la variante con stock 0 |
+| Inventario → Gimnasio | HTTP, con timeout, reintentos e idempotencia | Consultar su stock de FAV y registrar reposiciones |
 
-## Capacidad compartida (opción A)
+## Integración con otros grupos
 
-Si se elige la **opción A · Reserva de cupos**, Inventario la expone con el contrato [`cupos-v1`](../../docs/contracts/cupos-v1.openapi.yaml), por una entrada aparte y con tablas propias, para poder quitarla sin tocar el stock de FAV ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)). Mock: [`mocks/cupos-v1`](../../mocks/cupos-v1).
+- **Pedidos del grupo de proveedores:** no entran directo a Inventario. Ventas le pide reservar el stock online, igual que en una compra por transferencia ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)).
+- **Consignación en el gimnasio (capacidad consumida):** Inventario llama a la API del gimnasio para consultar cuánto stock de FAV le queda y registrar reposiciones. Al reponer, descuenta el stock físico y guarda una *reposición pendiente* que un proceso envía con reintentos. Se hace con un adaptador de salida que traduce el modelo del gimnasio al de FAV. **[?]** Contrato del gimnasio, pendiente (ADR-009).
 
 ## Más información
 

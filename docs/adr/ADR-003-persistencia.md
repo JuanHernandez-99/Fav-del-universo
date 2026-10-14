@@ -9,6 +9,8 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
+> **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
+
 ## Contexto
 
 ADR-001 define cuatro servicios, cada uno dueño de sus datos. La consigna pide (requisito 2.8):

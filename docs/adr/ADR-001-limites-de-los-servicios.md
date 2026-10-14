@@ -7,6 +7,8 @@
 | **Decisión de la consigna** | D1 · Límites de los servicios |
 | **Relacionadas** | [ADR-003](ADR-003-persistencia.md) (persistencia), [ADR-005](ADR-005-comunicacion.md) (comunicación), [ADR-008](ADR-008-contrato-propio.md) (contrato propio) |
 
+> **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
+
 ## Contexto
 
 FAV vende ropa en un local y empieza a vender online. El sistema tiene que unificar el stock de los dos canales, registrar todas las ventas y permitir compras online con reserva temporal de stock (SPEC §2). La consigna pide al menos tres microservicios y un API Gateway, con una base de datos por servicio.

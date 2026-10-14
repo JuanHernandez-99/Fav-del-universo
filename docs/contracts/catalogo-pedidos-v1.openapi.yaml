@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: FAV · Catálogo y pedidos para otros grupos
+  version: 1.0.0
+  description: |
+    Capacidad que FAV, una tienda de ropa, ofrece a otro grupo.
+
+    El grupo consumidor puede:
+    1. **Ver el catálogo** de FAV: productos publicados, sus variantes (talle y color) y el precio vigente.
+    2. **Hacer un pedido**: FAV aparta el stock y registra la venta, que queda **pendiente de pago por
+       transferencia**. El pedido lo hace el grupo para sí mismo; no se envían datos de clientes finales.
+
+    **Cómo sigue un pedido después de crearlo (fuera de esta API):** el grupo transfiere el total a FAV.
+    Cuando FAV verifica la transferencia, la venta pasa a pagada y el stock se descuenta definitivamente.
+    Si no se confirma el pago antes de `pago.venceEn` (48 horas), el pedido vence y el stock se libera.
+    Consultar el estado de un pedido no está incluido en la v1.
+
+    Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por FAV, sin confirmar.
+servers:
+  - url: http://localhost:8090
+    description: Mock local (`mocks/catalogo-pedidos-v1/`).
+  - url: https://pendiente.example
+    description: Entorno desplegado. [?] URL pública, antes de la presentación grupal.
+security:
+  - ClaveDeGrupo: []
+tags:
+  - name: Catálogo
+    description: Productos publicados por FAV.
+  - name: Pedidos
+    description: Compras del grupo consumidor a FAV.
+
+paths:
+  /v1/productos:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [Catálogo]
+      operationId: listarProductos
+      summary: Ver el catálogo
+      description: |
+        Devuelve todos los productos **publicados**, con sus variantes y el precio vigente
+        (con la promoción aplicada, si hay una).
+
+        No informa stock: si una variante no alcanza, el pedido responde `409 STOCK_INSUFICIENTE`.
+        Devuelve el catálogo completo en una sola respuesta (del orden de cientos de productos).
+        La lista va dentro de `items` para poder sumar más adelante una paginación opcional sin romper
+        el contrato: sin parámetros seguiría devolviendo todo.
+      responses:
+        '200':
+          description: Catálogo publicado.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Catalogo'
+              examples:
+                catalogo:
+                  $ref: '#/components/examples/Catalogo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /v1/pedidos:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+    post:
+      tags: [Pedidos]
+      operationId: crearPedido
+      summary: Hacer un pedido
+      description: |
+        Aparta el stock de todas las variantes pedidas y registra la venta, **pendiente de pago por
+        transferencia**. Es **todo o nada**: si una variante no alcanza, no se aparta ninguna.
+
+        - El precio lo calcula FAV al momento del pedido (precio vigente). Se devuelve en la respuesta.
+        - El stock queda apartado hasta `pago.venceEn` (48 horas). Si no se confirma la transferencia
+          en ese plazo, el pedido vence y el stock se libera.
+        - **Idempotencia:** el header `Idempotency-Key` es obligatorio. Repetir el pedido con la misma
+          clave y el mismo cuerpo devuelve la misma respuesta, sin crear otro pedido. La misma clave con
+          otro cuerpo devuelve `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoNuevo'
+            examples:
+              pedido:
+                $ref: '#/components/examples/PedidoNuevo'
+      responses:
+        '201':
+          description: Pedido creado, pendiente de pago por transferencia.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pedido'
+              examples:
+                pedido:
+                  $ref: '#/components/examples/Pedido'
+        '400':
+          description: |
+            - `PEDIDO_INVALIDO`: falta un header obligatorio (por ejemplo `Idempotency-Key`) o el cuerpo no cumple el contrato. `errores` indica los campos.
+            - `VARIANTE_INEXISTENTE`: una variante no existe o su producto no está publicado. `variantes` indica cuáles.
+
+            No reintentar sin corregir el pedido.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              examples:
+                pedidoInvalido:
+                  $ref: '#/components/examples/PedidoInvalido'
+                varianteInexistente:
+                  value:
+                    type: https://fav.example/errores/variante-inexistente
+                    title: Variante inexistente
+                    status: 400
+                    detail: La variante var-inexistente no existe o no está publicada.
+                    codigo: VARIANTE_INEXISTENTE
+                    variantes: [var-inexistente]
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '409':
+          description: |
+            - `STOCK_INSUFICIENTE`: al menos una variante no alcanza; no se apartó nada. `faltantes` indica cuáles.
+            - `CLAVE_IDEMPOTENCIA_REUTILIZADA`: la `Idempotency-Key` ya se usó con otro cuerpo.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              examples:
+                stockInsuficiente:
+                  value:
+                    type: https://fav.example/errores/stock-insuficiente
+                    title: Stock insuficiente
+                    status: 409
+                    detail: Al menos una variante no alcanza. No se apartó ninguna unidad.
+                    codigo: STOCK_INSUFICIENTE
+                    faltantes:
+                      - varianteId: var-remera-basica-blanca-m
+                        solicitada: 3
+                claveReutilizada:
+                  value:
+                    type: https://fav.example/errores/clave-idempotencia-reutilizada
+                    title: Clave de idempotencia reutilizada
+                    status: 409
+                    detail: La Idempotency-Key ya se usó con un pedido distinto.
+                    codigo: CLAVE_IDEMPOTENCIA_REUTILIZADA
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+components:
+  securitySchemes:
+    ClaveDeGrupo:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Clave propia del grupo consumidor, entregada por FAV. **[?]** cómo se entrega y se rota.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Clave única por pedido lógico (se recomienda un UUID). Ante timeout, `500` o `503`,
+        reintentar con la misma clave y el mismo cuerpo. Vigencia: 48 horas **[propuesta]**.
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 100
+      example: 6f1c2b8e-3d4a-4e5f-9a7b-1c2d3e4f5a6b
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Identificador para seguir la operación en los logs de ambos sistemas. Si no se envía, FAV genera uno.
+      schema:
+        type: string
+        maxLength: 100
+
+  headers:
+    CorrelationId:
+      description: El mismo identificador recibido, o uno generado por FAV.
+      schema:
+        type: string
+    RetryAfter:
+      description: Segundos a esperar antes de reintentar.
+      schema:
+        type: integer
+
+  schemas:
+    Catalogo:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Producto'
+
+    Producto:
+      type: object
+      required: [productoId, nombre, categoria, variantes]
+      properties:
+        productoId:
+          type: string
+        nombre:
+          type: string
+        categoria:
+          type: string
+          description: Una de las categorías de FAV (por ejemplo `remeras`, `jeans`, `buzos`).
+        descripcion:
+          type: string
+          description: Opcional.
+        fotoUrl:
+          type: string
+          format: uri
+          description: Foto principal. Opcional; puede no venir.
+        variantes:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Variante'
+
+    Variante:
+      type: object
+      required: [varianteId, talle, color, precio]
+      properties:
+        varianteId:
+          type: string
+          description: Identificador a usar en el pedido.
+        talle:
+          type: string
+        color:
+          type: string
+        precio:
+          type: number
+          format: double
+          description: Precio vigente por unidad, en pesos argentinos, con la promoción aplicada si hay una.
+
+    PedidoNuevo:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        referenciaExterna:
+          type: string
+          maxLength: 100
+          description: Identificador del pedido en el sistema del grupo. Se guarda y se devuelve.
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: Hasta 20 variantes por pedido **[propuesta]**. Una variante no puede repetirse.
+          items:
+            $ref: '#/components/schemas/ItemPedido'
+
+    ItemPedido:
+      type: object
+      additionalProperties: false
+      required: [varianteId, cantidad]
+      properties:
+        varianteId:
+          type: string
+        cantidad:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: Hasta 10 unidades por variante **[propuesta]**.
+
+    Pedido:
+      type: object
+      required: [pedidoId, estado, items, total, moneda, pago, creadoEn]
+      properties:
+        pedidoId:
+          type: string
+          format: uuid
+        referenciaExterna:
+          type: string
+        estado:
+          type: string
+          enum: [PENDIENTE_DE_PAGO]
+          description: |
+            Al crearse, el pedido siempre queda `PENDIENTE_DE_PAGO`. Los estados siguientes
+            (pagado o vencido) se resuelven fuera de esta API en la v1.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemPedidoConPrecio'
+        total:
+          type: number
+          format: double
+        moneda:
+          type: string
+          enum: [ARS]
+        pago:
+          $ref: '#/components/schemas/Pago'
+        creadoEn:
+          type: string
+          format: date-time
+
+    ItemPedidoConPrecio:
+      type: object
+      required: [varianteId, cantidad, precioUnitario, subtotal]
+      properties:
+        varianteId:
+          type: string
+        cantidad:
+          type: integer
+        precioUnitario:
+          type: number
+          format: double
+        subtotal:
+          type: number
+          format: double
+
+    Pago:
+      type: object
+      required: [medio, venceEn, datosTransferencia]
+      properties:
+        medio:
+          type: string
+          enum: [TRANSFERENCIA]
+        venceEn:
+          type: string
+          format: date-time
+          description: Hasta cuándo queda apartado el stock esperando la transferencia (48 horas).
+        datosTransferencia:
+          type: object
+          description: Datos bancarios de FAV para transferir. **[?]** los define el cliente; los del ejemplo son ficticios.
+          required: [alias, titular]
+          properties:
+            alias:
+              type: string
+            titular:
+              type: string
+
+    Problema:
+      type: object
+      description: Error en formato Problem Details (RFC 9457) con un `codigo` estable. Decidir siempre por `codigo`.
+      required: [type, title, status, codigo]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        codigo:
+          type: string
+          enum:
+            - PEDIDO_INVALIDO
+            - NO_AUTENTICADO
+            - STOCK_INSUFICIENTE
+            - CLAVE_IDEMPOTENCIA_REUTILIZADA
+            - VARIANTE_INEXISTENTE
+            - LIMITE_EXCEDIDO
+            - ERROR_INTERNO
+            - NO_DISPONIBLE
+        errores:
+          type: array
+          description: Solo en `PEDIDO_INVALIDO`. Campos con problemas.
+          items:
+            type: object
+            properties:
+              campo:
+                type: string
+              mensaje:
+                type: string
+        faltantes:
+          type: array
+          description: Solo en `STOCK_INSUFICIENTE`. Variantes que no alcanzan.
+          items:
+            type: object
+            properties:
+              varianteId:
+                type: string
+              solicitada:
+                type: integer
+        variantes:
+          type: array
+          description: Solo en `VARIANTE_INEXISTENTE`. Variantes que no existen o no están publicadas.
+          items:
+            type: string
+
+  responses:
+    NoAutenticado:
+      description: Falta la clave del grupo o no es válida.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          examples:
+            noAutenticado:
+              value:
+                type: https://fav.example/errores/no-autenticado
+                title: No autenticado
+                status: 401
+                codigo: NO_AUTENTICADO
+    LimiteExcedido:
+      description: Demasiados pedidos del grupo (60 por minuto **[propuesta]**). Reintentar después de `Retry-After`.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          examples:
+            limiteExcedido:
+              value:
+                type: https://fav.example/errores/limite-excedido
+                title: Límite excedido
+                status: 429
+                codigo: LIMITE_EXCEDIDO
+    ErrorInterno:
+      description: Error inesperado de FAV. Reintentar con la misma `Idempotency-Key`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          examples:
+            errorInterno:
+              value:
+                type: https://fav.example/errores/error-interno
+                title: Error interno
+                status: 500
+                codigo: ERROR_INTERNO
+    NoDisponible:
+      description: FAV o una de sus dependencias no está disponible. Reintentar con la misma `Idempotency-Key`.
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          examples:
+            noDisponible:
+              value:
+                type: https://fav.example/errores/no-disponible
+                title: Servicio no disponible
+                status: 503
+                codigo: NO_DISPONIBLE
+
+  examples:
+    PedidoInvalido:
+      value:
+        type: https://fav.example/errores/pedido-invalido
+        title: Pedido inválido
+        status: 400
+        codigo: PEDIDO_INVALIDO
+        errores:
+          - campo: items[0].cantidad
+            mensaje: debe estar entre 1 y 10
+    Catalogo:
+      value:
+        items:
+          - productoId: prod-remera-basica
+            nombre: Remera básica
+            categoria: remeras
+            descripcion: Remera de algodón, corte recto.
+            fotoUrl: https://fav.example/fotos/remera-basica.jpg
+            variantes:
+              - varianteId: var-remera-basica-blanca-m
+                talle: M
+                color: Blanco
+                precio: 15000
+              - varianteId: var-remera-basica-negra-l
+                talle: L
+                color: Negro
+                precio: 15000
+          - productoId: prod-jean-mom
+            nombre: Jean mom
+            categoria: jeans
+            variantes:
+              - varianteId: var-jean-mom-celeste-38
+                talle: '38'
+                color: Celeste
+                precio: 42000
+    PedidoNuevo:
+      value:
+        referenciaExterna: OC-2026-0457
+        items:
+          - varianteId: var-remera-basica-blanca-m
+            cantidad: 3
+          - varianteId: var-jean-mom-celeste-38
+            cantidad: 1
+    Pedido:
+      value:
+        pedidoId: 7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f
+        referenciaExterna: OC-2026-0457
+        estado: PENDIENTE_DE_PAGO
+        items:
+          - varianteId: var-remera-basica-blanca-m
+            cantidad: 3
+            precioUnitario: 15000
+            subtotal: 45000
+          - varianteId: var-jean-mom-celeste-38
+            cantidad: 1
+            precioUnitario: 42000
+            subtotal: 42000
+        total: 87000
+        moneda: ARS
+        pago:
+          medio: TRANSFERENCIA
+          venceEn: '2026-10-18T15:00:00Z'
+          datosTransferencia:
+            alias: FAV.EJEMPLO.ALIAS
+            titular: FAV (ejemplo)
+        creadoEn: '2026-10-16T15:00:00Z'

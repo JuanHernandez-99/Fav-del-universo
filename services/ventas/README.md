@@ -25,9 +25,9 @@ No modifica el stock: se lo pide a [Inventario](../inventario). No consulta a Us
 | Ventas → proveedor de mail | Fuera de la transacción de la venta | Mails al comprador y al administrador |
 | Inventario → Ventas | Evento `ReservaVencida` | Pasar la venta a *Vencida* |
 
-## Capacidad compartida (opción B)
+## Capacidad compartida: pedidos
 
-Si se elige la **opción B · Envío de emails**, Ventas la expone con el contrato [`emails-v1`](../../docs/contracts/emails-v1.openapi.yaml), por un adaptador de entrada aparte que usa el puerto de mail existente y con una tabla propia ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)). Mock: [`mocks/emails-v1`](../../mocks/emails-v1).
+Ventas recibe los pedidos del grupo de proveedores (`POST /v1/pedidos`, contrato [`catalogo-pedidos-v1`](../../docs/contracts/catalogo-pedidos-v1.openapi.yaml)). Pide el precio a Catálogo, reserva el stock online en Inventario por 48 horas y registra la venta *Pendiente de pago* por transferencia, con el canal *grupo externo*. Desde ahí sigue como cualquier compra por transferencia. Entra por un adaptador aparte, que se puede desactivar ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)). Mock: [`mocks/catalogo-pedidos-v1`](../../mocks/catalogo-pedidos-v1).
 
 ## Más información
 
