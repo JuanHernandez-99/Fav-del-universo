@@ -1,0 +1,5 @@
+// Une los módulos Go para desarrollo local (previsto, Entrega 2).
+// Cada servicio tendrá su propio go.mod. Descomentar cada línea cuando exista su go.mod:
+// un `use` a una carpeta sin go.mod hace fallar todos los comandos de go.
+// Versión de Go [?]: ajustar a la que use el equipo.
+go 1.22
