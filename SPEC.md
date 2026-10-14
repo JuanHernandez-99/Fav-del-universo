@@ -1,8 +1,10 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.7 (borrador para la Entrega 1)** · 09/10/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.8** · 14/10/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
+>
+> **Cambios en 0.8:** la cátedra asignó los grupos. La capacidad publicada pasa a ser **catálogo y pedidos** para el grupo de proveedores, y se suma la capacidad a consumir: la venta en consignación en un gimnasio (§11). Las opciones A y B quedan descartadas (ADR-008).
 >
 > **Cambios en 0.7:** la capacidad publicada deja de ser la reserva de stock de FAV. Se proponen dos opciones independientes del dominio, A (reserva de cupos) y B (envío de emails), y se elige una según el grupo consumidor (§11). El diagrama de estados (§7) pasa de Mermaid a `docs/diagrams/estados.png`. CU-01: la reserva se confirma con una llamada síncrona a Inventario en lugar del evento `VentaPagada` (ADR-005).
 >
@@ -30,7 +32,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 - Panel de administración: productos, precios y promociones, stock por variante, ventas y estados, y variantes con stock a corregir.
 - Mails al comprador y al administrador.
 - Usuarios con roles de comprador y administrador.
-- Una capacidad publicada para que la use otro grupo de la materia (§11).
+- Integración con otros grupos de la materia: un grupo le compra a FAV y FAV vende en consignación en un gimnasio (§11).
 
 ### Fuera del alcance
 | Qué | Motivo |
@@ -64,7 +66,8 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | Administrador | Rol de gestión que usa el cliente. Único rol de administración (RN-23). |
 | Mercado Pago | Sistema externo que procesa los pagos online y avisa el resultado. |
 | Sistema | Procesos automáticos: vencimiento de reservas y envío de mails. |
-| Grupo consumidor | Sistema de otro grupo de la materia que usa la capacidad publicada por FAV (§11). |
+| Grupo de proveedores | Sistema de otro grupo de la materia que ve el catálogo de FAV y le hace pedidos para sí mismo, como un comprador mayorista (§11). |
+| Gimnasio | Sistema de otro grupo de la materia que vende ropa de FAV en consignación (§11). |
 
 ## 5. Glosario
 
@@ -361,26 +364,35 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 
 ## 11. Integración con otros grupos
 
-### Capacidad a publicar
+La cátedra asigna qué grupo consume a cuál. Las dos integraciones existen por la materia: se implementan como entradas y salidas aparte, que se pueden desactivar cuando el sistema pase al cliente.
 
-El grupo consumidor tiene otro dominio, así que la capacidad no depende de la ropa. Se proponen dos opciones y se publica **una sola**, elegida según el grupo que asigne la cátedra **[?]**.
+### Capacidad que publicamos: catálogo y pedidos
 
-| Opción | Qué ofrece | Servicio | Contrato |
-|---|---|---|---|
-| **A · Reserva de cupos** | El consumidor registra cupos (un identificador y una cantidad), los reserva por un tiempo y los confirma o libera. Si no hace nada, vencen solos. Nunca se reserva más de lo disponible. | Inventario | `docs/contracts/cupos-v1.openapi.yaml` |
-| **B · Envío de emails** | El consumidor manda destinatario, asunto y texto ya armados, para enviar ya o programado. FAV lo envía con reintentos; el consumidor consulta el estado o lo cancela antes del envío. | Ventas | `docs/contracts/emails-v1.openapi.yaml` |
+El **grupo de proveedores** ve el catálogo de FAV y le hace pedidos para sí mismo, como un comprador mayorista.
 
-Reglas comunes:
-- Cada grupo consumidor tiene una clave propia y solo ve y opera lo suyo **[propuesta]**.
-- Un reintento por un error de red no duplica reservas ni emails (clave de idempotencia).
-- No se suman servicios: la capacidad es una entrada aparte de un servicio existente.
-- Existe por la materia: al terminar la cursada se puede quitar y entregar al cliente el sistema sin ella.
+| Operación | Qué hace | Servicio |
+|---|---|---|
+| `GET /v1/productos` | Devuelve los productos publicados con sus variantes (talle y color) y el precio vigente. No informa stock. | Catálogo |
+| `POST /v1/pedidos` | Aparta el stock y registra la venta, pendiente de pago por transferencia. | Ventas, que aparta el stock en Inventario |
 
-El uso de cada opción está en `docs/contracts/README.md` y la decisión se justifica en el ADR-008 (D8).
+**HU-26 · Pedido de un grupo externo.** Como grupo de proveedores quiero hacerle un pedido a FAV, para comprar su ropa. *(RN-06, RN-09, RN-22)*
+1. Cuando todas las variantes alcanzan, entonces se aparta el stock **online [propuesta]** por 48 horas y la venta queda *Pendiente de pago* por transferencia, con el canal *grupo externo*.
+2. Cuando una variante no alcanza, entonces no se aparta nada y se informa cuál falta.
+3. Cuando el pedido se repite con la misma clave de idempotencia, entonces se aplica una sola vez.
+4. Desde ahí sigue como una compra por transferencia (CU-02): el administrador confirma la transferencia o la venta vence a las 48 horas.
 
-### Capacidad a consumir
+Contrato: `docs/contracts/catalogo-pedidos-v1.openapi.yaml`. Uso, errores y ejemplos en `docs/contracts/README.md`. La decisión se justifica en el ADR-008 (D8).
 
-**[?]** La asigna la cátedra.
+### Capacidad que consumimos: venta en consignación en un gimnasio
+
+FAV deja ropa en un **gimnasio**, que la vende y se queda con una comisión. La ropa sigue siendo de FAV hasta que se vende. **Inventario** llama a la API del gimnasio para:
+
+- consultar cuánto stock de FAV le queda;
+- registrar una reposición: Inventario descuenta el stock físico (movimiento *salida a consignación*) y se la informa al gimnasio.
+
+Fuera de la v1 **[propuesta]**: registrar las ventas que hace el gimnasio y calcular la comisión. Se liquidan por fuera del sistema.
+
+**[?]** Contrato del gimnasio: se pidió al grupo. La decisión se documenta en el ADR-009 (D9).
 
 ## 12. Pendientes
 
@@ -391,6 +403,7 @@ El uso de cada opción está en `docs/contracts/README.md` y la decisión se jus
 | Cómo se resuelve una venta *A verificar* (reintegro o reasignación) | RN-14 |
 | Cómo cobra con Mercado Pago en el local (fuera del sistema o desde el sistema) | RN-18 |
 | Datos de contacto (mail y teléfono) | RN-21, HU-24 |
+| Datos para transferir (alias o CBU y titular) | HU-12, HU-26 |
 | Avisarle que el filtro de poco stock no entra en v1 y que se reemplaza por la vista de stock por producto | HU-09 |
 | Cuántos productos piensa tener | Dimensionamiento (D13) |
 | Una versión del Excel de stock, para ver la estructura | Carga inicial |
@@ -398,6 +411,6 @@ El uso de cada opción está en `docs/contracts/README.md` y la decisión se jus
 ### Del equipo
 | Tema | Dónde se resuelve |
 |---|---|
-| Elegir la capacidad a publicar (A o B) según el grupo consumidor | D8 |
 | Cómo se entrega y se rota la clave de cada grupo consumidor | D8 |
+| Contrato del gimnasio y cómo se identifican los productos de FAV en su sistema | D9 |
 | Retraso máximo del índice de búsqueda | D6 |

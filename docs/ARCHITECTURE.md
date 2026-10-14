@@ -1,10 +1,14 @@
 # Arquitectura — FAV Tienda Online
 
-> **Versión 0.5 (borrador para la Entrega 1)** · 09/10/2026 · Documento vivo.
+> **Versión 0.7** · 14/10/2026 · Documento vivo.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, a validar en el ADR correspondiente · _previsto_: forma parte del diseño pero se implementa en una entrega posterior.
 >
 > El alcance funcional (reglas, historias y casos de uso) está en [`SPEC.md`](../SPEC.md). Las decisiones se justifican en [`docs/adr/`](adr/).
+>
+> **Cambios en 0.7:** la cátedra asignó los grupos. La capacidad publicada es **catálogo y pedidos** (Catálogo y Ventas) y se consume la capacidad de un **gimnasio** desde Inventario (§6). Las opciones A y B quedan descartadas (ADR-008).
+>
+> **Cambios en 0.6:** Inventario pasa a usar arquitectura hexagonal **[propuesta]** (§4 y §13). La tabla de servicios se separa del estilo interno de cada uno.
 >
 > **Cambios en 0.5:** la capacidad publicada pasa a ser una de dos opciones, A (reserva de cupos, en Inventario) o B (envío de emails, en Ventas), sin servicios nuevos (§6). La reserva se confirma con una llamada síncrona a Inventario y desaparece el evento `VentaPagada` (ADR-005).
 >
@@ -31,15 +35,15 @@ Cada servicio es dueño de sus datos y nadie accede a la base de otro: la inform
 
 Muestra el sistema como una caja y con quién interactúa.
 
-![Diagrama de contexto: el comprador registrado, el comprador invitado y el administrador usan el Sistema FAV; el sistema crea pagos en Mercado Pago y recibe su aviso, envía mails mediante un proveedor de mail, expone una capacidad a un grupo consumidor y consumirá la capacidad de un grupo proveedor todavía no asignado.](diagrams/contexto.png)
+![Diagrama de contexto: el comprador registrado, el comprador invitado y el administrador usan el Sistema FAV; el sistema crea pagos en Mercado Pago y recibe su aviso, envía mails mediante un proveedor de mail, le ofrece su catálogo y pedidos al grupo de proveedores y consume la capacidad del gimnasio.](diagrams/contexto.png)
 
-Fuente editable: [`diagrams/contexto.drawio`](diagrams/contexto.drawio). Las líneas punteadas indican relaciones todavía no definidas: la capacidad a consumir la asigna la cátedra. El grupo consumidor aparece con las dos opciones de capacidad publicada (A y B, §6); se simplifica al elegir una.
+Fuente editable: [`diagrams/contexto.drawio`](diagrams/contexto.drawio). La línea punteada hacia el gimnasio indica que su contrato todavía no está definido.
 
 ## 3. Diagrama de contenedores
 
 Muestra las piezas desplegables dentro del sistema y cómo se comunican.
 
-![Diagrama de contenedores: el frontend web llama al API Gateway, que rutea a los servicios Usuarios, Catálogo, Inventario y Ventas, cada uno con su propia base (MySQL o MongoDB). Ventas consulta el precio a Catálogo y reserva stock en Inventario, crea pagos en Mercado Pago y envía mails. Catálogo, Inventario y Ventas intercambian eventos por RabbitMQ. Caché, motor de búsqueda y observabilidad están previstos. El grupo consumidor entra por el gateway a la capacidad publicada: cupos en Inventario (opción A) o emails en Ventas (opción B).](diagrams/contenedores.png)
+![Diagrama de contenedores: el frontend web llama al API Gateway, que rutea a los servicios Usuarios, Catálogo, Inventario y Ventas, cada uno con su propia base (MySQL o MongoDB). Ventas consulta el precio a Catálogo y reserva stock en Inventario, crea pagos en Mercado Pago y envía mails. Catálogo, Inventario y Ventas intercambian eventos por RabbitMQ. Caché, motor de búsqueda y observabilidad están previstos. El grupo de proveedores entra por el gateway a Catálogo (ver el catálogo) y a Ventas (hacer pedidos). Inventario llama a la API del gimnasio.](diagrams/contenedores.png)
 
 Fuente editable: [`diagrams/contenedores.drawio`](diagrams/contenedores.drawio). Las líneas y los bordes punteados son componentes o relaciones previstos o pendientes de definir. Al pie del diagrama, una tabla relaciona cuatro historias con los contenedores que intervienen.
 
@@ -47,14 +51,23 @@ Fuente editable: [`diagrams/contenedores.drawio`](diagrams/contenedores.drawio).
 
 ## 4. Servicios, responsabilidades y datos
 
-| Servicio   | Responsabilidad                                                                                                                                               | Datos que posee                                                                                                                                                                               | Estilo interno (preliminar, D2)                                                                                        |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Catálogo   | Productos, variantes, fotos, categorías, precios base, promociones y publicación. Calcula el precio vigente.                                                  | Productos con sus variantes, promociones                                                                                                                                                      | **Capas** (Handler → Service → Repository). **[propuesta]** lecturas servidas por el índice de búsqueda (CQRS liviano) |
-| Inventario | Stock por variante y canal, reservas con vencimiento, transferencias, ingresos, ajustes y movimientos. Expone la capacidad publicada si se elige la opción A. | Stock, reservas, movimientos, outbox, mensajes procesados. Con la opción A, también los cupos y reservas de cada grupo consumidor.                                                            | **[?]** a definir en el D2                                                                                             |
-| Ventas     | Ventas online y del local, estados, pagos (Mercado Pago y transferencia) y envío de mails. Expone la capacidad publicada si se elige la opción B.             | Ventas (con el id y el email del comprador), ítems, pagos, registro de mails, outbox, mensajes procesados. Con la opción B, también los emails de cada grupo consumidor, en una tabla propia. | **Hexagonal** **[propuesta]**                                                                                          |
-| Usuarios   | Registro, inicio de sesión, emisión del token (id, email y rol) y roles.                                                                                      | Usuarios, hash de contraseña, rol                                                                                                                                                             | **Capas** **[propuesta]**                                                                                              |
+| Servicio | Responsabilidad | Datos que posee |
+|---|---|---|
+| Catálogo | Productos, variantes, fotos, categorías, precios base, promociones y publicación. Calcula el precio vigente. Expone el catálogo al grupo de proveedores. | Productos con sus variantes, promociones |
+| Inventario | Stock por variante y canal, reservas con vencimiento, transferencias, ingresos, ajustes y movimientos. Consulta y repone el stock en consignación del gimnasio. | Stock, reservas, movimientos (incluidas las salidas a consignación), reposiciones pendientes, outbox, mensajes procesados. |
+| Ventas | Ventas online y del local, estados, pagos (Mercado Pago y transferencia) y envío de mails. Recibe los pedidos del grupo de proveedores. | Ventas (con el id y el email del comprador, o el grupo externo que compró), ítems, pagos, registro de mails, outbox, mensajes procesados. |
+| Usuarios | Registro, inicio de sesión, emisión del token (id, email y rol) y roles. | Usuarios, hash de contraseña, rol |
 
-Con esto se cumplen las dos arquitecturas internas distintas que pide la consigna: **capas** (Catálogo y Usuarios) y **hexagonal** (Ventas).
+### Estilo interno de cada servicio (preliminar, D2)
+
+| Servicio | Estilo | Por qué |
+|---|---|---|
+| Catálogo | **Capas**: Handler → Service → Repository | Pocas reglas: casi todo es alta, edición y lectura de productos por un solo administrador. La única regla con peso es el precio vigente con promociones, y entra en la capa de servicio. La carga de lectura se resuelve con caché e índice, no con la estructura interna. **[propuesta]** Lecturas servidas por el índice de búsqueda (CQRS liviano). |
+| Usuarios | **Capas** **[propuesta]** | Registro, inicio de sesión y emisión del token. El email único lo garantiza la base y no hay proveedores externos que puedan cambiar. Puertos y adaptadores agregarían piezas sin una variación que proteger. |
+| Ventas | **Hexagonal** **[propuesta]** | Tiene el ciclo de estados de la venta, con transiciones que no pueden saltearse ni repetirse (no cobrar dos veces). Depende de varios sistemas externos que pueden cambiar: Mercado Pago, el proveedor de mail (todavía sin elegir), RabbitMQ y las APIs de Catálogo e Inventario. Recibe pedidos por varias entradas: comprador, administrador, aviso de Mercado Pago y eventos. Los puertos permiten probar las reglas con adaptadores falsos y cambiar un proveedor sin tocar el núcleo. |
+| Inventario | **Hexagonal** **[propuesta]** | Tiene las reglas más críticas del sistema: no vender de más, reservar todo o nada, transferir sin dejar stock negativo y las transiciones de la reserva (activa, confirmada, liberada, vencida). Recibe pedidos por varias entradas: Ventas, el panel, el evento `VarianteCreada` y el proceso que vence reservas. Y consume la capacidad del gimnasio (D9), un proveedor cuyo contrato no controlamos. La carrera entre dos reservas la resuelve la base con una actualización condicional: el puerto del repositorio expresa la operación completa ("reservar si alcanza") y el adaptador de MySQL la hace atómica. El núcleo valida el resto de las reglas. |
+
+Con esto se cumplen las dos arquitecturas internas distintas que pide la consigna: **capas** (Catálogo y Usuarios) y **hexagonal** (Ventas e Inventario). El criterio sigue el apunte de estilos de backend: capas cuando hay pocas reglas y consultas sencillas; hexagonal cuando hay invariantes de negocio o el núcleo depende de proveedores externos que pueden cambiar.
 
 ### Qué no hace cada servicio
 
@@ -70,8 +83,8 @@ Se resumen acá y se justifican en el [**ADR-001 (D1)**](adr/ADR-001-limites-de-
 
 - **Catálogo e Inventario están separados** porque tienen cargas y garantías distintas: el catálogo se lee mucho y tolera unos segundos de atraso; el stock no puede venderse de más ni perder unidades. Separarlos permite escalar y cachear el catálogo sin tocar el stock, y deja la reserva y la transferencia contenidas en un solo servicio.
 - **Los pagos están dentro de Ventas**, como adaptador hacia Mercado Pago, porque no hay reglas de pago propias que justifiquen otro servicio.
-- **No hay servicio de notificaciones:** Ventas envía los mails mediante un puerto propio. Si en el futuro hace falta, el adaptador de mail se puede extraer a un servicio sin cambiar la lógica de negocio. Con la opción B de la capacidad publicada, los emails de otros grupos entran por un adaptador aparte de Ventas y usan el mismo puerto.
-- **La capacidad publicada no suma servicios:** vive en Inventario (opción A) o en Ventas (opción B), como una entrada aparte que se puede quitar al terminar la materia.
+- **No hay servicio de notificaciones:** Ventas envía los mails mediante un puerto propio. Si en el futuro hace falta, el adaptador de mail se puede extraer a un servicio sin cambiar la lógica de negocio.
+- **Las integraciones con otros grupos no suman servicios:** el catálogo se expone desde Catálogo, los pedidos entran a Ventas y la consignación sale desde Inventario. Cada una es una entrada o salida aparte, que se puede desactivar cuando el sistema pase al cliente.
 - **No hay servicio de carrito:** el carrito no reserva stock, así que no tiene reglas ni garantías. Vive en el navegador y se envía completo a Ventas al comprar, que vuelve a validar precio, publicación y stock.
 - **Ventas no consulta a Usuarios:** la identidad del comprador llega en el token (ver §6). Comprar no depende de que Usuarios esté disponible.
 - **Inventario no copia datos de Catálogo:** la vista de stock del panel la compone el frontend con datos de los dos servicios.
@@ -86,7 +99,8 @@ Se resumen acá y se justifican en el [**ADR-001 (D1)**](adr/ADR-001-limites-de-
 | Venta, ítems, pagos y estados        | Ventas                                                              | El comprador registrado los consulta a través del gateway; se filtran por su id de usuario.                                                                                                                                                                                     |
 | Usuario, credenciales y rol          | Usuarios                                                            | El gateway valida el token. Ventas recibe el id y el email del comprador desde el token y los guarda en cada venta.                                                                                                                                                             |
 | Carrito                              | Frontend (navegador del comprador)                                  | No llega al backend hasta que el comprador aprieta "Comprar".                                                                                                                                                                                                                   |
-| Datos de la capacidad publicada      | Inventario (opción A: cupos y reservas) o Ventas (opción B: emails) | Cada grupo consumidor ve solo lo suyo, separado por su clave. No se mezclan con los datos de FAV.                                                                                                                                                                               |
+| Pedidos de grupos externos | Ventas (la venta) e Inventario (el stock apartado) | Se identifican por la clave del grupo. Se registran como ventas con el canal *grupo externo*. |
+| Stock en consignación | Gimnasio | FAV lo consulta por su API. Inventario registra las salidas a consignación y las reposiciones. |
 | Índice de búsqueda                   | Modelo de lectura derivado                                          | No es fuente de verdad: se reconstruye a partir de Catálogo e Inventario.                                                                                                                                                                                                       |
 | Caché                                | Copia temporal                                                      | No es fuente de verdad: puede estar ausente o vencida.                                                                                                                                                                                                                          |
 
@@ -109,21 +123,27 @@ Al iniciar sesión, Usuarios emite un JWT con `sub` (id), `email`, `role`, `iat`
 | Ventas → Mercado Pago                                    | Crear el pago                                                                                     | Timeout y circuit breaker                                                           | La compra no avanza y la reserva vence sola                  |
 | Mercado Pago → Gateway → Ventas                          | Aviso del resultado del pago                                                                      | Procesamiento idempotente                                                           | Mercado Pago reintenta el aviso                              |
 | Ventas → proveedor de mail                               | Enviar mails                                                                                      | Envío fuera de la transacción de la venta, con reintentos **[propuesta]**           | Se registra como fallido; la venta no se afecta              |
-| Grupo consumidor → Gateway → Inventario (A) o Ventas (B) | Capacidad publicada                                                                               | Clave por grupo **[propuesta]**, clave de idempotencia, límite de pedidos por grupo | Errores definidos en el contrato                             |
+| Grupo de proveedores → Gateway → Catálogo y Ventas | Ver el catálogo y hacer pedidos (capacidad publicada) | Clave por grupo **[propuesta]**, clave de idempotencia, límite de pedidos por grupo | Errores definidos en el contrato |
+| Inventario → Gimnasio | Consultar su stock de FAV y registrar reposiciones (capacidad consumida) | Timeout, reintento acotado, clave de idempotencia y circuit breaker **[propuesta]** | La reposición queda pendiente y se reintenta; el panel muestra que los datos del gimnasio no están disponibles |
 
 Los valores concretos de timeouts y reintentos se definen en el **ADR-005 (D5)**.
 
-### Capacidad publicada (dos opciones, se elige una)
+### Capacidad publicada: catálogo y pedidos
 
-|                    | Opción A · Reserva de cupos                                                                          | Opción B · Envío de emails                                                                                 |
-| ------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Qué hace           | El consumidor registra cupos, los reserva por un tiempo y los confirma o libera; si no, vencen solos | El consumidor manda un email armado, para ya o programado; FAV lo envía con reintentos e informa el estado |
-| Servicio           | Inventario: reutiliza el mecanismo de reserva que usa Ventas                                         | Ventas: un adaptador de entrada aparte que usa el puerto de mail existente                                 |
-| Comunicación       | Síncrona                                                                                             | Síncrona para pedir y consultar; el envío ocurre en segundo plano                                          |
-| Si el servicio cae | La capacidad deja de responder                                                                       | La capacidad deja de responder; los emails ya registrados se envían al volver                              |
-| Contrato           | [`cupos-v1.openapi.yaml`](contracts/cupos-v1.openapi.yaml)                                           | [`emails-v1.openapi.yaml`](contracts/emails-v1.openapi.yaml)                                               |
+El grupo de proveedores ve el catálogo de FAV y le hace pedidos para sí mismo, como un comprador mayorista.
 
-Uso, errores y ejemplos en [`contracts/README.md`](contracts/README.md). La elección y la alternativa descartada se registran en el **ADR-008 (D8)**.
+| Operación | Servicio | Qué hace |
+|---|---|---|
+| `GET /v1/productos` | Catálogo | Productos publicados con sus variantes y el precio vigente. No informa stock. |
+| `POST /v1/pedidos` | Ventas | Pide el precio a Catálogo, aparta el stock online en Inventario por 48 horas (todo o nada) y registra la venta *Pendiente de pago* por transferencia. Desde ahí sigue como una compra por transferencia (CU-02). |
+
+Contrato: [`catalogo-pedidos-v1.openapi.yaml`](contracts/catalogo-pedidos-v1.openapi.yaml). Uso, errores y ejemplos en [`contracts/README.md`](contracts/README.md). Se justifica en el **ADR-008 (D8)**.
+
+### Capacidad consumida: venta en consignación en un gimnasio
+
+El gimnasio vende ropa de FAV y se queda con una comisión. **Inventario** llama a su API para consultar cuánto stock de FAV le queda y para registrar reposiciones. Al reponer, Inventario descuenta el stock físico y guarda una *reposición pendiente* en la misma transacción (con outbox); un proceso la envía al gimnasio con una clave de idempotencia y la reintenta si falla. Si el gimnasio la rechaza, las unidades vuelven al stock físico.
+
+Inventario lo hace con un adaptador de salida que traduce el modelo del gimnasio al de FAV. **[?]** Contrato del gimnasio, pendiente. Se justifica en el **ADR-009 (D9)**.
 
 ### Asíncronas (RabbitMQ, con transactional outbox)
 
@@ -155,10 +175,11 @@ Si algo se cae, lo demás tiene que seguir funcionando y tiene que poder saberse
 | Se cae                                  | Sigue funcionando                                                                                                                        | Deja de funcionar                                                                                       | Cómo se contiene                                                    |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Una réplica de Catálogo                 | Todo: la otra réplica atiende                                                                                                            | —                                                                                                       | Balanceo con verificación de disponibilidad (D12)                   |
-| Catálogo (todas las réplicas)           | Iniciar sesión, panel de ventas; venta del local con el monto cargado a mano **[propuesta]**                                             | Navegar, buscar, comprar online y ver el stock con nombres en el panel                                  | Timeout desde Ventas; error claro                                   |
-| Inventario                              | Navegar y buscar (la disponibilidad mostrada puede estar desactualizada)                                                                 | Comprar online, registrar ventas del local, ver y mover stock; la capacidad publicada si es la opción A | Timeout y reintento acotado; nunca queda una venta a medias         |
-| Ventas                                  | Navegar, buscar, gestionar productos y stock                                                                                             | Comprar, registrar ventas, ver pedidos; la capacidad publicada si es la opción B                        | El gateway devuelve un error claro                                  |
-| Un pico de pedidos del grupo consumidor | Todo                                                                                                                                     | —                                                                                                       | Límite de pedidos por grupo **[propuesta]**: el exceso recibe `429` |
+| Catálogo (todas las réplicas)           | Iniciar sesión, panel de ventas; venta del local con el monto cargado a mano **[propuesta]**                                             | Navegar, buscar, comprar online, ver el stock con nombres en el panel y la capacidad publicada (catálogo y pedidos)                                  | Timeout desde Ventas; error claro                                   |
+| Inventario | Navegar y buscar (la disponibilidad mostrada puede estar desactualizada) | Comprar online, registrar ventas del local, ver y mover stock, pedidos de grupos externos, reponer al gimnasio | Timeout y reintento acotado; nunca queda una venta a medias |
+| Ventas | Navegar, buscar, gestionar productos y stock | Comprar, registrar ventas, ver pedidos, pedidos de grupos externos | El gateway devuelve un error claro |
+| Un pico de pedidos del grupo de proveedores | Todo | — | Límite de pedidos por grupo **[propuesta]**: el exceso recibe `429` |
+| El gimnasio | Todo lo de FAV | Ver el stock del gimnasio y enviarle reposiciones | Timeout y circuit breaker; las reposiciones pendientes se envían cuando vuelve |
 | Usuarios                                | Navegar, buscar, comprar como invitado y las sesiones ya iniciadas, porque el gateway valida el token sin consultar a Usuarios (ADR-001) | Iniciar sesión y registrarse                                                                            | —                                                                   |
 | RabbitMQ                                | Todo lo síncrono                                                                                                                         | Los efectos asíncronos se demoran: paso a _Vencida_, variantes nuevas en Inventario, índice             | Outbox: los eventos se publican cuando vuelve                       |
 | Mercado Pago                            | Navegar; comprar por transferencia                                                                                                       | Pagar con Mercado Pago                                                                                  | Timeout y circuit breaker; se ofrece la transferencia               |
@@ -193,7 +214,7 @@ Se simula un **pico de demanda** como los que describe el cliente (cambio de tem
 
 - **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Catálogo con dos réplicas), MongoDB, tres MySQL y RabbitMQ. Redis, el motor de búsqueda y las herramientas de observabilidad se suman cuando se incorporen. Los secretos (incluida la clave privada del token) van en un archivo `.env` que no se sube al repositorio.
 - **Balanceo:** Catálogo con dos réplicas, porque es el servicio más leído **[propuesta]**. El mecanismo se define en el **ADR-012 (D12)**.
-- **Nube:** el servicio que expone la capacidad publicada se despliega con una URL pública para el grupo consumidor: Inventario con la opción A, o Ventas con su base y el proveedor de mail con la opción B. **[?]** proveedor de nube.
+- **Nube:** para que el grupo de proveedores use la capacidad con una URL pública se despliegan el gateway, Catálogo, Ventas e Inventario con sus bases. **[?]** proveedor de nube.
 
 ## 13. Estructura del repositorio
 
@@ -227,8 +248,7 @@ Lo que todavía no existe en el repositorio es previsto y se agrega en entregas 
 │   │   └── ADR-008-contrato-propio.md
 │   └── contracts/
 │       ├── README.md
-│       ├── cupos-v1.openapi.yaml   # opción A
-│       └── emails-v1.openapi.yaml  # opción B
+│       └── catalogo-pedidos-v1.openapi.yaml   # capacidad publicada
 ├── services/
 │   ├── catalogo/
 │   ├── inventario/
@@ -236,9 +256,8 @@ Lo que todavía no existe en el repositorio es previsto y se agrega en entregas 
 │   └── usuarios/
 ├── gateway/
 ├── frontend/
-└── mocks/                      # mock del contrato publicado; queda el de la opción elegida
-    ├── cupos-v1/
-    └── emails-v1/
+└── mocks/                      # mock del contrato publicado
+    └── catalogo-pedidos-v1/
 ```
 
 **Cada servicio** tiene su propio `go.mod`, `Dockerfile` y `README.md`, y se puede construir y desplegar por separado. Su organización interna sigue el estilo del servicio, que se decide en el D2. Estas estructuras son provisorias:
@@ -264,6 +283,17 @@ services/ventas/                # hexagonal
 ├── Dockerfile
 ├── go.mod
 └── README.md
+
+services/inventario/            # hexagonal
+├── cmd/inventario/main.go
+├── internal/
+│   ├── dominio/                # stock, reserva, transferencia y sus reglas
+│   ├── aplicacion/             # casos de uso: reservar, confirmar, liberar, transferir, ajustar
+│   ├── puertos/                # interfaces que necesita el núcleo
+│   └── adaptadores/            # http, mysql, rabbitmq, proceso de vencimiento
+├── Dockerfile
+├── go.mod
+└── README.md
 ```
 
 **Numeración de los ADR:** el número coincide con la decisión de la consigna (ADR-001 = D1, …, ADR-013 = D13). Las decisiones adicionales empiezan en ADR-014.
@@ -276,21 +306,20 @@ services/ventas/                # hexagonal
 | [ADR-001](adr/ADR-001-limites-de-los-servicios.md) | D1 · Límites de los servicios     | Aceptada · Entrega 1                                 |
 | [ADR-003](adr/ADR-003-persistencia.md)             | D3 · Persistencia                 | Aceptada (versión inicial) · Entrega 1               |
 | [ADR-005](adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) · Entrega 1               |
-| [ADR-008](adr/ADR-008-contrato-propio.md)          | D8 · Contrato propio              | Propuesta · se acepta al elegir la capacidad (A o B) |
+| [ADR-008](adr/ADR-008-contrato-propio.md) | D8 · Contrato propio | Aceptada · Entrega 2 |
 | ADR-002, 004, 006, 007, 009 a 013                  | D2, D4, D6, D7, D9 a D13          | Entregas siguientes                                  |
 
 ## 15. Pendientes de arquitectura
 
 | Tema                                                                                          | Dónde se resuelve                         |
 | --------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Estilo interno de Inventario                                                                  | D2                                        |
+| Justificación de los estilos internos de cada servicio                                        | D2 (ADR-002)                              |
 | Motor de búsqueda y retraso máximo del índice                                                 | D6                                        |
 | Qué se cachea exactamente y tiempo de vencimiento                                             | D7                                        |
 | Tecnología del API Gateway y del frontend                                                     | D2 / D12                                  |
 | Herramientas de observabilidad y retención de métricas                                        | D11                                       |
-| Elegir la capacidad publicada (A o B) según el grupo consumidor                               | D8                                        |
+| Contrato del gimnasio y cómo identifica los productos de FAV | D9 |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
-| Opción B: cuánto tiempo se conservan los emails de otros grupos y dirección remitente         | D8                                        |
 | Dónde se almacenan las fotos de los productos                                                 | D3                                        |
 | Firma y vencimiento del token, y dónde lo guarda el frontend                                  | Implementación del gateway y del frontend |
 | Proveedor de mail y de nube                                                                   | D5 / D13                                  |

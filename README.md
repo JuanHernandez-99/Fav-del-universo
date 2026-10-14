@@ -7,7 +7,7 @@ Juan Hernandez - 2325917
 
 Sistema de venta online y control de stock para **FAV**, una tienda de indumentaria femenina que hoy vende solo en el local y lleva el stock en un Excel. Es también el Trabajo Práctico Integrador de **Arquitectura de Software 2026**.
 
-> **Estado: Entrega 1 · Diseño y contrato con mock.** Todavía no hay código de los servicios. Lo que hay es el diseño, las decisiones y el contrato de la capacidad a compartir. Lo que dice _previsto_ se implementa en entregas siguientes.
+> **Estado: camino a la Entrega 2.** Todavía no hay código de los servicios. Hay diseño, decisiones, el contrato de la capacidad compartida y su mock. Lo que dice _previsto_ se implementa en entregas siguientes.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: parte del diseño, todavía no implementado.
 
@@ -36,16 +36,18 @@ Cuatro microservicios en **Go**, cada uno con su propia base de datos, detrás d
 
 Detalle, diagramas, comunicaciones y comportamiento ante fallas: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-## Capacidad compartida con otro grupo
+## Integración con otros grupos
 
-Publicamos una capacidad para que la use otro grupo de la materia, con un contrato OpenAPI. Hay dos opciones y se publica **una sola**, según el grupo que la consuma **[?]**:
+**Capacidad que publicamos: catálogo y pedidos.** Otro grupo de la materia puede ver el catálogo de FAV y hacerle pedidos, como un comprador mayorista. El pedido aparta el stock y registra la venta, pendiente de pago por transferencia.
 
-| Opción                                   | Qué ofrece                                                             | Servicio   | Contrato                                                          |
-| ---------------------------------------- | ---------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------- |
-| **A · Reserva de cupos con vencimiento** | Registrar cupos, reservarlos por un tiempo y confirmarlos o liberarlos | Inventario | [`cupos-v1.openapi.yaml`](docs/contracts/cupos-v1.openapi.yaml)   |
-| **B · Envío de emails**                  | Enviar un email armado, ya o programado, y consultar su estado         | Ventas     | [`emails-v1.openapi.yaml`](docs/contracts/emails-v1.openapi.yaml) |
+| Operación | Ruta | Servicio |
+|---|---|---|
+| Ver el catálogo | `GET /v1/productos` | Catálogo |
+| Hacer un pedido | `POST /v1/pedidos` | Ventas (aparta el stock en Inventario) |
 
-Cómo usarla, errores y ejemplos: [`docs/contracts/README.md`](docs/contracts/README.md). Mocks para probarla: [`mocks/`](mocks).
+Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v1.openapi.yaml). Cómo usarla, errores y ejemplos: [`docs/contracts/README.md`](docs/contracts/README.md). Mock para probarla: [`mocks/catalogo-pedidos-v1`](mocks/catalogo-pedidos-v1).
+
+**Capacidad que consumimos: gimnasio.** FAV vende ropa en consignación en un gimnasio: Inventario consulta cuánto stock nuestro les queda y les registra reposiciones. **[?]** Contrato pendiente del grupo del gimnasio.
 
 ## Decisiones de arquitectura (ADR)
 
@@ -54,17 +56,17 @@ Cómo usarla, errores y ejemplos: [`docs/contracts/README.md`](docs/contracts/RE
 | [ADR-001](docs/adr/ADR-001-limites-de-los-servicios.md) | D1 · Límites de los servicios     | Aceptada                   |
 | [ADR-003](docs/adr/ADR-003-persistencia.md)             | D3 · Persistencia                 | Aceptada (versión inicial) |
 | [ADR-005](docs/adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) |
-| [ADR-008](docs/adr/ADR-008-contrato-propio.md)          | D8 · Contrato propio              | Propuesta                  |
+| [ADR-008](docs/adr/ADR-008-contrato-propio.md)          | D8 · Contrato propio              | Aceptada                   |
 
 Las demás decisiones se registran en las entregas siguientes. Plantilla: [`ADR-000`](docs/adr/ADR-000-plantilla.md).
 
 ## Cómo levantarlo
 
-**Entrega 1.** Solo se puede levantar el mock de la capacidad compartida:
+**Hoy.** Solo se puede levantar el mock de la capacidad compartida:
 
 ```bash
-cd mocks/cupos-v1      # o mocks/emails-v1
-docker compose up
+cd mocks/catalogo-pedidos-v1
+docker compose up      # queda en http://localhost:8090
 ```
 
 **Previsto (Entrega 2).** Todo el sistema con un solo comando:
@@ -98,6 +100,6 @@ El [`docker-compose.yml`](docker-compose.yml) de la raíz ya tiene la infraestru
 
 | Entrega                        | Contenido                                                                                       | Estado   |
 | ------------------------------ | ----------------------------------------------------------------------------------------------- | -------- |
-| 1 · Diseño y contrato con mock | README, SPEC, ARCHITECTURE, diagramas, límites de los servicios, contrato y ADR D1, D3, D5 y D8 | En curso |
-| 2                              | Servicios funcionando, capacidad compartida, más ADR                                            | Prevista |
+| 1 · Diseño y contrato con mock | README, SPEC, ARCHITECTURE, diagramas, límites de los servicios, contrato y ADR D1, D3, D5 y D8 | Entregada |
+| 2 · Dominio propio de punta a punta (23/10) | Servicios funcionando, capacidad compartida, logs y traza, más ADR | En curso |
 | Siguientes                     | Caché, búsqueda, observabilidad, pruebas de carga, caída controlada                             | Prevista |

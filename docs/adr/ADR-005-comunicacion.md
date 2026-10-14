@@ -9,6 +9,8 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar. Los valores numéricos son **[propuesta]** hasta medirlos en la Entrega 2.
 
+> **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
+
 ## Contexto
 
 La consigna (requisito 2.5) pide comunicación síncrona y asíncrona:

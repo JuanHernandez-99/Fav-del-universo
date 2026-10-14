@@ -1,212 +1,165 @@
-# Capacidad publicada por FAV
+# Capacidad publicada por FAV · Catálogo y pedidos
 
-> **Estado: propuesta para la Entrega 1** · 09/10/2026
+> **Versión vigente: 1.0.0** · 14/10/2026
 >
-> Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar.
+> Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por FAV, sin confirmar.
 
-FAV propone **dos capacidades alternativas** para que las use otro grupo. Se publicará **una sola**, según el grupo consumidor que asigne la cátedra. Las dos son independientes del dominio de FAV (ropa): sirven para sistemas de otros dominios.
+FAV es una tienda de ropa. Esta capacidad le permite a otro grupo **ver el catálogo de FAV y hacerle pedidos**, como un comprador mayorista:
 
-| Opción | Qué ofrece | Servicio de FAV | Contrato |
-|---|---|---|---|
-| **A · Reserva de cupos** | Apartar algo limitado durante un tiempo, sin sobreventa, y después confirmarlo o liberarlo | Inventario | [`cupos-v1.openapi.yaml`](cupos-v1.openapi.yaml) |
-| **B · Envío de emails** | Enviar un email armado por el consumidor, en el momento o programado, con reintentos y estado consultable | Ventas | [`emails-v1.openapi.yaml`](emails-v1.openapi.yaml) |
+1. **Ver el catálogo:** productos publicados, sus variantes (talle y color) y el precio vigente.
+2. **Hacer un pedido:** FAV aparta el stock y registra la venta, que queda **pendiente de pago por transferencia**.
 
-Los contratos están en **OpenAPI 3.0.3** y son la fuente de verdad. Se pueden ver en [Swagger Editor](https://editor.swagger.io) pegando el YAML.
+El pedido lo hace el grupo para sí mismo: no se envían datos de clientes finales.
+
+| | |
+|---|---|
+| **Contrato** | [`catalogo-pedidos-v1.openapi.yaml`](catalogo-pedidos-v1.openapi.yaml) (OpenAPI 3.0.3). Es la fuente de verdad. Se puede ver en [Swagger Editor](https://editor.swagger.io) pegando el YAML. |
+| **Mock** | [`mocks/catalogo-pedidos-v1/`](../../mocks/catalogo-pedidos-v1) |
+| **Decisión de diseño** | [ADR-008](../adr/ADR-008-contrato-propio.md) |
 
 ---
 
-## 1. Reglas comunes a las dos opciones
+## 1. Operaciones
 
-### Autenticación
-Cada grupo consumidor recibe una **clave propia** y la envía en el header `X-API-Key` **[propuesta]**. La clave separa los datos de cada grupo: un grupo solo ve y opera lo suyo. Lo de otro grupo responde como inexistente (`404`). **[?]** cómo se entrega y se rota la clave.
+| Operación | Ruta | Qué hace |
+|---|---|---|
+| Ver el catálogo | `GET /v1/productos` | Devuelve todos los productos publicados con sus variantes y el precio vigente. |
+| Hacer un pedido | `POST /v1/pedidos` | Aparta el stock y registra la venta, pendiente de pago por transferencia. Todo o nada. |
 
-### Idempotencia
-- Las operaciones que **crean** algo (reservar, enviar un email) exigen el header `Idempotency-Key`: una clave única por cada operación lógica (se recomienda un UUID).
-- Ante un timeout, un `500` o un `503`, se reintenta **con la misma clave y el mismo cuerpo**: se obtiene el mismo resultado, sin duplicar.
+### Ver el catálogo
+
+- Devuelve solo productos **publicados**, dentro de `items`.
+- Por producto: `productoId`, `nombre`, `categoria` y `variantes`. `descripcion` y `fotoUrl` son opcionales: pueden no venir.
+- Por variante: `varianteId` (el que se usa en el pedido), `talle`, `color` y `precio` (precio vigente por unidad, en pesos, con la promoción aplicada si hay una).
+- **No informa stock.** Si una variante no alcanza, el pedido responde `409 STOCK_INSUFICIENTE`.
+- Devuelve el catálogo completo en una sola respuesta (del orden de cientos de productos). Si el consumidor quiere mostrarlo por páginas, lo hace de su lado.
+
+### Hacer un pedido
+
+- Se envían `items` (hasta 20 variantes **[propuesta]**, sin repetir) con `varianteId` y `cantidad` (de 1 a 10 **[propuesta]**), y opcionalmente una `referenciaExterna` (el número de pedido en su sistema).
+- **Todo o nada:** si una variante no alcanza, no se aparta ninguna.
+- **El precio lo calcula FAV** al momento del pedido y se devuelve en la respuesta.
+- El pedido queda `PENDIENTE_DE_PAGO`. La respuesta incluye el total, los datos para transferir y `pago.venceEn`: el stock queda apartado **48 horas**.
+
+### Qué pasa después del pedido (fuera de la API)
+
+```
+POST /v1/pedidos ──► PENDIENTE_DE_PAGO ──(FAV verifica la transferencia)──► pagado: el stock se descuenta
+                            │
+                            └──(pasan 48 horas sin pago)──► vencido: el stock se libera
+```
+
+1. El grupo transfiere el total a los datos de `pago.datosTransferencia`.
+2. FAV verifica la transferencia: la venta pasa a pagada y el stock se descuenta definitivamente.
+3. Si no llega en 48 horas, el pedido vence y el stock se libera.
+
+Consultar el estado de un pedido no está en la v1. Para saber si se acreditó un pago, usar el contacto (§7).
+
+**[?]** Los datos bancarios reales los define el cliente. Los del ejemplo son ficticios.
+
+---
+
+## 2. Autenticación, idempotencia y límites
+
+**Autenticación.** Cada grupo recibe una clave propia y la envía en el header `X-API-Key`. Sin clave o con una clave inválida: `401 NO_AUTENTICADO`. **[?]** Cómo se entrega y se rota la clave.
+
+**Idempotencia.** `POST /v1/pedidos` exige el header `Idempotency-Key`: una clave única por pedido (se recomienda un UUID).
+- Ante un timeout, un `500` o un `503`, reintentar **con la misma clave y el mismo cuerpo**: se recibe la misma respuesta, sin crear otro pedido.
 - La misma clave con otro cuerpo devuelve `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`.
-- Vigencia de la clave: 48 horas **[propuesta]**.
-- Las operaciones sobre algo existente (confirmar, liberar, cancelar, registrar un cupo) son idempotentes por sí mismas: repetirlas no tiene efecto adicional.
+- La clave vale 48 horas **[propuesta]**.
 
-### Errores
+**Límite de uso.** 60 pedidos por minuto por grupo, sumando las dos operaciones **[propuesta]**. El exceso recibe `429` con el header `Retry-After`.
+
+**Correlación.** Se puede enviar `X-Correlation-Id` para seguir una operación en los logs de los dos sistemas. FAV lo devuelve siempre; si no se envía, genera uno.
+
+---
+
+## 3. Errores
+
 Todos los errores usan **Problem Details** (RFC 9457) con un campo `codigo` estable. **Decidir siempre por `codigo`**, no por los textos.
 
 ```json
 {
-  "type": "https://fav.example/errores/pedido-invalido",
-  "title": "Pedido inválido",
-  "status": 400,
-  "codigo": "PEDIDO_INVALIDO",
-  "errores": [{ "campo": "items[0].cantidad", "mensaje": "debe ser mayor o igual a 1" }]
+  "type": "https://fav.example/errores/stock-insuficiente",
+  "title": "Stock insuficiente",
+  "status": 409,
+  "detail": "Al menos una variante no alcanza. No se apartó ninguna unidad.",
+  "codigo": "STOCK_INSUFICIENTE",
+  "faltantes": [{ "varianteId": "var-remera-basica-blanca-m", "solicitada": 3 }]
 }
 ```
 
-Errores comunes a las dos opciones:
+| HTTP | `codigo` | Operación | Significado | ¿Reintentar? |
+|---|---|---|---|---|
+| 400 | `PEDIDO_INVALIDO` | Pedido | Falta un header obligatorio o el cuerpo no cumple el contrato. `errores` indica los campos. | No. Corregir. |
+| 400 | `VARIANTE_INEXISTENTE` | Pedido | Una variante no existe o su producto no está publicado. `variantes` indica cuáles. | No. Corregir. |
+| 401 | `NO_AUTENTICADO` | Ambas | Falta la clave o no es válida. | No. |
+| 409 | `STOCK_INSUFICIENTE` | Pedido | Al menos una variante no alcanza. No se apartó nada. `faltantes` indica cuáles. | No con las mismas cantidades. |
+| 409 | `CLAVE_IDEMPOTENCIA_REUTILIZADA` | Pedido | La clave ya se usó con otro cuerpo. | No. Usar otra clave. |
+| 429 | `LIMITE_EXCEDIDO` | Ambas | Demasiados pedidos del grupo. | Sí, después de `Retry-After`. |
+| 500 | `ERROR_INTERNO` | Ambas | Error inesperado de FAV. | Sí, con la misma `Idempotency-Key`. |
+| 503 | `NO_DISPONIBLE` | Ambas | FAV o una dependencia no está disponible. | Sí, con la misma `Idempotency-Key`. |
 
-| HTTP | `codigo` | Significado | ¿Reintentar? |
-|---|---|---|---|
-| 400 | `PEDIDO_INVALIDO` | Falta un header obligatorio o el cuerpo no cumple el contrato. `errores` indica los campos. | No. Corregir. |
-| 401 | `NO_AUTENTICADO` | Falta la clave del grupo o no es válida. | No. |
-| 409 | `CLAVE_IDEMPOTENCIA_REUTILIZADA` | La clave ya se usó con otro cuerpo. | No. Usar otra clave. |
-| 429 | `LIMITE_EXCEDIDO` | Demasiados pedidos del grupo. **[?]** valor del límite. | Sí, después de `Retry-After`. |
-| 500 | `ERROR_INTERNO` | Error inesperado. | Sí, con la misma `Idempotency-Key`. |
-| 503 | `NO_DISPONIBLE` | El servicio o una dependencia no está disponible. | Sí, con la misma `Idempotency-Key`. |
-
-### Recomendaciones para el consumidor
-- Timeout de 2 segundos por llamada **[propuesta]**.
-- Reintentar solo ante timeout, `429`, `500` o `503`, hasta 3 veces con espera creciente **[propuesta]**.
-- Enviar `X-Correlation-Id` para seguir una operación en los logs de ambos sistemas. Siempre se devuelve en la respuesta.
-- Ignorar los campos de respuesta que no conozca (ver versionado).
+**Recomendaciones para el consumidor [propuesta]:**
+- Timeout de 3 segundos por llamada.
+- Reintentar solo ante timeout, `429`, `500` o `503`, hasta 3 veces con espera creciente.
+- Ignorar los campos de respuesta que no conozca (ver §5).
 
 ---
 
-## 2. Opción A · Reserva de cupos
-
-Un **cupo** es algo limitado con una cantidad, por ejemplo "tortas del sábado, 10". FAV no sabe qué representa: para FAV es un identificador y un número.
-
-**Disponible = capacidad − reservado − confirmado.** Nunca se reserva más de lo disponible.
-
-| Operación | Ruta | Qué hace |
-|---|---|---|
-| Registrar o ajustar un cupo | `PUT /v1/cupos/{cupoId}` | Crea el cupo o cambia su capacidad total. El consumidor elige el `cupoId`. |
-| Consultar un cupo | `GET /v1/cupos/{cupoId}` | Devuelve capacidad, reservado, confirmado y disponible. |
-| Reservar | `POST /v1/reservas` | Aparta unidades de uno o más cupos durante `vencimientoMinutos` (de 1 a 2880 **[propuesta]**). Todo o nada. |
-| Confirmar | `POST /v1/reservas/{id}/confirmar` | Las unidades se consumen definitivamente. |
-| Liberar | `POST /v1/reservas/{id}/liberar` | Las unidades vuelven a estar disponibles. |
-
-### Ciclo de vida de una reserva
-
-```
-            confirmar
-  ACTIVA ─────────────► CONFIRMADA
-    │  │
-    │  │ liberar
-    │  └──────────────► LIBERADA
-    │
-    │ pasa venceEn
-    └─────────────────► VENCIDA
-```
-
-Los tres estados finales no cambian más. Si una confirmación coincide con el vencimiento, gana una sola de las dos.
-
-### Ejemplo
+## 4. Ejemplos
 
 ```bash
-# 1. Registrar el cupo (una vez)
-curl -X PUT http://localhost:8090/v1/cupos/tortas-2026-10-10 \
-  -H "X-API-Key: <clave-del-grupo>" -H "Content-Type: application/json" \
-  -d '{ "descripcion": "Tortas del sábado 10/10", "capacidad": 10 }'
+# 1. Ver el catálogo
+curl http://localhost:8090/v1/productos \
+  -H "X-API-Key: clave-de-prueba"
+# → 200 { "items": [ { "productoId": "prod-remera-basica", "nombre": "Remera básica",
+#          "variantes": [ { "varianteId": "var-remera-basica-blanca-m", "talle": "M",
+#                           "color": "Blanco", "precio": 15000 }, … ] }, … ] }
 
-# 2. Reservar 1 unidad por 24 horas
-curl -X POST http://localhost:8090/v1/reservas \
-  -H "X-API-Key: <clave-del-grupo>" -H "Content-Type: application/json" \
+# 2. Hacer un pedido
+curl -X POST http://localhost:8090/v1/pedidos \
+  -H "X-API-Key: clave-de-prueba" -H "Content-Type: application/json" \
   -H "Idempotency-Key: 6f1c2b8e-3d4a-4e5f-9a7b-1c2d3e4f5a6b" \
-  -d '{ "referenciaExterna": "pedido-4521", "vencimientoMinutos": 1440,
-        "items": [ { "cupoId": "tortas-2026-10-10", "cantidad": 1 } ] }'
-# → 201 { "id": "3fa85f64-…", "estado": "ACTIVA", "venceEn": "2026-10-10T15:00:00Z", … }
+  -d '{ "referenciaExterna": "OC-2026-0457",
+        "items": [ { "varianteId": "var-remera-basica-blanca-m", "cantidad": 3 },
+                   { "varianteId": "var-jean-mom-celeste-38", "cantidad": 1 } ] }'
+# → 201 { "pedidoId": "7d9f2c1e-…", "estado": "PENDIENTE_DE_PAGO", "total": 87000, "moneda": "ARS",
+#         "pago": { "medio": "TRANSFERENCIA", "venceEn": "2026-10-18T15:00:00Z",
+#                   "datosTransferencia": { "alias": "FAV.EJEMPLO.ALIAS", "titular": "FAV (ejemplo)" } }, … }
 
-# 3. Confirmar (o liberar)
-curl -X POST http://localhost:8090/v1/reservas/3fa85f64-5717-4562-b3fc-2c963f66afa6/confirmar \
-  -H "X-API-Key: <clave-del-grupo>"
-# → 200 { "estado": "CONFIRMADA", … }
+# 3. Ver un error en el mock (stock insuficiente)
+curl -X POST http://localhost:8090/v1/pedidos \
+  -H "Prefer: code=409" \
+  -H "X-API-Key: clave-de-prueba" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: 6f1c2b8e-3d4a-4e5f-9a7b-1c2d3e4f5a6b" \
+  -d '{ "items": [ { "varianteId": "var-remera-basica-blanca-m", "cantidad": 3 } ] }'
+# → 409 { "codigo": "STOCK_INSUFICIENTE", "faltantes": [ … ] }
 ```
-
-### Errores propios
-
-| HTTP | `codigo` | Operación | Significado |
-|---|---|---|---|
-| 404 | `CUPO_INEXISTENTE` | Consultar cupo | El cupo no existe o no es del grupo. |
-| 422 | `CUPO_INEXISTENTE` | Reservar | Algún cupo del pedido no existe. No se reservó nada. |
-| 409 | `CUPO_INSUFICIENTE` | Reservar | Algún cupo no alcanza. `faltantes` indica cuáles y cuánto hay. No se reservó nada. |
-| 409 | `CAPACIDAD_MENOR_QUE_EN_USO` | Registrar cupo | La nueva capacidad es menor que lo reservado más lo confirmado. |
-| 404 | `RESERVA_INEXISTENTE` | Confirmar, Liberar | La reserva no existe o no es del grupo. |
-| 409 | `RESERVA_VENCIDA` | Confirmar | Venció antes de confirmarse. |
-| 409 | `RESERVA_LIBERADA` | Confirmar | Se liberó antes de confirmarse. |
-| 409 | `RESERVA_CONFIRMADA` | Liberar | Ya se confirmó; no se puede liberar. |
 
 ---
-
-## 3. Opción B · Envío de emails
-
-El consumidor manda **destinatario, asunto y texto ya armados**. FAV no decide ni interpreta el contenido. No hay plantillas en esta versión **[propuesta]**.
-
-El envío es **asincrónico**: el pedido se responde con `202` apenas se registra, sin esperar al proveedor de mail. El estado se consulta después.
-
-| Operación | Ruta | Qué hace |
-|---|---|---|
-| Enviar | `POST /v1/emails` | Registra el email para enviarlo ya o en `enviarEn` (hasta 30 días **[propuesta]**). |
-| Consultar | `GET /v1/emails/{id}` | Devuelve el estado, los intentos y, si falló, el motivo. |
-| Cancelar | `POST /v1/emails/{id}/cancelar` | Cancela un email programado que todavía no se envió. |
-
-### Estados
-
-```
-               se envía
- PROGRAMADO ─────────────► ENVIADO
-    │   │
-    │   │ se agotan los reintentos (5 [propuesta])
-    │   └─────────────────► FALLIDO
-    │
-    │ cancelar
-    └─────────────────────► CANCELADO
-```
-
-`ENVIADO` significa que el proveedor de mail aceptó el mensaje; no garantiza que llegue a la bandeja de entrada.
-
-Límites **[propuesta]**: un destinatario por email, asunto de hasta 200 caracteres, texto plano de hasta 10.000 caracteres.
-
-### Ejemplo
-
-```bash
-# 1. Programar un recordatorio
-curl -X POST http://localhost:8091/v1/emails \
-  -H "X-API-Key: <clave-del-grupo>" -H "Content-Type: application/json" \
-  -H "Idempotency-Key: 0c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f" \
-  -d '{ "destinatario": "paciente@example.com", "asunto": "Recordatorio de turno",
-        "texto": "Tu turno es mañana a las 10:00.", "enviarEn": "2026-10-14T12:00:00Z",
-        "referenciaExterna": "turno-981" }'
-# → 202 { "id": "9b2e7c41-…", "estado": "PROGRAMADO", "intentos": 0, … }
-
-# 2. Consultar el estado
-curl http://localhost:8091/v1/emails/9b2e7c41-0d3a-4f6e-8a51-2c7d9e0f1a23 \
-  -H "X-API-Key: <clave-del-grupo>"
-
-# 3. Cancelar (si el turno se canceló)
-curl -X POST http://localhost:8091/v1/emails/9b2e7c41-0d3a-4f6e-8a51-2c7d9e0f1a23/cancelar \
-  -H "X-API-Key: <clave-del-grupo>"
-```
-
-### Errores propios
-
-| HTTP | `codigo` | Operación | Significado |
-|---|---|---|---|
-| 404 | `EMAIL_INEXISTENTE` | Consultar, Cancelar | El email no existe o no es del grupo. |
-| 409 | `EMAIL_NO_CANCELABLE` | Cancelar | El email ya se envió o ya falló. |
-
-**[?]** proveedor de mail, dirección remitente y cuánto tiempo se conservan los mensajes.
-
----
-
-## 4. Entornos
-
-| Entorno | Opción A | Opción B | Estado |
-|---|---|---|---|
-| Mock local | `http://localhost:8090` **[propuesta]** | `http://localhost:8091` **[propuesta]** | En `mocks/`, para la Entrega 1 |
-| Desplegado (nube) | **[?]** | **[?]** | Antes de la presentación grupal. Proveedor de nube pendiente. |
 
 ## 5. Versionado y compatibilidad
 
-- La versión mayor va en la ruta (`/v1/...`) y en `info.version` del contrato (versionado semántico).
-- **Cambios compatibles** (suben la versión menor): operaciones nuevas, campos opcionales nuevos en los pedidos, campos nuevos en las respuestas, nuevos valores de `codigo`.
+- La versión mayor va en la ruta (`/v1/...`) y la completa en `info.version` del contrato (versionado semántico).
+- **Cambios compatibles** (suben la versión menor, misma ruta): operaciones nuevas, campos opcionales nuevos en los pedidos, campos nuevos en las respuestas, valores nuevos de `codigo`. **El consumidor debe ignorar los campos que no conoce.**
 - **Cambios incompatibles** (nueva versión mayor, `/v2/...`): quitar o renombrar campos u operaciones, volver obligatorio un campo opcional, cambiar el significado de un estado o de un código.
 - Si sale una `v2`, la `v1` sigue operativa hasta el fin de la evaluación.
-- Todo cambio se registra en el historial y en el ADR-008 (D8).
+- Posibles agregados compatibles a futuro: disponibilidad en el catálogo, paginación opcional (sin parámetros seguiría devolviendo el catálogo completo) y consulta del estado de un pedido.
 
-## 6. Historial de versiones
+## 6. Entornos
 
-| Versión | Fecha | Cambios |
+| Entorno | URL | Estado |
 |---|---|---|
-| 1.0.0 | 09/10/2026 | Primera versión de las dos propuestas (A: cupos, B: emails). |
+| Mock local | `http://localhost:8090` | Disponible. Ver [`mocks/catalogo-pedidos-v1/`](../../mocks/catalogo-pedidos-v1). |
+| Desplegado (nube) | **[?]** | Antes de la presentación grupal. |
 
 ## 7. Contacto
 
-**[?]** Canal para que el grupo consumidor reporte problemas o pida cambios (por ejemplo, issues del repositorio).
+**[?]** Canal para reportar problemas, pedir cambios o consultar el estado de un pago.
+
+## 8. Historial de versiones
+
+| Versión | Fecha | Cambios |
+|---|---|---|
+| 1.0.0 | 14/10/2026 | Primera versión: catálogo y pedidos. Reemplaza las propuestas de la Entrega 1 (reserva de cupos y envío de emails), descartadas al asignarse el grupo consumidor (ADR-008). |
