@@ -374,12 +374,16 @@ El **grupo de proveedores** ve el catálogo de FAV y le hace pedidos para sí mi
 |---|---|---|
 | `GET /v1/productos` | Devuelve los productos publicados con sus variantes (talle y color) y el precio vigente. No informa stock. | Catálogo |
 | `POST /v1/pedidos` | Aparta el stock y registra la venta, pendiente de pago por transferencia. | Ventas, que aparta el stock en Inventario |
+| `GET /v1/pedidos/{pedidoId}` | Devuelve el pedido con su estado vigente (contrato 1.1.0). | Ventas |
+| Webhook `pedidoActualizado` | FAV avisa a la `notificacionUrl` del pedido cuando pasa a pagado, vencido o a verificar (contrato 1.1.0). | Ventas |
 
 **HU-26 · Pedido de un grupo externo.** Como grupo de proveedores quiero hacerle un pedido a FAV, para comprar su ropa. *(RN-06, RN-09, RN-22)*
 1. Cuando todas las variantes alcanzan, entonces se aparta el stock **online [propuesta]** por 48 horas y la venta queda *Pendiente de pago* por transferencia, con el canal *grupo externo*.
 2. Cuando una variante no alcanza, entonces no se aparta nada y se informa cuál falta.
 3. Cuando el pedido se repite con la misma clave de idempotencia, entonces se aplica una sola vez.
 4. Desde ahí sigue como una compra por transferencia (CU-02): el administrador confirma la transferencia o la venta vence a las 48 horas.
+5. Dado un pedido con `notificacionUrl`, cuando la venta pasa a *Pagada*, *Vencida* o *A verificar*, entonces FAV envía un aviso firmado a esa URL; si el receptor no responde `2xx`, se reintenta con el mismo `eventoId`. La venta no se afecta si el aviso falla. *(contrato 1.1.0)*
+6. Cuando el grupo consulta un pedido propio, entonces ve su estado vigente; un pedido de otro grupo responde como inexistente. *(contrato 1.1.0)*
 
 Contrato: `docs/contracts/catalogo-pedidos-v1.openapi.yaml`. Uso, errores y ejemplos en `docs/contracts/README.md`. La decisión se justifica en el ADR-008 (D8).
 

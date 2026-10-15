@@ -27,7 +27,7 @@ No modifica el stock: se lo pide a [Inventario](../inventario). No consulta a Us
 
 ## Capacidad compartida: pedidos
 
-Ventas recibe los pedidos del grupo de proveedores (`POST /v1/pedidos`, contrato [`catalogo-pedidos-v1`](../../docs/contracts/catalogo-pedidos-v1.openapi.yaml)). Pide el precio a Catálogo, reserva el stock online en Inventario por 48 horas y registra la venta *Pendiente de pago* por transferencia, con el canal *grupo externo*. Desde ahí sigue como cualquier compra por transferencia. Entra por un adaptador aparte, que se puede desactivar ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)). Mock: [`mocks/catalogo-pedidos-v1`](../../mocks/catalogo-pedidos-v1).
+Ventas recibe los pedidos del grupo de proveedores (`POST /v1/pedidos`, contrato [`catalogo-pedidos-v1`](../../docs/contracts/catalogo-pedidos-v1.openapi.yaml)). Pide el precio a Catálogo, reserva el stock online en Inventario por 48 horas y registra la venta *Pendiente de pago* por transferencia, con el canal *grupo externo*. Desde ahí sigue como cualquier compra por transferencia. También responde `GET /v1/pedidos/{pedidoId}` y, si el pedido trae `notificacionUrl`, envía el webhook `pedidoActualizado` firmado cuando la venta se paga o vence, con el mismo mecanismo que los mails (contrato 1.1.0). Entra por un adaptador aparte, que se puede desactivar ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)). Mock: [`mocks/catalogo-pedidos-v1`](../../mocks/catalogo-pedidos-v1).
 
 ## Más información
 

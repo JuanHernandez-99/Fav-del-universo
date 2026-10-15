@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: FAV · Catálogo y pedidos para otros grupos
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Capacidad que FAV, una tienda de ropa, ofrece a otro grupo.
 
@@ -9,11 +9,27 @@ info:
     1. **Ver el catálogo** de FAV: productos publicados, sus variantes (talle y color) y el precio vigente.
     2. **Hacer un pedido**: FAV aparta el stock y registra la venta, que queda **pendiente de pago por
        transferencia**. El pedido lo hace el grupo para sí mismo; no se envían datos de clientes finales.
+    3. **Enterarse de cómo sigue el pedido** *(nuevo en 1.1.0)*: FAV avisa por **webhook** cuando el pedido
+       se paga o vence, y el estado se puede consultar con `GET /v1/pedidos/{pedidoId}`.
 
-    **Cómo sigue un pedido después de crearlo (fuera de esta API):** el grupo transfiere el total a FAV.
-    Cuando FAV verifica la transferencia, la venta pasa a pagada y el stock se descuenta definitivamente.
-    Si no se confirma el pago antes de `pago.venceEn` (48 horas), el pedido vence y el stock se libera.
-    Consultar el estado de un pedido no está incluido en la v1.
+    **Cómo sigue un pedido después de crearlo:** el grupo transfiere el total a FAV. Cuando FAV verifica la
+    transferencia, el pedido pasa a `PAGADO` y el stock se descuenta definitivamente. Si no se confirma el
+    pago antes de `pago.venceEn` (48 horas), el pedido pasa a `VENCIDO` y el stock se libera.
+
+    **Por qué un webhook.** Quien se entera primero de esos cambios es FAV: el pago lo verifica el
+    administrador y el vencimiento ocurre sin que nadie lo pida. Con el webhook, FAV le avisa al grupo en el
+    momento, sin que el grupo tenga que preguntar cada tanto. La consulta `GET` queda para confirmar el estado
+    o recuperarse si se perdió un aviso. El webhook es **opcional**: si el pedido no trae `notificacionUrl`,
+    todo funciona como en la 1.0.0.
+
+    **Compatibilidad:** la 1.1.0 solo agrega (un campo opcional, una operación, un callback, estados y
+    códigos de error). Un consumidor de la 1.0.0 sigue funcionando sin cambios.
+
+    **Versionado:** un cambio que puede romper a un consumidor se publica en una ruta nueva (`/v2/...`), y la
+    `/v1/...` sigue habilitada hasta una fecha de baja anunciada con 1 semana de anticipación
+    **[propuesta]**, nunca antes del fin de la evaluación. Desde el anuncio, las respuestas de la `v1` llevan
+    los headers `Deprecation` y `Sunset`; pasada la fecha, responden `410 VERSION_RETIRADA`. Detalle en
+    `docs/contracts/README.md` §6.
 
     Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por FAV, sin confirmar.
 servers:
@@ -32,7 +48,7 @@ tags:
 paths:
   /v1/productos:
     parameters:
-      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: "#/components/parameters/CorrelationId"
     get:
       tags: [Catálogo]
       operationId: listarProductos
@@ -46,30 +62,30 @@ paths:
         La lista va dentro de `items` para poder sumar más adelante una paginación opcional sin romper
         el contrato: sin parámetros seguiría devolviendo todo.
       responses:
-        '200':
+        "200":
           description: Catálogo publicado.
           headers:
             X-Correlation-Id:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Catalogo'
+                $ref: "#/components/schemas/Catalogo"
               examples:
                 catalogo:
-                  $ref: '#/components/examples/Catalogo'
-        '401':
-          $ref: '#/components/responses/NoAutenticado'
-        '429':
-          $ref: '#/components/responses/LimiteExcedido'
-        '500':
-          $ref: '#/components/responses/ErrorInterno'
-        '503':
-          $ref: '#/components/responses/NoDisponible'
+                  $ref: "#/components/examples/Catalogo"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "429":
+          $ref: "#/components/responses/LimiteExcedido"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
 
   /v1/pedidos:
     parameters:
-      - $ref: '#/components/parameters/CorrelationId'
+      - $ref: "#/components/parameters/CorrelationId"
     post:
       tags: [Pedidos]
       operationId: crearPedido
@@ -84,43 +100,47 @@ paths:
         - **Idempotencia:** el header `Idempotency-Key` es obligatorio. Repetir el pedido con la misma
           clave y el mismo cuerpo devuelve la misma respuesta, sin crear otro pedido. La misma clave con
           otro cuerpo devuelve `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`.
+        - **Avisos (opcional, desde 1.1.0):** si el cuerpo trae `notificacionUrl`, FAV envía ahí el
+          webhook `pedidoActualizado` cada vez que el pedido cambia de estado. Ver *Callbacks*.
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PedidoNuevo'
+              $ref: "#/components/schemas/PedidoNuevo"
             examples:
               pedido:
-                $ref: '#/components/examples/PedidoNuevo'
+                $ref: "#/components/examples/PedidoNuevo"
+              pedidoConAvisos:
+                $ref: "#/components/examples/PedidoNuevoConAvisos"
       responses:
-        '201':
+        "201":
           description: Pedido creado, pendiente de pago por transferencia.
           headers:
             X-Correlation-Id:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Pedido'
+                $ref: "#/components/schemas/Pedido"
               examples:
                 pedido:
-                  $ref: '#/components/examples/Pedido'
-        '400':
+                  $ref: "#/components/examples/Pedido"
+        "400":
           description: |
-            - `PEDIDO_INVALIDO`: falta un header obligatorio (por ejemplo `Idempotency-Key`) o el cuerpo no cumple el contrato. `errores` indica los campos.
+            - `PEDIDO_INVALIDO`: falta un header obligatorio (por ejemplo `Idempotency-Key`) o el cuerpo no cumple el contrato (incluida una `notificacionUrl` inválida). `errores` indica los campos.
             - `VARIANTE_INEXISTENTE`: una variante no existe o su producto no está publicado. `variantes` indica cuáles.
 
             No reintentar sin corregir el pedido.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/Problema'
+                $ref: "#/components/schemas/Problema"
               examples:
                 pedidoInvalido:
-                  $ref: '#/components/examples/PedidoInvalido'
+                  $ref: "#/components/examples/PedidoInvalido"
                 varianteInexistente:
                   value:
                     type: https://fav.example/errores/variante-inexistente
@@ -129,16 +149,16 @@ paths:
                     detail: La variante var-inexistente no existe o no está publicada.
                     codigo: VARIANTE_INEXISTENTE
                     variantes: [var-inexistente]
-        '401':
-          $ref: '#/components/responses/NoAutenticado'
-        '409':
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "409":
           description: |
             - `STOCK_INSUFICIENTE`: al menos una variante no alcanza; no se apartó nada. `faltantes` indica cuáles.
             - `CLAVE_IDEMPOTENCIA_REUTILIZADA`: la `Idempotency-Key` ya se usó con otro cuerpo.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/Problema'
+                $ref: "#/components/schemas/Problema"
               examples:
                 stockInsuficiente:
                   value:
@@ -157,12 +177,146 @@ paths:
                     status: 409
                     detail: La Idempotency-Key ya se usó con un pedido distinto.
                     codigo: CLAVE_IDEMPOTENCIA_REUTILIZADA
-        '429':
-          $ref: '#/components/responses/LimiteExcedido'
-        '500':
-          $ref: '#/components/responses/ErrorInterno'
-        '503':
-          $ref: '#/components/responses/NoDisponible'
+        "429":
+          $ref: "#/components/responses/LimiteExcedido"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+      callbacks:
+        pedidoActualizado:
+          "{$request.body#/notificacionUrl}":
+            post:
+              tags: [Pedidos]
+              operationId: pedidoActualizado
+              summary: Aviso de cambio de estado (webhook)
+              description: |
+                **Lo envía FAV** a la `notificacionUrl` del pedido cuando el pedido pasa a `PAGADO`,
+                `VENCIDO` o `A_VERIFICAR`. Lo recibe un endpoint del grupo consumidor.
+
+                **Qué tiene que hacer el receptor:**
+                1. **Verificar la firma** del header `X-FAV-Firma` antes de confiar en el cuerpo
+                   (ver el header). Firma inválida o vencida: responder `401` y descartar.
+                2. **Deduplicar por `eventoId`:** el mismo aviso puede llegar más de una vez. Si ya se
+                   procesó, responder `200` sin repetir el efecto.
+                3. **Responder `2xx` rápido** (en menos de 5 segundos) y hacer el trabajo pesado después.
+                4. Si hay dudas (aviso fuera de orden, datos que no cierran), **consultar
+                   `GET /v1/pedidos/{pedidoId}`**: el estado vigente es el de esa consulta, no el del aviso.
+
+                **Entrega:** al menos una vez. Si FAV no recibe un `2xx` en 5 segundos, reintenta a los
+                1, 5, 15 y 60 minutos. Agotados los intentos, el aviso se
+                descarta y el estado sigue disponible con el `GET`.
+
+                **Orden:** los estados solo avanzan (`PENDIENTE_DE_PAGO` → `PAGADO` o `VENCIDO`;
+                `VENCIDO` → `A_VERIFICAR`). Si llega un aviso con un estado anterior al que ya se
+                tiene, se puede ignorar.
+              security: []
+              parameters:
+                - name: X-FAV-Firma
+                  in: header
+                  required: true
+                  description: |
+                    Firma del aviso, con el formato `t=<timestamp>,v1=<firma>`:
+                    - `t`: segundos desde 1970 (Unix) en que FAV firmó el aviso.
+                    - `v1`: HMAC-SHA256 en hexadecimal de `<t>.<cuerpo>`, donde `<cuerpo>` es el cuerpo
+                      **crudo, tal cual se recibió** (sin volver a serializar el JSON), y la clave es el
+                      **secreto de avisos** del grupo.
+
+                    El receptor recalcula la firma, la compara en tiempo constante y rechaza el aviso
+                    si `t` tiene más de 5 minutos de antigüedad **[propuesta]**.
+
+                    El secreto de avisos lo entrega FAV junto con la clave del grupo **[?]**. En el mock
+                    el secreto es `secreto-de-prueba`.
+
+                    **Vector de prueba:** el ejemplo de este header es la firma real del ejemplo `pagado`
+                    serializado en una línea, sin espacios (como se envía), con el secreto `secreto-de-prueba`.
+                  schema:
+                    type: string
+                    pattern: '^t=\d+,v1=[0-9a-f]{64}$'
+                  example: t=1792243201,v1=2fbec75293b36b2159e73e8c8c1a36062411d20762993a8755dd47a211182ab4
+                - name: X-FAV-Evento-Id
+                  in: header
+                  required: true
+                  description: El mismo `eventoId` del cuerpo, para deduplicar sin leer el cuerpo.
+                  schema:
+                    type: string
+                    format: uuid
+                  example: 3b7e9a2c-5d1f-4c8e-a9b0-6f2d1e4c7a8b
+                - $ref: "#/components/parameters/CorrelationId"
+              requestBody:
+                required: true
+                content:
+                  application/json:
+                    schema:
+                      $ref: "#/components/schemas/EventoPedido"
+                    examples:
+                      pagado:
+                        $ref: "#/components/examples/EventoPagado"
+                      vencido:
+                        $ref: "#/components/examples/EventoVencido"
+              responses:
+                "200":
+                  description: Aviso recibido (o ya procesado antes). Cualquier `2xx` vale.
+                "401":
+                  description: Firma inválida o vencida. FAV no reintenta este aviso.
+                "5XX":
+                  description: El receptor falló. FAV reintenta según la política de entrega.
+
+  /v1/pedidos/{pedidoId}:
+    parameters:
+      - $ref: "#/components/parameters/CorrelationId"
+      - name: pedidoId
+        in: path
+        required: true
+        description: El `pedidoId` devuelto al crear el pedido.
+        schema:
+          type: string
+          format: uuid
+        example: 7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f
+    get:
+      tags: [Pedidos]
+      operationId: consultarPedido
+      summary: Consultar un pedido
+      description: |
+        *(Nuevo en 1.1.0.)* Devuelve el pedido con su **estado vigente**. Sirve para confirmar lo que
+        dijo un webhook o para ponerse al día si se perdió un aviso.
+
+        Solo se pueden consultar los pedidos del propio grupo: un pedido de otro grupo responde
+        `404 PEDIDO_INEXISTENTE`, igual que uno que no existe.
+      responses:
+        "200":
+          description: El pedido con su estado vigente.
+          headers:
+            X-Correlation-Id:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pedido"
+              examples:
+                pagado:
+                  $ref: "#/components/examples/PedidoPagado"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          description: "`PEDIDO_INEXISTENTE`: el pedido no existe o es de otro grupo. No reintentar."
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problema"
+              examples:
+                pedidoInexistente:
+                  value:
+                    type: https://fav.example/errores/pedido-inexistente
+                    title: Pedido inexistente
+                    status: 404
+                    codigo: PEDIDO_INEXISTENTE
+        "429":
+          $ref: "#/components/responses/LimiteExcedido"
+        "500":
+          $ref: "#/components/responses/ErrorInterno"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
 
 components:
   securitySchemes:
@@ -212,7 +366,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/Producto'
+            $ref: "#/components/schemas/Producto"
 
     Producto:
       type: object
@@ -236,7 +390,7 @@ components:
           type: array
           minItems: 1
           items:
-            $ref: '#/components/schemas/Variante'
+            $ref: "#/components/schemas/Variante"
 
     Variante:
       type: object
@@ -263,13 +417,23 @@ components:
           type: string
           maxLength: 100
           description: Identificador del pedido en el sistema del grupo. Se guarda y se devuelve.
+        notificacionUrl:
+          type: string
+          format: uri
+          maxLength: 500
+          pattern: "^https?://"
+          description: |
+            *(Opcional, desde 1.1.0.)* Endpoint del grupo donde FAV envía el webhook `pedidoActualizado`.
+            Tiene que ser alcanzable desde FAV: en el entorno desplegado, una URL pública con `https`
+            **[propuesta]**; con el mock local, por ejemplo `http://host.docker.internal:9000/...`.
+            Forma parte del pedido: cuenta para la idempotencia como el resto del cuerpo.
         items:
           type: array
           minItems: 1
           maxItems: 20
           description: Hasta 20 variantes por pedido **[propuesta]**. Una variante no puede repetirse.
           items:
-            $ref: '#/components/schemas/ItemPedido'
+            $ref: "#/components/schemas/ItemPedido"
 
     ItemPedido:
       type: object
@@ -284,6 +448,21 @@ components:
           maximum: 10
           description: Hasta 10 unidades por variante **[propuesta]**.
 
+    EstadoPedido:
+      type: string
+      enum: [PENDIENTE_DE_PAGO, PAGADO, VENCIDO, A_VERIFICAR]
+      description: |
+        - `PENDIENTE_DE_PAGO`: el stock está apartado hasta `pago.venceEn`, esperando la transferencia.
+          Es el estado con el que se crea **siempre** el pedido.
+        - `PAGADO`: FAV verificó la transferencia; el stock se descontó. La entrega se coordina por el
+          contacto (§7 del README).
+        - `VENCIDO`: pasaron las 48 horas sin que FAV verifique el pago; el stock se liberó.
+        - `A_VERIFICAR`: la transferencia llegó cuando el pedido ya había vencido. FAV lo revisa a mano
+          y se comunica por el contacto **[?]** (reintegro o nueva reserva).
+
+        En una versión menor futura pueden agregarse estados. **Un estado que no se conoce** se trata
+        como "en revisión": no se toma ninguna acción automática y se consulta por el contacto.
+
     Pedido:
       type: object
       required: [pedidoId, estado, items, total, moneda, pago, creadoEn]
@@ -294,15 +473,11 @@ components:
         referenciaExterna:
           type: string
         estado:
-          type: string
-          enum: [PENDIENTE_DE_PAGO]
-          description: |
-            Al crearse, el pedido siempre queda `PENDIENTE_DE_PAGO`. Los estados siguientes
-            (pagado o vencido) se resuelven fuera de esta API en la v1.
+          $ref: "#/components/schemas/EstadoPedido"
         items:
           type: array
           items:
-            $ref: '#/components/schemas/ItemPedidoConPrecio'
+            $ref: "#/components/schemas/ItemPedidoConPrecio"
         total:
           type: number
           format: double
@@ -310,10 +485,17 @@ components:
           type: string
           enum: [ARS]
         pago:
-          $ref: '#/components/schemas/Pago'
+          $ref: "#/components/schemas/Pago"
+        notificacionUrl:
+          type: string
+          description: "*(Desde 1.1.0.)* La URL de avisos registrada para el pedido, si se envió."
         creadoEn:
           type: string
           format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+          description: "*(Desde 1.1.0.)* Último cambio de estado."
 
     ItemPedidoConPrecio:
       type: object
@@ -351,6 +533,38 @@ components:
             titular:
               type: string
 
+    EventoPedido:
+      type: object
+      description: |
+        Cuerpo del webhook `pedidoActualizado`. Avisa que el pedido cambió de estado; el estado vigente
+        siempre se puede confirmar con `GET /v1/pedidos/{pedidoId}`.
+        El receptor debe **ignorar los campos que no conozca** (se pueden agregar en versiones menores).
+      required: [eventoId, tipo, ocurridoEn, pedido]
+      properties:
+        eventoId:
+          type: string
+          format: uuid
+          description: Identificador único del aviso. Es el mismo en todos los reintentos, así que sirve para deduplicar.
+        tipo:
+          type: string
+          enum: [pedido.actualizado]
+        ocurridoEn:
+          type: string
+          format: date-time
+          description: Cuándo cambió el estado en FAV (no cuándo se envió el aviso).
+        pedido:
+          type: object
+          required: [pedidoId, estado]
+          properties:
+            pedidoId:
+              type: string
+              format: uuid
+            referenciaExterna:
+              type: string
+              description: La que envió el grupo al crear el pedido, si la envió.
+            estado:
+              $ref: "#/components/schemas/EstadoPedido"
+
     Problema:
       type: object
       description: Error en formato Problem Details (RFC 9457) con un `codigo` estable. Decidir siempre por `codigo`.
@@ -372,6 +586,8 @@ components:
             - STOCK_INSUFICIENTE
             - CLAVE_IDEMPOTENCIA_REUTILIZADA
             - VARIANTE_INEXISTENTE
+            - PEDIDO_INEXISTENTE
+            - VERSION_RETIRADA
             - LIMITE_EXCEDIDO
             - ERROR_INTERNO
             - NO_DISPONIBLE
@@ -407,7 +623,7 @@ components:
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/Problema'
+            $ref: "#/components/schemas/Problema"
           examples:
             noAutenticado:
               value:
@@ -419,11 +635,11 @@ components:
       description: Demasiados pedidos del grupo (60 por minuto **[propuesta]**). Reintentar después de `Retry-After`.
       headers:
         Retry-After:
-          $ref: '#/components/headers/RetryAfter'
+          $ref: "#/components/headers/RetryAfter"
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/Problema'
+            $ref: "#/components/schemas/Problema"
           examples:
             limiteExcedido:
               value:
@@ -436,7 +652,7 @@ components:
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/Problema'
+            $ref: "#/components/schemas/Problema"
           examples:
             errorInterno:
               value:
@@ -448,11 +664,11 @@ components:
       description: FAV o una de sus dependencias no está disponible. Reintentar con la misma `Idempotency-Key`.
       headers:
         Retry-After:
-          $ref: '#/components/headers/RetryAfter'
+          $ref: "#/components/headers/RetryAfter"
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/Problema'
+            $ref: "#/components/schemas/Problema"
           examples:
             noDisponible:
               value:
@@ -493,12 +709,23 @@ components:
             categoria: jeans
             variantes:
               - varianteId: var-jean-mom-celeste-38
-                talle: '38'
+                talle: "38"
                 color: Celeste
                 precio: 42000
     PedidoNuevo:
+      summary: Pedido sin avisos (igual que en 1.0.0)
       value:
         referenciaExterna: OC-2026-0457
+        items:
+          - varianteId: var-remera-basica-blanca-m
+            cantidad: 3
+          - varianteId: var-jean-mom-celeste-38
+            cantidad: 1
+    PedidoNuevoConAvisos:
+      summary: Pedido con webhook de avisos
+      value:
+        referenciaExterna: OC-2026-0457
+        notificacionUrl: https://proveedores.example/webhooks/fav
         items:
           - varianteId: var-remera-basica-blanca-m
             cantidad: 3
@@ -522,8 +749,54 @@ components:
         moneda: ARS
         pago:
           medio: TRANSFERENCIA
-          venceEn: '2026-10-18T15:00:00Z'
+          venceEn: "2026-10-18T15:00:00Z"
           datosTransferencia:
             alias: FAV.EJEMPLO.ALIAS
             titular: FAV (ejemplo)
-        creadoEn: '2026-10-16T15:00:00Z'
+        creadoEn: "2026-10-16T15:00:00Z"
+        actualizadoEn: "2026-10-16T15:00:00Z"
+    PedidoPagado:
+      value:
+        pedidoId: 7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f
+        referenciaExterna: OC-2026-0457
+        estado: PAGADO
+        items:
+          - varianteId: var-remera-basica-blanca-m
+            cantidad: 3
+            precioUnitario: 15000
+            subtotal: 45000
+          - varianteId: var-jean-mom-celeste-38
+            cantidad: 1
+            precioUnitario: 42000
+            subtotal: 42000
+        total: 87000
+        moneda: ARS
+        pago:
+          medio: TRANSFERENCIA
+          venceEn: "2026-10-18T15:00:00Z"
+          datosTransferencia:
+            alias: FAV.EJEMPLO.ALIAS
+            titular: FAV (ejemplo)
+        notificacionUrl: https://proveedores.example/webhooks/fav
+        creadoEn: "2026-10-16T15:00:00Z"
+        actualizadoEn: "2026-10-17T13:20:00Z"
+    EventoPagado:
+      summary: El pedido se pagó
+      value:
+        eventoId: 3b7e9a2c-5d1f-4c8e-a9b0-6f2d1e4c7a8b
+        tipo: pedido.actualizado
+        ocurridoEn: "2026-10-17T13:20:00Z"
+        pedido:
+          pedidoId: 7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f
+          referenciaExterna: OC-2026-0457
+          estado: PAGADO
+    EventoVencido:
+      summary: El pedido venció sin pago
+      value:
+        eventoId: 9c4d2e1f-7a6b-4b3c-8d2e-1f0a9b8c7d6e
+        tipo: pedido.actualizado
+        ocurridoEn: "2026-10-18T15:00:30Z"
+        pedido:
+          pedidoId: 7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f
+          referenciaExterna: OC-2026-0457
+          estado: VENCIDO

@@ -136,6 +136,8 @@ El grupo de proveedores ve el catálogo de FAV y le hace pedidos para sí mismo,
 |---|---|---|
 | `GET /v1/productos` | Catálogo | Productos publicados con sus variantes y el precio vigente. No informa stock. |
 | `POST /v1/pedidos` | Ventas | Pide el precio a Catálogo, aparta el stock online en Inventario por 48 horas (todo o nada) y registra la venta *Pendiente de pago* por transferencia. Desde ahí sigue como una compra por transferencia (CU-02). |
+| `GET /v1/pedidos/{pedidoId}` | Ventas | Estado vigente del pedido (contrato 1.1.0). |
+| Webhook `pedidoActualizado` | Ventas | Al pasar la venta a *Pagada*, *Vencida* o *A verificar*, avisa a la `notificacionUrl` del pedido, firmado con HMAC. Se guarda en la misma transacción que el cambio de estado y se envía después con reintentos, como los mails (contrato 1.1.0). |
 
 Contrato: [`catalogo-pedidos-v1.openapi.yaml`](contracts/catalogo-pedidos-v1.openapi.yaml). Uso, errores y ejemplos en [`contracts/README.md`](contracts/README.md). Se justifica en el **ADR-008 (D8)**.
 

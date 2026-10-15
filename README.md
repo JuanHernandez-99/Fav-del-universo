@@ -38,14 +38,16 @@ Detalle, diagramas, comunicaciones y comportamiento ante fallas: [`docs/ARCHITEC
 
 ## Integración con otros grupos
 
-**Capacidad que publicamos: catálogo y pedidos.** Otro grupo de la materia puede ver el catálogo de FAV y hacerle pedidos, como un comprador mayorista. El pedido aparta el stock y registra la venta, pendiente de pago por transferencia.
+**Capacidad que publicamos: catálogo y pedidos** (contrato 1.1.0). Otro grupo de la materia puede ver el catálogo de FAV y hacerle pedidos, como un comprador mayorista. El pedido aparta el stock y registra la venta, pendiente de pago por transferencia. FAV le avisa por webhook cuando el pedido se paga o vence.
 
 | Operación | Ruta | Servicio |
 |---|---|---|
 | Ver el catálogo | `GET /v1/productos` | Catálogo |
 | Hacer un pedido | `POST /v1/pedidos` | Ventas (aparta el stock en Inventario) |
+| Consultar un pedido | `GET /v1/pedidos/{pedidoId}` | Ventas |
+| Aviso de cambio de estado (webhook) | `POST` a la `notificacionUrl` del grupo | Ventas (lo envía FAV) |
 
-Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v1.openapi.yaml). Cómo usarla, errores y ejemplos: [`docs/contracts/README.md`](docs/contracts/README.md). Mock para probarla: [`mocks/catalogo-pedidos-v1`](mocks/catalogo-pedidos-v1).
+Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v1.openapi.yaml). Cómo usarla, errores y ejemplos: [`docs/contracts/README.md`](docs/contracts/README.md). Mock para probarla, que también envía los avisos firmados: [`mocks/catalogo-pedidos-v1`](mocks/catalogo-pedidos-v1).
 
 **Capacidad que consumimos: gimnasio.** FAV vende ropa en consignación en un gimnasio: Inventario consulta cuánto stock nuestro les queda y les registra reposiciones. **[?]** Contrato pendiente del grupo del gimnasio.
 

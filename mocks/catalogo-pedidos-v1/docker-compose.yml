@@ -1,10 +1,42 @@
-# Mock del contrato catalogo-pedidos-v1. Responde con los ejemplos del contrato.
+# Mock del contrato catalogo-pedidos-v1 (1.1.0). Responde con los ejemplos del contrato
+# y envía el webhook pedidoActualizado firmado.
 # Uso: docker compose up   →   http://localhost:8090
 services:
-  mock-catalogo-pedidos-v1:
+  # Responde las operaciones con los ejemplos del contrato y valida los pedidos.
+  prism:
     image: stoplight/prism:5
     command: mock -h 0.0.0.0 -p 4010 /contracts/catalogo-pedidos-v1.openapi.yaml
     volumes:
       - ../../docs/contracts:/contracts:ro
+
+  # Punto de entrada del mock: reenvía todo a Prism y envía los avisos firmados.
+  mock-catalogo-pedidos-v1:
+    image: node:22-alpine
+    working_dir: /mock
+    command: ["node", "servidor.mjs"]
+    environment:
+      PUERTO: "8090"
+      PRISM_URL: http://prism:4010
+      SUMIDERO_URL: http://mock-catalogo-pedidos-v1:8090/_mock/sumidero
+      SECRETO_AVISOS: secreto-de-prueba
+      DEMORA_AVISO_MS: "2000"
+    volumes:
+      - ./:/mock:ro
     ports:
-      - "8090:4010"
+      - "8090:8090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # para avisar a un receptor que corre en la máquina
+    depends_on:
+      - prism
+
+  # Herramienta: envía un aviso firmado a cualquier URL, sin hacer un pedido.
+  # Uso: docker compose run --rm enviar-aviso --url http://host.docker.internal:9000/webhooks/fav
+  enviar-aviso:
+    image: node:22-alpine
+    profiles: [herramientas]
+    working_dir: /mock
+    entrypoint: ["node", "enviar-aviso.mjs"]
+    volumes:
+      - ./:/mock:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
