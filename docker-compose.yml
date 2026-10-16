@@ -1,5 +1,5 @@
-# Arranque local (previsto). En la Entrega 1 solo está la infraestructura:
-# los servicios están comentados hasta que existan su código y su Dockerfile.
+# Arranque local. Están la infraestructura y los servicios implementados;
+# el resto queda comentado hasta que exista su código y su Dockerfile.
 # Uso: cp .env.example .env  →  docker compose up
 # Versiones de las imágenes y puertos: [propuesta]
 
@@ -24,7 +24,10 @@ services:
       MYSQL_DATABASE: ${INVENTARIO_DB_NAME}
       MYSQL_USER: ${INVENTARIO_DB_USER}
       MYSQL_PASSWORD: ${INVENTARIO_DB_PASSWORD}
-    volumes: [mysql-inventario-data:/var/lib/mysql]
+    volumes:
+      - mysql-inventario-data:/var/lib/mysql
+      # Esquema y datos de ejemplo: se cargan solo la primera vez (volumen vacío).
+      - ./services/inventario/migraciones:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -73,15 +76,27 @@ services:
       timeout: 5s
       retries: 10
 
-  # ---------- Servicios (previstos: descomentar al crear cada Dockerfile) ----------
+  # ---------- Servicios ----------
+  inventario:
+    build: ./services/inventario
+    environment:
+      INVENTARIO_DB_HOST: mysql-inventario
+      INVENTARIO_DB_USER: ${INVENTARIO_DB_USER}
+      INVENTARIO_DB_PASSWORD: ${INVENTARIO_DB_PASSWORD}
+      INVENTARIO_DB_NAME: ${INVENTARIO_DB_NAME}
+      # Si el usuario o la clave tienen caracteres especiales, van codificados como en una URL.
+      INVENTARIO_RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672/
+    ports:
+      - "8082:8080" # [propuesta] acceso directo para probar, hasta que exista el gateway
+    depends_on:
+      mysql-inventario: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  # ---------- Servicios previstos (descomentar al crear cada Dockerfile) ----------
   # catalogo:
   #   build: ./services/catalogo
   #   deploy: { replicas: 2 } # [propuesta] dos réplicas (D12)
   #   depends_on: { mongo-catalogo: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
-  #
-  # inventario:
-  #   build: ./services/inventario
-  #   depends_on: { mysql-inventario: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
   #
   # ventas:
   #   build: ./services/ventas

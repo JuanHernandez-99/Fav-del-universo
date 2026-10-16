@@ -64,12 +64,19 @@ Las demás decisiones se registran en las entregas siguientes. Plantilla: [`ADR-
 
 ## Cómo levantarlo
 
-**Hoy.** Solo se puede levantar el mock de la capacidad compartida:
+**Hoy.** Se pueden levantar Inventario (con su base y RabbitMQ) y el mock de la capacidad compartida:
+
+```bash
+cp .env.example .env                                   # la primera vez
+docker compose up --build mysql-inventario inventario  # Inventario en http://localhost:8082
+```
 
 ```bash
 cd mocks/catalogo-pedidos-v1
-docker compose up      # queda en http://localhost:8090
+docker compose up                                      # mock en http://localhost:8090
 ```
+
+Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/README.md).
 
 **Previsto (Entrega 2).** Todo el sistema con un solo comando:
 
@@ -78,7 +85,7 @@ cp .env.example .env   # completar los valores
 docker compose up --build
 ```
 
-El [`docker-compose.yml`](docker-compose.yml) de la raíz ya tiene la infraestructura (bases y RabbitMQ). Los servicios están comentados hasta que existan.
+El [`docker-compose.yml`](docker-compose.yml) de la raíz tiene la infraestructura (bases y RabbitMQ) y los servicios implementados; el resto está comentado hasta que exista.
 
 ## Estructura del repositorio
 
