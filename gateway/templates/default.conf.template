@@ -1,0 +1,104 @@
+# API Gateway (nginx). La imagen oficial reemplaza las ${VARIABLES} al arrancar.
+# Entrega 2: rutea la capacidad publicada al mock de Catálogo y Ventas, y las rutas de
+# administración a las réplicas de Inventario, con balanceo y verificación de disponibilidad (ADR-012).
+
+# DNS interno de Docker. `resolve` en cada upstream vuelve a consultarlo cada 5 s,
+# así una réplica nueva o reiniciada (con otra IP) entra al balanceo sin reiniciar nginx.
+resolver 127.0.0.11 valid=5s ipv6=off;
+
+upstream inventario {
+    zone inventario 64k;
+    # Round robin entre todas las IPs del nombre `inventario` (una por réplica).
+    # Una réplica que falla 2 veces en 10 s queda fuera 10 s (verificación pasiva).
+    server inventario:8080 resolve max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
+
+upstream catalogo_ventas {
+    zone catalogo_ventas 64k;
+    server catalogo-ventas-mock:8080 resolve;
+}
+
+# Correlation id: se respeta el del cliente; si no viene, se usa el id del pedido de nginx (ADR-005, punto 7).
+map $http_x_correlation_id $correlacion {
+    ""      $request_id;
+    default $http_x_correlation_id;
+}
+
+# Clave del grupo consumidor (ADR-008). Una sola clave en la Entrega 2.
+map $http_x_api_key $grupo_valido {
+    default                0;
+    "${CAPACIDAD_API_KEY}" 1;
+}
+
+# Clave provisoria del panel, hasta que exista Usuarios y el gateway valide el JWT (ADR-001).
+map $http_x_admin_key $admin_valido {
+    default            0;
+    "${ADMIN_API_KEY}" 1;
+}
+
+# Límite por grupo: 60 pedidos por minuto, con ráfagas de hasta 20 (contrato, respuesta 429).
+limit_req_zone $http_x_api_key zone=por_grupo:10m rate=60r/m;
+limit_req_status 429;
+
+# Log de acceso en JSON, con la réplica que atendió cada pedido (upstream_addr).
+log_format json escape=json '{"time":"$time_iso8601","servicio":"gateway","correlation_id":"$correlacion",'
+    '"metodo":"$request_method","ruta":"$uri","codigo":$status,"duracion_s":$request_time,'
+    '"upstream":"$upstream_addr","upstream_codigo":"$upstream_status","upstream_duracion_s":"$upstream_response_time"}';
+
+proxy_http_version 1.1;
+proxy_set_header Connection "";
+proxy_set_header Host $host;
+proxy_set_header X-Correlation-Id $correlacion;
+proxy_connect_timeout 1s;
+proxy_read_timeout 5s;     # gateway → servicio: 5 s (ADR-005)
+proxy_send_timeout 5s;
+# Si una réplica no acepta la conexión, no responde o responde 502, se prueba la otra. nginx no reenvía
+# un POST que ya llegó a una réplica (no es idempotente para nginx); sí lo hace si no pudo conectarse.
+# El 503 queda afuera a propósito: Inventario lo usa para decir que una dependencia (el gimnasio) no está
+# disponible. Contarlo como falla sacaba del balanceo a réplicas sanas.
+proxy_next_upstream error timeout http_502;
+proxy_next_upstream_tries 2;
+
+# ---------- Entrada pública ----------
+server {
+    listen 8080;
+    access_log /dev/stdout json;
+    # El gateway siempre devuelve el correlation id, también en sus propios errores (401, 429).
+    proxy_hide_header X-Correlation-Id;
+    add_header X-Correlation-Id $correlacion always;
+
+    location = /healthz { access_log off; return 200; }
+
+    # Capacidad publicada: catálogo y pedidos (contrato catalogo-pedidos-v1).
+    location ~ ^/v1/(productos|pedidos)$ {
+        if ($grupo_valido = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        limit_req zone=por_grupo burst=20 nodelay;
+        proxy_pass http://catalogo_ventas;
+    }
+
+    # Panel de administración: stock, transferencias y consignación.
+    location /inventario/ {
+        if ($admin_valido = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        proxy_set_header X-User-Id "admin";
+        proxy_set_header X-User-Role "administrador";
+        proxy_pass http://inventario/;
+    }
+
+    default_type application/problem+json;
+}
+
+# ---------- Entrada interna (red de Docker, sin puerto publicado) ----------
+# Ventas llama a Inventario por acá, así sus llamadas también se reparten entre las réplicas.
+server {
+    listen 8081;
+    access_log /dev/stdout json;
+
+    location / {
+        proxy_pass http://inventario;
+    }
+}

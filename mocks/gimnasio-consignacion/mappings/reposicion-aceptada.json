@@ -1,0 +1,21 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v1/consignaciones/reposiciones",
+    "headers": {
+      "X-API-Key": { "matches": ".+" },
+      "Idempotency-Key": { "matches": ".+" }
+    },
+    "bodyPatterns": [
+      { "matchesJsonPath": "$.productoCodigo" },
+      { "matchesJsonPath": "$.unidades" }
+    ]
+  },
+  "response": {
+    "status": 201,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "reposicionId": "{{randomValue type='UUID'}}", "estado": "RECIBIDA" },
+    "transformers": ["response-template"]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v1/consignaciones/reposiciones",
+    "bodyPatterns": [{ "matchesJsonPath": "$[?(@.unidades > 20)]" }]
+  },
+  "response": {
+    "status": 422,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "error": "CAPACIDAD_EXCEDIDA", "mensaje": "El gimnasio no recibe más de 20 unidades por reposición." }
+  }
+}

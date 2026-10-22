@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/api/v1/consignaciones/stock",
+    "queryParameters": { "proveedorId": { "equalTo": "fav" } },
+    "headers": { "X-API-Key": { "matches": ".+" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "proveedorId": "fav",
+      "items": [
+        { "productoCodigo": "var-remera-basica-blanca-m", "unidadesDisponibles": 3, "unidadesVendidas": 2 },
+        { "productoCodigo": "var-jean-mom-celeste-38", "unidadesDisponibles": 1, "unidadesVendidas": 0 }
+      ]
+    }
+  }
+}
