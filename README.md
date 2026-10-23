@@ -64,7 +64,7 @@ Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v
 | [ADR-009](docs/adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Aceptada (contrato supuesto) |
 | [ADR-010](docs/adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada                   |
 | [ADR-011](docs/adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada (primera versión) |
-| [ADR-012](docs/adr/ADR-012-balanceo-de-carga.md)        | D12 · Balanceo de carga           | Aceptada                   |
+| [ADR-012](docs/adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada                   |
 | [ADR-013](docs/adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | Propuesta                  |
 
 Las decisiones marcadas como _Propuesta_ (D6, D7, D13) son diseño, sin implementar ni medir. Plantilla: [`ADR-000`](docs/adr/ADR-000-plantilla.md).

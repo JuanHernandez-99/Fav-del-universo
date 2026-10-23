@@ -5,7 +5,7 @@
 | **Estado**                  | Aceptada (primera versión) · Entrega 2. Cubre Inventario y la entrada por el gateway. La caída controlada y su informe (`docs/POSTMORTEM.md`) están **pendientes**.                                                                                                                       |
 | **Fecha**                   | 23/10/2026                                                                                                                                                                                                                                                                               |
 | **Decisión de la consigna** | D10 · Resiliencia                                                                                                                                                                                                                                                                        |
-| **Relacionadas**            | [ADR-004](ADR-004-consistencia-y-concurrencia.md) (idempotencia), [ADR-005](ADR-005-comunicacion.md) (timeouts y reintentos), [ADR-009](ADR-009-consumo-del-gimnasio.md) (gimnasio), [ADR-011](ADR-011-observabilidad.md) (métricas y alertas), [ADR-012](ADR-012-balanceo-de-carga.md) (réplicas) |
+| **Relacionadas**            | [ADR-004](ADR-004-consistencia-y-concurrencia.md) (idempotencia), [ADR-005](ADR-005-comunicacion.md) (timeouts y reintentos), [ADR-009](ADR-009-consumo-del-gimnasio.md) (gimnasio), [ADR-011](ADR-011-observabilidad.md) (métricas y alertas), [ADR-012](ADR-012-balanceo.md) (réplicas) |
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: forma parte del diseño pero todavía no está implementado.
 
