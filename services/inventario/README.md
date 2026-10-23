@@ -105,4 +105,4 @@ INVENTARIO_TEST_DSN="inventario:cambiar@tcp(localhost:3307)/inventario?parseTime
 
 ## Más información
 
-[Arquitectura §4 y §7](../../docs/ARCHITECTURE.md) · [ADR-001](../../docs/adr/ADR-001-limites-de-los-servicios.md) · [ADR-003](../../docs/adr/ADR-003-persistencia.md) · [ADR-005](../../docs/adr/ADR-005-comunicacion.md)
+[Arquitectura §4 y §7](../../docs/ARCHITECTURE.md) · [ADR-001](../../docs/adr/ADR-001-limites-de-los-servicios.md) · [ADR-003](../../docs/adr/ADR-003-persistencia.md) · [ADR-005](../../docs/adr/ADR-005-comunicacion.md) · [ADR-002](../../docs/adr/ADR-002-arquitectura-interna.md) · [ADR-004](../../docs/adr/ADR-004-consistencia-y-concurrencia.md) · [ADR-009](../../docs/adr/ADR-009-consumo-del-gimnasio.md) · [ADR-010](../../docs/adr/ADR-010-resiliencia.md) · [ADR-011](../../docs/adr/ADR-011-observabilidad.md) · [ADR-012](../../docs/adr/ADR-012-balanceo-de-carga.md)

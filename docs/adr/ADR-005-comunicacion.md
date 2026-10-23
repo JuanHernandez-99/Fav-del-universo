@@ -154,3 +154,19 @@ Cada pedido lleva un identificador de correlación (`X-Correlation-Id`). Si no v
 - Con RabbitMQ detenido se puede comprar; al volver, los eventos del outbox se publican.
 - Con Inventario lento (por encima de 2 s), Ventas reintenta, no duplica la reserva y, agotados los intentos, muestra un error claro.
 - Las trazas de una compra muestran el mismo identificador de correlación en todos los servicios.
+
+## Validación (Entrega 2)
+
+Contrastado con el código de Inventario, el gateway y el mock de Ventas.
+
+| Punto del ADR                                          | Resultado                                                                                                                                                                  |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Confirmación síncrona entre Ventas e Inventario        | **Implementada** en Inventario (`POST /v1/reservas/{id}/confirmar`). Falta Ventas real.                                                                                      |
+| Timeouts                                               | Gateway: 5 s de lectura y 1 s de conexión. Inventario: 4 s por pedido, 3 s de conexión y 5 s de lectura/escritura a la base. Gimnasio: 2 s. Mock de Ventas: 2 s por intento. |
+| Reintentos                                             | Mock de Ventas: 3 intentos con 0, 200 y 400 ms más variación, solo ante 502/503/504 o error de red, nunca ante 4xx. Gimnasio: reintentos persistidos en la base (5 s hasta 5 min). |
+| Idempotencia                                           | **Implementada** con encabezado `Idempotency-Key` y huella del pedido; clave reutilizada con otro cuerpo devuelve `409`.                                                      |
+| Identificador de correlación                           | **Implementado:** lo toma o genera el gateway (`$request_id`), lo propagan los servicios y se guarda en el outbox. Ver ADR-011.                                                |
+| Outbox                                                 | **Parcial:** se escribe en la misma transacción, pero **no hay publicador** a RabbitMQ y el outbox **no tiene columna `version`**; el sobre del evento se completa al publicar. |
+| Consumo idempotente y DLQ                              | **No implementados** (Inventario aún no consume eventos).                                                                                                                    |
+
+**Problema detectado:** los reintentos del mock de Ventas y los del gateway se suman, y el tiempo total de Ventas puede superar los 5 s del gateway (ADR-010). Hay que alinear los tiempos al implementar Ventas.

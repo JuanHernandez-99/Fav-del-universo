@@ -98,3 +98,22 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 - Cada servicio arranca con su propia base en Docker Compose y ningún servicio tiene credenciales de otra base (RNF-08).
 - Test de integración por servicio contra su base real (requisito 2.11).
 - Test de concurrencia: dos reservas simultáneas sobre la última unidad; solo una se confirma y el stock nunca queda negativo.
+
+## Validación (Entrega 2)
+
+**Inventario (MySQL) — implementado y probado.**
+
+| Elemento del ADR                                  | Resultado                                                                                                                                                   |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Base propia con credenciales propias              | **Confirmado** (`mysql-inventario`, puerto 3307 en el host para desarrollo).                                                                                 |
+| Esquema versionado                                | **Confirmado:** `sql/001_esquema.sql` y `sql/002_datos_de_ejemplo.sql` (datos de ejemplo solo con `INVENTARIO_DATOS_EJEMPLO=true`).                          |
+| Reglas en la base                                 | **Confirmado:** restricciones `CHECK` sobre las cantidades de `stock`, claves únicas para la idempotencia y para los ítems de una reserva.                   |
+| Tablas de Inventario                              | `stock`, `reservas`, `reserva_items`, `movimientos`, `operaciones`, `reposiciones`, `outbox`.                                                                |
+| Test de integración contra la base real           | **Hecho:** 7 pruebas (ADR-004), con `-race`, contra MySQL 8.0.                                                                                               |
+
+**Diferencias con lo previsto**
+
+- La tabla de **mensajes procesados** (consumo idempotente de eventos) **todavía no existe**: Inventario aún no consume eventos.
+- El Compose usa **MySQL 8.4**; los tests corrieron en **8.0**. Repetirlos contra 8.4.
+- **MongoDB (Catálogo) no se validó:** el servicio no está implementado.
+- El `outbox` se escribe en la misma transacción, pero **no hay publicador** hacia RabbitMQ en esta versión.

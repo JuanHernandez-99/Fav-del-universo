@@ -188,16 +188,19 @@ Si algo se cae, lo demás tiene que seguir funcionando y tiene que poder saberse
 | Motor de búsqueda                       | Navegar por categoría desde la base de Catálogo                                                                                          | Búsqueda por texto y filtros                                                                            | Error claro; el índice se reconstruye al volver                     |
 | La base de un servicio                  | Los demás servicios                                                                                                                      | Ese servicio                                                                                            | Una base por servicio: la falla no se propaga                       |
 
-## 9. Caché y búsqueda (previstas)
+## 9. Caché y búsqueda (propuestas, sin implementar)
 
 - **Herramientas existentes, no implementaciones propias:** la caché usa Redis y la búsqueda un motor de búsqueda, ambos a través de sus bibliotecas cliente para Go. No se programa una caché ni un índice desde cero.
 - **Qué se cachea [propuesta]:** las lecturas del catálogo, como la ficha de producto y los listados por categoría. El stock para reservar y el precio para cobrar **no** se leen de la caché, sino de la fuente.
-- **Que la caché no quede mal cargada:** al cambiar un producto, un precio o una promoción, se invalida su entrada. Además, cada entrada vence por tiempo. Se mide la tasa de aciertos para comprobar que se aprovecha, comparando antes y después (**ADR-007, D7**).
-- **Búsqueda:** índice de productos publicados actualizado por eventos, con un retraso máximo definido y la posibilidad de reconstruirlo desde cero (**ADR-006, D6**). **[?]** motor (Elasticsearch u OpenSearch).
+- **Que la caché no quede mal cargada:** al cambiar un producto, un precio o una promoción, se invalida su entrada. Además, cada entrada vence por tiempo. Se mide la tasa de aciertos para comprobar que se aprovecha, comparando antes y después (**[ADR-007](adr/ADR-007-cache.md), D7**). El ADR condiciona la caché a una medición previa sin ella.
+- **Búsqueda:** índice de productos publicados actualizado por eventos, con un retraso máximo definido y la posibilidad de reconstruirlo desde cero (**[ADR-006](adr/ADR-006-busqueda.md), D6**). **[propuesta]** Elasticsearch u OpenSearch; la disponibilidad no se indexa.
 
-## 10. Observabilidad (prevista)
+## 10. Observabilidad
 
-El estado de una operación tiene que poder entenderse sin revisar cada componente a mano (**ADR-011, D11**):
+El estado de una operación tiene que poder entenderse sin revisar cada componente a mano (**[ADR-011](adr/ADR-011-observabilidad.md), D11**).
+
+**Implementado en Inventario y el gateway (Entrega 2):** logs JSON con `servicio`, `instancia`, `correlation_id`, `trace_id` y `span_id`; log de acceso del gateway con la réplica que atendió; trazas OpenTelemetry a Jaeger (`:16686`) con una traza del flujo mock de Ventas → Inventario → MySQL; métricas Prometheus (`:9090`) con una serie por réplica. **Falta:** tablero (Grafana), alertas cargadas, persistencia del historial y el resto de los servicios. El objetivo completo es:
+
 
 - **Logs estructurados** en todos los servicios y en el gateway, con un identificador de correlación que viaja en cada llamada y en cada evento. Permite seguir una compra de punta a punta. El token nunca se escribe en los logs.
 - **Métricas** por servicio: pedidos por endpoint y código de estado (incluidos 4xx y 5xx), latencia, fallas de cada dependencia, mensajes en la DLQ, aciertos de caché y estado de cada réplica.
@@ -206,14 +209,15 @@ El estado de una operación tiene que poder entenderse sin revisar cada componen
 - **Tablero** con el estado general del sistema y al menos una alerta.
 - **[?]** herramientas: se definen cuando se dé el teórico de observabilidad.
 
-## 11. Pruebas de carga (previstas)
+## 11. Pruebas de carga (previstas, guion sin ejecutar)
 
-Se simula un **pico de demanda** como los que describe el cliente (cambio de temporada, diciembre): muchos compradores navegando y buscando a la vez, y compras concurrentes sobre las mismas variantes. Se mide latencia, errores, reparto entre las réplicas de Catálogo y el comportamiento de las reservas. El volumen real es bajo (10 a 20 prendas por semana), así que el escenario de pico es una hipótesis que se documenta como tal (**ADR-013, D13**).
+Se simula un **pico de demanda** como los que describe el cliente (cambio de temporada, diciembre): muchos compradores navegando y buscando a la vez, y compras concurrentes sobre las mismas variantes. Se mide latencia, errores, reparto entre las réplicas de Catálogo y el comportamiento de las reservas. El volumen real es bajo (10 a 20 prendas por semana), así que el escenario de pico es una hipótesis que se documenta como tal (**[ADR-013](adr/ADR-013-capacidad-y-costos.md), D13**). El guion de k6 está en `loadtest/` y todavía no se ejecutó.
 
 ## 12. Distribución de los componentes
 
 - **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Catálogo con dos réplicas), MongoDB, tres MySQL y RabbitMQ. Redis, el motor de búsqueda y las herramientas de observabilidad se suman cuando se incorporen. Los secretos (incluida la clave privada del token) van en un archivo `.env` que no se sube al repositorio.
-- **Balanceo:** Catálogo con dos réplicas, porque es el servicio más leído **[propuesta]**. El mecanismo se define en el **ADR-012 (D12)**.
+- **Balanceo:** en la Entrega 2 el servicio replicado es **Inventario** (2 réplicas con `deploy.replicas`), detrás de un gateway nginx con round robin y verificación pasiva ([ADR-012](adr/ADR-012-balanceo-de-carga.md), D12). Catálogo con dos réplicas sigue **[propuesta]**.
+- **Estado actual del Compose:** gateway, Inventario ×2, MySQL de Inventario, mocks de Catálogo/Ventas y del gimnasio, Jaeger y Prometheus. El perfil `completo` suma MongoDB, MySQL de Ventas y Usuarios y RabbitMQ.
 - **Nube:** para que el grupo de proveedores use la capacidad con una URL pública se despliegan el gateway, Catálogo, Ventas e Inventario con sus bases. **[?]** proveedor de nube.
 
 ## 13. Estructura del repositorio
@@ -242,9 +246,7 @@ Lo que todavía no existe en el repositorio es previsto y se agrega en entregas 
 │   │   └── estados.png
 │   ├── adr/
 │   │   ├── ADR-000-plantilla.md
-│   │   ├── ADR-001-limites-de-los-servicios.md
-│   │   ├── ADR-003-persistencia.md
-│   │   ├── ADR-005-comunicacion.md
+│   │   ├── ADR-001 … ADR-013   # uno por decisión de la consigna (D1 a D13)
 │   │   └── ADR-008-contrato-propio.md
 │   └── contracts/
 │       ├── README.md
@@ -254,10 +256,14 @@ Lo que todavía no existe en el repositorio es previsto y se agrega en entregas 
 │   ├── inventario/
 │   ├── ventas/
 │   └── usuarios/
-├── gateway/
+├── gateway/                    # nginx: entrada pública, balanceo y límites
+├── observabilidad/             # configuración de Prometheus
+├── loadtest/                   # guion de carga (k6)
 ├── frontend/
-└── mocks/                      # mock del contrato publicado
-    └── catalogo-pedidos-v1/
+└── mocks/                      # contrato publicado, Catálogo/Ventas y gimnasio
+    ├── catalogo-pedidos-v1/
+    ├── catalogo-ventas/
+    └── gimnasio-consignacion/
 ```
 
 **Cada servicio** tiene su propio `go.mod`, `Dockerfile` y `README.md`, y se puede construir y desplegar por separado. Su organización interna sigue el estilo del servicio, que se decide en el D2. Estas estructuras son provisorias:
@@ -307,7 +313,15 @@ services/inventario/            # hexagonal
 | [ADR-003](adr/ADR-003-persistencia.md)             | D3 · Persistencia                 | Aceptada (versión inicial) · Entrega 1               |
 | [ADR-005](adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) · Entrega 1               |
 | [ADR-008](adr/ADR-008-contrato-propio.md) | D8 · Contrato propio | Aceptada · Entrega 2 |
-| ADR-002, 004, 006, 007, 009 a 013                  | D2, D4, D6, D7, D9 a D13          | Entregas siguientes                                  |
+| [ADR-002](adr/ADR-002-arquitectura-interna.md)     | D2 · Arquitectura interna         | Aceptada · Entrega 2 (implementada en Inventario)    |
+| [ADR-004](adr/ADR-004-consistencia-y-concurrencia.md) | D4 · Consistencia y concurrencia | Aceptada · Entrega 2 (7 pruebas de integración)      |
+| [ADR-006](adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | **Propuesta** · Entrega 2 (sin implementar)          |
+| [ADR-007](adr/ADR-007-cache.md)                    | D7 · Caché                        | **Propuesta** · Entrega 2 (sin implementar)          |
+| [ADR-009](adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Aceptada con contrato supuesto · Entrega 2           |
+| [ADR-010](adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada · Entrega 2                                 |
+| [ADR-011](adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada (primera versión) · Entrega 2               |
+| [ADR-012](adr/ADR-012-balanceo-de-carga.md)        | D12 · Balanceo de carga           | Aceptada · Entrega 2                                 |
+| [ADR-013](adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | **Propuesta** · Entrega 2 (sin mediciones)           |
 
 ## 15. Pendientes de arquitectura
 
@@ -316,7 +330,7 @@ services/inventario/            # hexagonal
 | Justificación de los estilos internos de cada servicio                                        | D2 (ADR-002)                              |
 | Motor de búsqueda y retraso máximo del índice                                                 | D6                                        |
 | Qué se cachea exactamente y tiempo de vencimiento                                             | D7                                        |
-| Tecnología del API Gateway y del frontend                                                     | D2 / D12                                  |
+| Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: pendiente                | D2 / D12                                  |
 | Herramientas de observabilidad y retención de métricas                                        | D11                                       |
 | Contrato del gimnasio y cómo identifica los productos de FAV | D9 |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
@@ -324,3 +338,20 @@ services/inventario/            # hexagonal
 | Firma y vencimiento del token, y dónde lo guarda el frontend                                  | Implementación del gateway y del frontend |
 | Proveedor de mail y de nube                                                                   | D5 / D13                                  |
 | Cómo recibe el entorno local los avisos de Mercado Pago                                       | D5                                        |
+
+## 16. Limitaciones conocidas y deuda técnica (Entrega 2)
+
+Lo que sabemos que no está o no funciona del todo. Se declara para la presentación.
+
+| Tema | Situación | Dónde |
+| ---- | --------- | ----- |
+| Servicios implementados | Solo **Inventario** es real. Catálogo y Ventas son un mock; Usuarios y el frontend no están | — |
+| Gateway único | Punto único de falla; la validación del JWT no está (se usa `X-Admin-Key`) | ADR-012 |
+| Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |
+| Publicador a RabbitMQ | El outbox se escribe, pero nadie lo publica; sin consumo idempotente ni DLQ | ADR-005 |
+| Tiempos entre capas | Reintentos del mock de Ventas y del gateway se suman y pueden pasar los 5 s | ADR-010 |
+| Observabilidad | Sin tablero ni alertas; Jaeger y Prometheus pierden datos al reiniciar; el gateway no crea spans | ADR-011 |
+| Búsqueda y caché | Solo diseño | ADR-006, ADR-007 |
+| Capacidad y costos | Guion de carga sin ejecutar; costos sin completar | ADR-013 |
+| Núcleo de Inventario | Sin tests unitarios de `aplicacion`; etiquetas `json` en `dominio` | ADR-002 |
+| Resiliencia comprobada | Falta `docs/POSTMORTEM.md` con una falla controlada ensayada | ADR-010 |

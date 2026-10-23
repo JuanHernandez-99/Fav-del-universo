@@ -154,3 +154,18 @@ En las dos, el consumidor externo depende de un solo servicio y la capacidad es 
 - Ningún servicio accede a la base de otro (RNF-08): se revisa en Docker Compose y en el código.
 - Una compra se completa con Usuarios detenido, usando una sesión ya iniciada.
 - Las trazas del flujo de compra muestran solo las dependencias de la tabla de relaciones.
+
+## Validación (Entrega 2)
+
+Contrastado contra el Inventario implementado (rama `feature-inventario`). Los demás servicios son mocks o no existen, por lo que **solo se valida el límite de Inventario**.
+
+| Punto del ADR                                              | Resultado                                                                                                                                                  |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventario es dueño del stock y de sus movimientos         | **Confirmado.** Tablas `stock`, `reservas`, `reserva_items`, `movimientos`, `operaciones`, `reposiciones` y `outbox` en su propia base (`mysql-inventario`).    |
+| Ningún servicio accede a la base de otro (RNF-08)          | **Confirmado para Inventario:** es el único con credenciales de su base. El Compose no las comparte. Falta repetirlo con los demás servicios cuando existan.  |
+| Inventario no conoce nombres ni precios                    | **Confirmado.** Maneja `varianteId`; los nombres se componen en el frontend (decisión 3).                                                                    |
+| Consulta de stock de varias variantes en un pedido         | **Implementado:** `GET /v1/stock?variantes=…` (en lote).                                                                                                    |
+| Relación con el gimnasio                                   | **Agregada:** Inventario consume la capacidad del gimnasio (ADR-009). Es una relación saliente nueva a reflejar en el diagrama de relaciones.                 |
+| Lista de variantes con "stock a corregir"                  | **No implementada:** hoy solo se informa un indicador por variante (`stockACorregir`).                                                                       |
+
+**Pendiente de validar:** que Ventas llegue a Inventario solo por la entrada interna `:8081`, y que una compra se complete con Usuarios detenido (requieren Ventas real).

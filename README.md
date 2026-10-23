@@ -7,7 +7,7 @@ Juan Hernandez - 2325917
 
 Sistema de venta online y control de stock para **FAV**, una tienda de indumentaria femenina que hoy vende solo en el local y lleva el stock en un Excel. Es también el Trabajo Práctico Integrador de **Arquitectura de Software 2026**.
 
-> **Estado: camino a la Entrega 2.** Todavía no hay código de los servicios. Hay diseño, decisiones, el contrato de la capacidad compartida y su mock. Lo que dice _previsto_ se implementa en entregas siguientes.
+> **Estado: Entrega 2.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). Catálogo y Ventas están simulados con un mock y Usuarios y el frontend todavía no existen. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: parte del diseño, todavía no implementado.
 
@@ -54,29 +54,38 @@ Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v
 | ADR                                                     | Decisión                          | Estado                     |
 | ------------------------------------------------------- | --------------------------------- | -------------------------- |
 | [ADR-001](docs/adr/ADR-001-limites-de-los-servicios.md) | D1 · Límites de los servicios     | Aceptada                   |
+| [ADR-002](docs/adr/ADR-002-arquitectura-interna.md)     | D2 · Arquitectura interna         | Aceptada                   |
 | [ADR-003](docs/adr/ADR-003-persistencia.md)             | D3 · Persistencia                 | Aceptada (versión inicial) |
+| [ADR-004](docs/adr/ADR-004-consistencia-y-concurrencia.md) | D4 · Consistencia y concurrencia | Aceptada                   |
 | [ADR-005](docs/adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) |
+| [ADR-006](docs/adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | Propuesta                  |
+| [ADR-007](docs/adr/ADR-007-cache.md)                    | D7 · Caché                        | Propuesta                  |
 | [ADR-008](docs/adr/ADR-008-contrato-propio.md)          | D8 · Contrato propio              | Aceptada                   |
+| [ADR-009](docs/adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Aceptada (contrato supuesto) |
+| [ADR-010](docs/adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada                   |
+| [ADR-011](docs/adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada (primera versión) |
+| [ADR-012](docs/adr/ADR-012-balanceo-de-carga.md)        | D12 · Balanceo de carga           | Aceptada                   |
+| [ADR-013](docs/adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | Propuesta                  |
 
-Las demás decisiones se registran en las entregas siguientes. Plantilla: [`ADR-000`](docs/adr/ADR-000-plantilla.md).
+Las decisiones marcadas como _Propuesta_ (D6, D7, D13) son diseño, sin implementar ni medir. Plantilla: [`ADR-000`](docs/adr/ADR-000-plantilla.md).
 
 ## Cómo levantarlo
 
-**Hoy.** Solo se puede levantar el mock de la capacidad compartida:
+Con Docker, desde la raíz:
 
 ```bash
-cd mocks/catalogo-pedidos-v1
-docker compose up      # queda en http://localhost:8090
-```
-
-**Previsto (Entrega 2).** Todo el sistema con un solo comando:
-
-```bash
-cp .env.example .env   # completar los valores
 docker compose up --build
 ```
 
-El [`docker-compose.yml`](docker-compose.yml) de la raíz ya tiene la infraestructura (bases y RabbitMQ). Los servicios están comentados hasta que existan.
+No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas), su MySQL con stock de ejemplo, el gateway, los mocks de Catálogo/Ventas y del gimnasio, Jaeger y Prometheus.
+
+| Qué | Dónde |
+|---|---|
+| Gateway (API) | http://localhost:8080 |
+| Jaeger (trazas) | http://localhost:16686 |
+| Prometheus (métricas) | http://localhost:9090 |
+
+Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/README.md). Perfil con el resto de la infraestructura (MongoDB, MySQL de Ventas y Usuarios, RabbitMQ): `docker compose --profile completo up`.
 
 ## Estructura del repositorio
 
@@ -90,10 +99,12 @@ El [`docker-compose.yml`](docker-compose.yml) de la raíz ya tiene la infraestru
 ├── services/               catalogo, inventario, ventas, usuarios
 ├── gateway/
 ├── frontend/
-├── mocks/                  mocks del contrato publicado
-├── docker-compose.yml      previsto: arranque local
+├── mocks/                  mocks de Catálogo/Ventas y del gimnasio
+├── observabilidad/         configuración de Prometheus
+├── loadtest/               guion de prueba de carga (k6, sin ejecutar)
+├── docker-compose.yml      arranque local
 ├── .env.example            variables, sin valores secretos
-└── go.work                 previsto: une los módulos Go
+└── go.work                 une los módulos Go
 ```
 
 ## Entregas
