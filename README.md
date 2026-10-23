@@ -57,6 +57,8 @@ Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v
 | [ADR-003](docs/adr/ADR-003-persistencia.md)             | D3 · Persistencia                 | Aceptada (versión inicial) |
 | [ADR-005](docs/adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) |
 | [ADR-008](docs/adr/ADR-008-contrato-propio.md)          | D8 · Contrato propio              | Aceptada                   |
+| [ADR-011](docs/adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada (versión inicial) |
+| [ADR-012](docs/adr/ADR-012-balanceo.md)                 | D12 · Balanceo de carga           | Aceptada (versión inicial) |
 
 Las demás decisiones se registran en las entregas siguientes. Plantilla: [`ADR-000`](docs/adr/ADR-000-plantilla.md).
 

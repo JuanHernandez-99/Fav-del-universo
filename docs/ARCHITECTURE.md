@@ -307,7 +307,9 @@ services/inventario/            # hexagonal
 | [ADR-003](adr/ADR-003-persistencia.md)             | D3 · Persistencia                 | Aceptada (versión inicial) · Entrega 1               |
 | [ADR-005](adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) · Entrega 1               |
 | [ADR-008](adr/ADR-008-contrato-propio.md) | D8 · Contrato propio | Aceptada · Entrega 2 |
-| ADR-002, 004, 006, 007, 009 a 013                  | D2, D4, D6, D7, D9 a D13          | Entregas siguientes                                  |
+| [ADR-011](adr/ADR-011-observabilidad.md) | D11 · Observabilidad | Aceptada (versión inicial) · Entrega 2 |
+| [ADR-012](adr/ADR-012-balanceo.md) | D12 · Balanceo de carga | Aceptada (versión inicial) · Entrega 2 |
+| ADR-002, 004, 006, 007, 009, 010 y 013             | D2, D4, D6, D7, D9, D10 y D13     | Entregas siguientes                                  |
 
 ## 15. Pendientes de arquitectura
 
