@@ -1,0 +1,7 @@
+rechazado OK: precio decimal (código 121)
+rechazado OK: sin variantes (código 121)
+rechazado OK: talle inexistente (código 121)
+rechazado OK: moneda USD (código 121)
+rechazado OK: sistema inválido (código 121)
+rechazado OK: vigencia invertida
+rechazado OK: MEDIO_PAGO sin medioPago

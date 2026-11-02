@@ -1,4 +1,4 @@
-Prueba de concurrencia · 2026-11-02 00:44:22 · http://localhost:8085
+Prueba de concurrencia · 2026-11-02 11:59:57 · http://localhost:8085
 Producto: prod-remera-prueba-de-concurrencia (version 1, 1 variante)
 20 pedidos simultáneos: POST /v1/admin/productos/prod-remera-prueba-de-concurrencia/variantes {"talle": "S", "color": "Blanco"}
 Respuestas: {201: 1, 409: 19} · códigos de error: {'VARIANTE_DUPLICADA': 19}
