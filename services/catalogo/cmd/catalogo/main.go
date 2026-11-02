@@ -14,7 +14,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/handler"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/repository"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/service"
 )
 
 const servicio = "catalogo"
@@ -47,24 +49,16 @@ func correr() error {
 	if err := esperarBase(ctx, repo); err != nil {
 		return err
 	}
+	if err := repo.AsegurarIndices(ctx); err != nil {
+		return fmt.Errorf("creando índices: %w", err)
+	}
 	slog.Info("conectado a mongo")
 
-	mux := http.NewServeMux()
-	// healthz: el proceso está vivo. readyz: además la base responde, así que puede recibir pedidos.
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancelar := context.WithTimeout(r.Context(), time.Second)
-		defer cancelar()
-		if err := repo.Ping(ctx); err != nil {
-			http.Error(w, "base no disponible", http.StatusServiceUnavailable)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	})
+	s := service.Nuevo(repo)
 
 	servidor := &http.Server{
 		Addr:              ":" + variable("CATALOGO_PUERTO", "8080"),
-		Handler:           mux,
+		Handler:           conLimiteDeTiempo(handler.NuevoRouter(s), 4*time.Second),
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      10 * time.Second,
 	}
@@ -119,6 +113,16 @@ func esperarBase(ctx context.Context, repo *repository.Repositorio) error {
 		case <-time.After(2 * time.Second):
 		}
 	}
+}
+
+// conLimiteDeTiempo corta cada pedido a los 4 s, por debajo de los 5 s del gateway (ADR-005).
+// El ctx con límite llega hasta Mongo: si la consulta tarda más, el driver la cancela.
+func conLimiteDeTiempo(h http.Handler, limite time.Duration) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancelar := context.WithTimeout(r.Context(), limite)
+		defer cancelar()
+		h.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func variable(nombre, porDefecto string) string {
