@@ -1,4 +1,4 @@
-# Compose del TP de MongoDB (D9). Base y API; Swagger y el cargador se suman después.
+# Compose del TP de MongoDB (D9). Base, API, Swagger UI y cargador.
 # Uso: cp .env.example .env && docker compose up -d
 
 services:
@@ -27,10 +27,20 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
       MONGO_DB: ${MONGO_DB}
       MONGO_HOST: mongo-catalogo:27017   # nombre del servicio, nunca localhost
+      CORS_ORIGENES: http://localhost:8086   # deja que Swagger UI llame a la API desde el navegador (D16)
     ports: ["8085:8080"]
     depends_on:
       mongo-catalogo:
         condition: service_healthy
+
+  # Documentación interactiva de la API: http://localhost:8086
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.17.14
+    environment:
+      SWAGGER_JSON: /api/openapi.yaml
+    volumes:
+      - ./api:/api:ro
+    ports: ["8086:8080"]
 
   # Crea colecciones e índices y carga los datos. No arranca con `up`: se corre a mano.
   #   docker compose run --rm cargador                 # completa: contrato + volumen del TP

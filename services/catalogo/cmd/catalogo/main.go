@@ -58,7 +58,7 @@ func correr() error {
 
 	servidor := &http.Server{
 		Addr:              ":" + variable("CATALOGO_PUERTO", "8080"),
-		Handler:           conLimiteDeTiempo(handler.NuevoRouter(s), 4*time.Second),
+		Handler:           handler.ConCORS(conLimiteDeTiempo(handler.NuevoRouter(s), 4*time.Second), os.Getenv("CORS_ORIGENES")),
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      10 * time.Second,
 	}

@@ -49,6 +49,8 @@
 | D14 | **El CRUD completo va bajo `/v1/admin/productos`** | Así calza con la tabla de la sección 5.4 de la consigna (un solo recurso para crear, obtener, actualizar, eliminar y listar). `GET /v1/productos` queda libre para la ruta pública del contrato, en la etapa FAV |
 | D15 | **Códigos de error propios, con el estilo de Inventario** | `PEDIDO_INVALIDO` (400), `PRODUCTO_NO_ENCONTRADO` (404), `VARIANTE_DUPLICADA` (409), `CONFLICTO_DE_VERSION` (409), `VARIANTE_INEXISTENTE` (400 en el lote, 404 en la ficha; ver sección 7) |
 
+| D16 | **CORS opcional, apagado por defecto** | Swagger UI (`:8086`) llama a la API (`:8085`) desde otro origen y el navegador lo bloquea sin cabeceras CORS. Se resuelve con un middleware en el servicio, activado por la variable `CORS_ORIGENES` (por ejemplo `http://localhost:8086`). Vacía = no hace nada. Solo la activa el Compose de `tp-mongo/`. **Por qué así:** el servicio es el mismo que usará FAV y ahí el gateway puede encargarse de CORS; si los dos mandan cabeceras, el navegador rechaza la respuesta. **Alternativa descartada:** un proxy nginx delante de Swagger UI (válida y sin tocar el código, pero suma un contenedor y un archivo más para el Compose y la defensa) |
+
 ---
 
 ## 3. Lo que el servicio debe respetar de FAV
@@ -119,7 +121,7 @@ FAV es una tienda de ropa que hoy vende solo en el local y lleva el stock en un 
 | RF-06 | Promociones con vigencia obligatoria, separadas del precio base | RN-05, HU-05 |
 | RF-07 | Cálculo del precio vigente | RN-05, RN-22 |
 | RF-08 | Listado con filtros, orden y paginación | HU-02 |
-| RF-09 | Consulta por lote de variantes | ADR-005, ADR-001 |
+| RF-09 | Consulta por lote de variantes *(recortado del TP, etapa FAV)* | ADR-005, ADR-001 |
 
 **Sistemas de talles (RN-02):** `LETRAS` (XS, S, M, L, XL, XXL) · `NUMERICO_PAR` (32, 34, 36, 38, 40, 42, 44, 46) · `NUMERICO_1_4` (1, 2, 3, 4) · `UNICO` (valor `U` **[propuesta]**).
 
@@ -351,8 +353,8 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | `POST /v1/admin/productos/{id}/publicar` | Publicar |
 | `GET /v1/admin/productos` | Listar con filtros: `categoria`, `talle`, `color`, `precioMin`, `precioMax`, `q`, `publicado`, `orden`, `pagina`, `tamano`. Orden siempre desempatado por `_id` para que la paginación no repita ni saltee resultados |
 | `POST /v1/admin/productos/{id}/variantes` | Agregar una variante (operación atómica de 5.9) |
-| `GET /v1/variantes?variantes=a,b,c` | **Consulta por lote** (Ventas y panel): de 1 a 200 ids separados por coma, y la respuesta va en `{"items": [...]}`, igual que `GET /v1/stock?variantes=…` de Inventario. Por variante devuelve `productoId`, `nombre`, `categoria`, `talle`, `color`, `publicado` y precio vigente (`medioPago` opcional, por defecto `TRANSFERENCIA`). No filtra por `publicado` |
-| `POST /v1/promociones`, `PUT /v1/promociones/{id}`, `GET /v1/promociones` | Gestionar promociones |
+| *(Recortado del TP, etapa FAV, sección 15)* `GET /v1/variantes?variantes=a,b,c` | **Consulta por lote** (Ventas y panel): de 1 a 200 ids separados por coma, y la respuesta va en `{"items": [...]}`, igual que `GET /v1/stock?variantes=…` de Inventario. Por variante devuelve `productoId`, `nombre`, `categoria`, `talle`, `color`, `publicado` y precio vigente (`medioPago` opcional, por defecto `TRANSFERENCIA`). No filtra por `publicado` |
+| *(Recortado del TP, etapa FAV, sección 15)* `POST /v1/promociones`, `PUT /v1/promociones/{id}`, `GET /v1/promociones` | Gestionar promociones |
 | `GET /healthz`, `GET /readyz` | Sondas. La segunda verifica la conexión a MongoDB |
 
 - El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote **[?]**.
@@ -524,6 +526,7 @@ Para el notebook: `pip install -r analisis/requirements.txt` y abrirlo con Jupyt
 
 Sin cambiar lo anterior:
 
+- **Recortado del TP el 02/11/2026 para llegar a la entrega** (el modelo y los datos ya los contemplan; falta el código Go): el **cálculo del precio vigente** (5.7: función aislada en `service`, con tests unitarios), la **consulta por lote** `GET /v1/variantes` (RF-09) y la **gestión de promociones** por API (`/v1/promociones`). En el TP las promociones se cargan con el cargador y se consultan en Mongo (consultas 2, 7 y notebook).
 - **Adaptador del contrato público** `catalogo-pedidos-v1` (solo publicados, sin stock, `fotoUrl`), aparte del API de administración, y la separación de rutas en el gateway (hoy `/v1/productos` y `/v1/pedidos` van al mismo mock).
 - **Evento `VarianteCreada`** con outbox (ni se publica ni se consume hoy). Si se guarda junto con el producto en una transacción, requiere replica set.
 - **Eventos de cambio de producto** para el indexador, con la `version` ya presente, y el **motor de búsqueda** (ADR-006) en lugar del índice de texto de Mongo.
