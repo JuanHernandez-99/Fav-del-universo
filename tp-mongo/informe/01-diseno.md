@@ -141,6 +141,13 @@ Embeber las variantes también habilita la consistencia del caso principal: agre
 
 **Validación de esquema en MongoDB.** MongoDB no impone un esquema por defecto: cada documento puede tener cualquier forma. Con `$jsonSchema` se le puede pedir a la colección que rechace los documentos que no cumplan (`validationAction: "error"`). Acá se usa en `productos` y `promociones` como **segunda barrera**, para que valga aunque la escritura no pase por la API (un import, `mongosh` a mano). Controla tipos y rangos: `precioBase.monto` entero largo mayor a 0, moneda `ARS`, `sistemaTalles` y talles de la lista, al menos una variante, ids de hasta 100 caracteres, `version` mayor o igual a 1, y en promociones la vigencia obligatoria con `desde < hasta` y el medio de pago cuando corresponde.
 
+| Colección | Qué exige el esquema |
+|---|---|
+| `productos` | Campos obligatorios (`nombre`, `categoria`, `sistemaTalles`, `precioBase`, `publicado`, `variantes`, fechas y `version`) · `_id` de hasta 100 caracteres · `precioBase.monto` entero largo (`long`) mayor a 0 y moneda `ARS` · `sistemaTalles` y talles dentro de la lista permitida · al menos una variante, con `id`, `talle` y `color` · cada foto con `url` · `version` mayor o igual a 1 |
+| `promociones` | `nombre`, `tipo`, `porcentaje` (1 a 100), `vigencia` y `alcance` obligatorios · `tipo` y `alcance.tipo` dentro de sus valores · `desde` y `hasta` de tipo fecha, con **`desde < hasta`** · si el tipo es `MEDIO_PAGO`, `medioPago` tiene que ser uno de los tres medios |
+
+El validador no está en el código: **lo guarda MongoDB como metadato de la colección**, dentro del volumen de datos. El script `01` solo lo instala (con `collMod`), y se puede ver en la base con `pruebas/ver_esquema.js`. Con `validationAction: "error"` una escritura inválida falla con el código 121 (*Document failed validation*), venga de la API, de `mongoimport` o de `mongosh`.
+
 **Cómo se mantiene sincronizada con el servicio Go.** Las dos capas aplican las mismas reglas. Los talles están en dos lugares (`modelo.SistemasTalles` en Go y `TALLES` en el script) y un test del servicio (`esquema_test.go`) falla si se separan. Lo que el esquema no puede expresar queda en el servicio: que la categoría exista y que el talle sea el del sistema **de ese producto** (cruza documentos y campos).
 
 **Se muestra con:** `scripts/01_crear_colecciones_e_indices.js` (colecciones, esquema e índices), `docker compose run --rm cargador` (carga y verificación) y `pruebas/validacion_esquema.js` (inserciones inválidas rechazadas, con su salida en `evidencia/validacion_esquema.txt`).
