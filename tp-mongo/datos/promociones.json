@@ -1,0 +1,290 @@
+[
+  {
+    "_id": "promo-efectivo-tienda",
+    "nombre": "10% pagando en efectivo",
+    "tipo": "MEDIO_PAGO",
+    "porcentaje": 10,
+    "medioPago": "EFECTIVO",
+    "vigencia": {
+      "desde": {
+        "$date": "2026-11-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-12-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-mercado-pago",
+    "nombre": "5% con Mercado Pago",
+    "tipo": "MEDIO_PAGO",
+    "porcentaje": 5,
+    "medioPago": "MERCADO_PAGO",
+    "vigencia": {
+      "desde": {
+        "$date": "2026-10-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2027-01-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-semana-del-jean",
+    "nombre": "Semana del jean",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 20,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-11-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-11-16T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "jeans"
+      ]
+    }
+  },
+  {
+    "_id": "promo-media-estacion",
+    "nombre": "Buzos y camperas de media estación",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 15,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-10-15T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-11-11T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "buzos",
+        "camperas"
+      ]
+    }
+  },
+  {
+    "_id": "promo-liquidacion",
+    "nombre": "Liquidación de productos seleccionados",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 30,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-10-20T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-11-21T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "PRODUCTO",
+      "ids": [
+        "prod-jean-mom-tiro-alto",
+        "prod-remera-manga-larga-rayada",
+        "prod-vestido-corto-de-fiesta"
+      ]
+    }
+  },
+  {
+    "_id": "promo-accesorios",
+    "nombre": "Semana de accesorios",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 25,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-11-02T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-11-09T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "accesorios",
+        "abanicos"
+      ]
+    }
+  },
+  {
+    "_id": "promo-hot-sale",
+    "nombre": "Hot Sale",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 25,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-05-11T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-05-14T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-invierno-camperas",
+    "nombre": "Invierno en camperas",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 20,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-06-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-08-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "camperas"
+      ]
+    }
+  },
+  {
+    "_id": "promo-transferencia-septiembre",
+    "nombre": "10% por transferencia en septiembre",
+    "tipo": "MEDIO_PAGO",
+    "porcentaje": 10,
+    "medioPago": "TRANSFERENCIA",
+    "vigencia": {
+      "desde": {
+        "$date": "2026-09-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-10-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-dia-de-la-madre",
+    "nombre": "Día de la Madre",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 15,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-10-10T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-10-19T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "vestidos",
+        "conjuntos"
+      ]
+    }
+  },
+  {
+    "_id": "promo-black-friday",
+    "nombre": "Black Friday",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 25,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-11-27T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-12-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-verano-remeras",
+    "nombre": "Verano en remeras",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 20,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-12-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2027-01-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "remeras"
+      ]
+    }
+  },
+  {
+    "_id": "promo-navidad",
+    "nombre": "Navidad en vestidos y conjuntos",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 15,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-12-15T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-12-25T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "vestidos",
+        "conjuntos"
+      ]
+    }
+  },
+  {
+    "_id": "promo-transferencia-enero",
+    "nombre": "10% por transferencia en enero",
+    "tipo": "MEDIO_PAGO",
+    "porcentaje": 10,
+    "medioPago": "TRANSFERENCIA",
+    "vigencia": {
+      "desde": {
+        "$date": "2027-01-02T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2027-02-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  }
+]

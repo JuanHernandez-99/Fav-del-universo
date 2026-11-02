@@ -1,0 +1,53 @@
+# Compose del TP de MongoDB (D9). Base y API; Swagger y el cargador se suman después.
+# Uso: cp .env.example .env && docker compose up -d
+
+services:
+  # Mismo nombre que en el Compose raíz de FAV: la API se conectará por este nombre, nunca por localhost.
+  mongo-catalogo:
+    image: mongo:7
+    environment:
+      # Crean el usuario root en la base `admin`, solo la primera vez (con el volumen vacío).
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    volumes: [mongo-catalogo-data:/data/db]
+    # Publicado solo en este Compose: lo usan el notebook y Compass. En el de FAV nunca.
+    ports: ["27017:27017"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  catalogo:
+    build: ../services/catalogo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_DB: ${MONGO_DB}
+      MONGO_HOST: mongo-catalogo:27017   # nombre del servicio, nunca localhost
+    ports: ["8085:8080"]
+    depends_on:
+      mongo-catalogo:
+        condition: service_healthy
+
+  # Crea colecciones e índices y carga los datos. No arranca con `up`: se corre a mano.
+  #   docker compose run --rm cargador                 # completa: contrato + volumen del TP
+  #   docker compose run --rm -e CARGA=minimo cargador # solo los 2 productos del contrato (FAV)
+  cargador:
+    image: mongo:7
+    profiles: [carga]
+    entrypoint: ["sh", "/scripts/cargar.sh"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_DB: ${MONGO_DB}
+      CARGA: ${CARGA:-completa}
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./datos:/datos:ro
+    depends_on:
+      mongo-catalogo:
+        condition: service_healthy
+
+volumes:
+  mongo-catalogo-data:

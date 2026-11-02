@@ -9,6 +9,7 @@ Reglas:
 - Antes de usar ids o rutas de Inventario, leé su código real en `services/inventario/`.
 - El servicio no maneja stock. La baja de producto es lógica (despublicar).
 - Nunca subas `.env` ni credenciales. Solo haces commits en la rama `services-catalogo-mongo` si yo te lo indico explicitamente.
+- La consigna del trabajo está en (Consigna_Proyecto_NoSQL_MongoDB.pdf), si estamos por hacer algo que tenga conflicto con esa consigna hacemelo saber antes.
 
 ## Modo de trabajo (obligatorio)
 

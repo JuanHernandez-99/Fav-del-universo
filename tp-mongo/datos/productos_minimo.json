@@ -1,0 +1,76 @@
+[
+  {
+    "_id": "prod-remera-basica",
+    "nombre": "Remera básica",
+    "descripcion": "Remera de algodón, corte recto.",
+    "categoria": "remeras",
+    "sistemaTalles": "LETRAS",
+    "precioBase": {
+      "monto": {
+        "$numberLong": "1500000"
+      },
+      "moneda": "ARS"
+    },
+    "publicado": true,
+    "atributos": {
+      "material": "algodón",
+      "genero": "unisex"
+    },
+    "fotos": [
+      {
+        "url": "https://fav.example/fotos/remera-basica.jpg",
+        "color": null
+      },
+      {
+        "url": "https://fav.example/fotos/remera-basica-blanca-1.jpg",
+        "color": "Blanco"
+      }
+    ],
+    "variantes": [
+      {
+        "id": "var-remera-basica-blanca-m",
+        "talle": "M",
+        "color": "Blanco"
+      },
+      {
+        "id": "var-remera-basica-negra-l",
+        "talle": "L",
+        "color": "Negro"
+      }
+    ],
+    "creadoEn": {
+      "$date": "2026-10-01T12:00:00Z"
+    },
+    "actualizadoEn": {
+      "$date": "2026-10-20T15:30:00Z"
+    },
+    "version": 3
+  },
+  {
+    "_id": "prod-jean-mom",
+    "nombre": "Jean mom",
+    "categoria": "jeans",
+    "sistemaTalles": "NUMERICO_PAR",
+    "precioBase": {
+      "monto": {
+        "$numberLong": "4200000"
+      },
+      "moneda": "ARS"
+    },
+    "publicado": true,
+    "variantes": [
+      {
+        "id": "var-jean-mom-celeste-38",
+        "talle": "38",
+        "color": "Celeste"
+      }
+    ],
+    "creadoEn": {
+      "$date": "2026-10-01T12:00:00Z"
+    },
+    "actualizadoEn": {
+      "$date": "2026-10-01T12:00:00Z"
+    },
+    "version": 1
+  }
+]

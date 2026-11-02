@@ -1,6 +1,6 @@
 # TP MongoDB · Catálogo de FAV · Guía de trabajo
 
-> **Versión 0.3** · 31/10/2026 · Entrega: **martes 3/11/2026**, en un `.zip`. No hay entregas parciales.
+> **Versión 0.4** · 01/11/2026 · Entrega: **martes 3/11/2026**, en un `.zip`. No hay entregas parciales.
 >
 > Convenciones: **[propuesta]** decisión provisoria nuestra · **[?]** pendiente de definir con alguien (ver sección 14).
 >
@@ -16,16 +16,14 @@
 |---|---|
 | Materia | Base de Datos Aplicada. Consigna: *Trabajo Práctico Integrador, Diseño e implementación de una base de datos NoSQL* (MongoDB) |
 | Dominio | **Catálogo y gestión de productos**, aprobado por el profesor. Es el servicio Catálogo del proyecto FAV (Arquitectura de Software) |
-| Equipo | 2 personas. Las expectativas son las mismas que para equipos de 3 o 4 |
+| Equipo | 2 personas |
 | Entrega | Martes 3/11/2026, en `.zip`. Informe en `.md`. Solo el servicio Catálogo; FAV se puede mostrar aparte desde la PC |
 | Defensa | El profesor ve el proyecto y hace preguntas. Se muestra desde la PC de uno de los integrantes. Cada integrante debe poder explicar el modelo, ejecutar una consulta, justificar un índice y describir el repositorio |
-| Herramientas de IA | De uso libre, e incluso se incentivan |
 | Aprobado por el profesor | Dominio con `productos`, `categorias` y `promociones`, **sin stock** · API en **Go** y notebook en **Python** · consistencia con **operación atómica sobre un documento** · **baja lógica** como `DELETE` · pruebas con evidencia manual · informe en `.md` |
-| Otro curso | Los dos profesores (Base de Datos y Arquitectura de Software) aceptan usar el mismo servicio en ambos trabajos |
 
 ### Ramas y carpetas
 
-- Ramas: `development` → `services-catalogo` (servicio para FAV) → `services-catalogo-mongo` (TP). **Se trabaja en `services-catalogo-mongo`.**
+- Ramas de git: `development` → `services-catalogo` (servicio para FAV) → `services-catalogo-mongo` (TP). **Se trabaja en `services-catalogo-mongo`.**
 - Hasta la entrega se toca **solo** `services/catalogo/` y `tp-mongo/`. No se modifican el `docker-compose.yml` raíz, el gateway, `.env.example` ni `go.work` (los usa también el resto del equipo de FAV). La integración al raíz se hace después, en otro PR.
 - Después de entregar: tag `tp-mongo-v1` sobre lo entregado, merge a `services-catalogo` y seguir con FAV.
 
@@ -36,7 +34,7 @@
 | # | Decisión | Detalle |
 |---|---|---|
 | D1 | **El stock no está en Catálogo** | Es de Inventario (MySQL). Catálogo solo conoce el id de la variante. Si el profesor pregunta cómo se haría en Mongo, se contesta de forma oral (sección 12) |
-| D2 | **Despublicar en lugar de borrar** | `DELETE /v1/productos/{id}` hace baja lógica (`publicado: false`), devuelve `204` y es idempotente. Los ids no se reutilizan |
+| D2 | **Despublicar en lugar de borrar** | `DELETE /v1/admin/productos/{id}` hace baja lógica (`publicado: false`), devuelve `204` y es idempotente. Los ids no se reutilizan |
 | D3 | **Las promociones no se acumulan** | Si aplican varias a un producto, gana la de mayor porcentaje **[propuesta]** |
 | D4 | **El precio público asume transferencia** | Si no se indica `medioPago`, vale `TRANSFERENCIA`. No se implementa ninguna pasarela de pagos |
 | D5 | **Redondeo hacia abajo a 2 decimales** | Se calcula en **centavos enteros** y se trunca, para evitar errores de coma flotante (`0.29 * 100 = 28.999…`) |
@@ -46,6 +44,10 @@
 | D9 | **Compose del TP en `tp-mongo/`** | La carpeta del servicio queda solo con lo que es de FAV |
 | D10 | **Jupyter** | El notebook se entrega ejecutado (`.ipynb`) y exportado a HTML. Para la demo se puede mostrar el HTML. El servicio de Jupyter en el Compose es opcional y se deja para el final |
 | D11 | **Dashboard interactivo** | Opcional. Solo si sobra tiempo, al final |
+| D12 | **El servidor genera el id de variante** | El administrador no lo escribe. Regla en 5.5. El cargador de datos usa la misma función. Los 3 ids del contrato ya existen y se cargan tal cual (sección 3, punto 11) |
+| D13 | **Montos en centavos enteros (`int64`)** | `precioBase.monto` se guarda en centavos, nunca como double. La API convierte a pesos con 2 decimales hacia afuera, porque el contrato define `precio` como `number` (double) en pesos |
+| D14 | **El CRUD completo va bajo `/v1/admin/productos`** | Así calza con la tabla de la sección 5.4 de la consigna (un solo recurso para crear, obtener, actualizar, eliminar y listar). `GET /v1/productos` queda libre para la ruta pública del contrato, en la etapa FAV |
+| D15 | **Códigos de error propios, con el estilo de Inventario** | `PEDIDO_INVALIDO` (400), `PRODUCTO_NO_ENCONTRADO` (404), `VARIANTE_DUPLICADA` (409), `CONFLICTO_DE_VERSION` (409), `VARIANTE_INEXISTENTE` (400 en el lote, 404 en la ficha; ver sección 7) |
 
 ---
 
@@ -65,7 +67,7 @@ Está tomado del código de Inventario (rama `development`), de los ADR y del co
 | 8 | Forma del catálogo público: JSON camelCase, solo publicados, **sin stock**, precio vigente por variante, `fotoUrl` opcional | Contrato `catalogo-pedidos-v1` |
 | 9 | Errores en `application/problem+json` con `codigo` estable | Contrato, mock, Inventario |
 | 10 | Go 1.26, sondas `/healthz` y `/readyz`, **sin estado en memoria** (se prevén dos réplicas), variables `MONGO_*` del `.env.example` raíz | Inventario, ADR-011, ARCHITECTURE §12 |
-| 11 | Los ids de las 3 variantes del contrato ya tienen stock en Inventario: `var-remera-basica-blanca-m`, `var-remera-basica-negra-l`, `var-jean-mom-celeste-38` | `002_datos_de_ejemplo.sql` |
+| 11 | Los ids de las 3 variantes del contrato ya tienen stock en Inventario: `var-remera-basica-blanca-m`, `var-remera-basica-negra-l`, `var-jean-mom-celeste-38`. **Se respetan tal cual**, aunque no sigan la regla de 5.5 ("blanca" en lugar de "blanco"): un id no cambia nunca y es opaco (el talle y el color se leen de sus campos, no del id). El conjunto mínimo los carga escritos, no generados | `002_datos_de_ejemplo.sql` |
 
 ---
 
@@ -136,7 +138,7 @@ Son tres: `productos` (entidad principal), `categorias` y `promociones`.
   "descripcion": "Remera de algodón, corte recto.",
   "categoria": "remeras",
   "sistemaTalles": "LETRAS",
-  "precioBase": { "monto": 15000, "moneda": "ARS" },
+  "precioBase": { "monto": { "$numberLong": "1500000" }, "moneda": "ARS" },
   "publicado": true,
   "atributos": { "material": "algodón", "genero": "unisex" },
   "fotos": [
@@ -160,7 +162,7 @@ Son tres: `productos` (entidad principal), `categorias` y `promociones`.
 | `descripcion` | string | No | Opcional también en el contrato |
 | `categoria` | string | Sí | **Referencia** a `categorias._id` |
 | `sistemaTalles` | enum | Sí | Uno de los cuatro de RN-02 |
-| `precioBase` | objeto | Sí | `monto` mayor a 0. El precio es **del producto**: las variantes no tienen precio propio. `moneda`: `ARS` |
+| `precioBase` | objeto | Sí | `monto`: entero `int64` en **centavos**, mayor a 0 (1500000 = $15.000,00, D13). El precio es **del producto**: las variantes no tienen precio propio. `moneda`: `ARS` |
 | `publicado` | boolean | Sí | `false` por defecto (HU-03.1) |
 | `atributos` | objeto libre | No | Puede variar por categoría. Es la parte flexible del modelo |
 | `fotos` | arreglo | No | `url` obligatoria, `color` opcional (RN-03). Solo la URL. La **primera** es la principal (`fotoUrl` del contrato) **[?]** |
@@ -225,8 +227,12 @@ La decisión responde a los patrones de acceso (lectura frecuente de la ficha co
 ### 5.5 Identificadores
 
 - `_id` y `variantes[].id` son **textos legibles**, no `ObjectId`, porque así los usan el contrato e Inventario.
-- Hasta 100 caracteres. **No cambian nunca**, ni al renombrar el producto.
-- Forma: `prod-` + nombre normalizado, y `var-` + producto + color + talle, como los ejemplos del contrato **[propuesta]**. Si el id de producto ya existe, se agrega un sufijo numérico.
+- Hasta 100 caracteres, porque Inventario lo exige (`VARCHAR(100)`). Si el id generado pasa el límite, se rechaza con `400`. **No cambian nunca**, ni al renombrar el producto ni al corregir el color de una variante.
+- Los genera el **servidor**, en una sola función que también usa el cargador de datos (D12):
+  - Producto: `prod-` + nombre normalizado. Si el id ya existe, se agrega un sufijo numérico **[propuesta]**.
+  - Variante: `var-` + producto (sin el `prod-`) + color + talle, todo normalizado. Por ejemplo, `prod-remera-basica` en Blanco, talle M, da `var-remera-basica-blanco-m`.
+  - Normalizar: minúsculas, sin acentos, sin espacios. Cómo se reemplazan los espacios y la ñ está en la sección 14.
+- Los 3 ids del contrato son **heredados** y no siguen esta regla. Se cargan tal cual (sección 3, punto 11).
 - Como no se borra, un id **no se reutiliza**: una variante recreada con el mismo id heredaría el stock de la anterior en Inventario.
 
 ### 5.6 Validaciones
@@ -250,7 +256,7 @@ Algoritmo, en una **sola función aislada** para poder cambiar la política sin 
 1. `medioPago` = el recibido, o `TRANSFERENCIA` si no vino (D4).
 2. Candidatas: promociones con fecha actual dentro de la vigencia, cuyo `alcance` incluya al producto (por id, por categoría o `TIENDA`), y que sean `PORCENTAJE` o `MEDIO_PAGO` con ese medio.
 3. Si hay más de una, **gana la de mayor porcentaje** (no se acumulan, D3).
-4. `precioFinal = trunc(precioBase_en_centavos × (100 − porcentaje) / 100) / 100`, es decir, hacia abajo a 2 decimales y calculado en centavos enteros (D5).
+4. `precioFinalCentavos = trunc(precioBaseCentavos × (100 − porcentaje) / 100)`, en enteros, es decir, hacia abajo y sin coma flotante (D5). Recién al responder se pasa a pesos con 2 decimales (D13).
 5. Sin candidatas, el precio vigente es el precio base.
 
 La respuesta debería indicar el precio base, el vigente y la promoción aplicada (si la hay).
@@ -274,15 +280,15 @@ Se crean al arrancar (idempotente, porque dos réplicas pueden arrancar a la vez
 
 **Caso principal: agregar una variante sin duplicarla.**
 
-- *Qué podría pasar sin protección:* dos pedidos simultáneos (dos pestañas del panel, o un reintento por red) agregan la misma variante `M` / `Blanco`. Cada uno lee el producto, no ve duplicados y agrega la suya: el producto queda con dos variantes iguales, con ids distintos. Inventario recibiría las dos y repartiría el stock entre ambas.
+- *Qué podría pasar sin protección:* dos pedidos simultáneos (dos pestañas del panel, o un reintento por red) agregan la misma variante `S` / `Blanco`. Cada uno lee el producto, no ve duplicados y agrega la suya: el producto queda con dos variantes iguales, con ids distintos. Inventario recibiría las dos y repartiría el stock entre ambas.
 - *Un índice único no alcanza:* en MongoDB, un índice único sobre un arreglo evita repetidos **entre documentos**, no dentro del mismo arreglo. El índice protege la unicidad del id en todo el catálogo; la actualización condicional protege talle y color dentro del producto.
 - *Solución, una operación atómica sobre un solo documento:*
 
 ```js
 db.productos.updateOne(
   { _id: idProducto,
-    variantes: { $not: { $elemMatch: { talle: "M", color: "Blanco" } } } },
-  { $push: { variantes: { id: "var-remera-basica-blanca-m", talle: "M", color: "Blanco" } },
+    variantes: { $not: { $elemMatch: { talle: "S", color: "Blanco" } } } },
+  { $push: { variantes: { id: "var-remera-basica-blanco-s", talle: "S", color: "Blanco" } },
     $set: { actualizadoEn: new Date() },
     $inc: { version: 1 } }
 )
@@ -314,27 +320,42 @@ Cada una se documenta con **objetivo, comando y resultado esperado** en `consult
 | 9 | Por categoría: cantidad, precio promedio, mínimo y máximo | Agrupamiento y estadísticas | `$group` con `$sum`, `$avg`, `$min`, `$max` |
 | 10 | ¿Qué categorías, talles y colores hay para armar los filtros de la tienda? | Adicional de complejidad (elegida por el equipo) | `$facet` |
 
+Los montos de las preguntas están en pesos, pero en los comandos se escriben en centavos (D13). Por ejemplo, 10.000 pesos es `1000000`.
+
 ---
 
 ## 7. API
 
 Errores en `application/problem+json` con `codigo` estable, como el contrato de FAV e Inventario. Código HTTP adecuado en cada caso: `400` validación, `404` inexistente, `409` conflicto, `204` baja.
 
+| `codigo` | HTTP | Cuándo |
+|---|---|---|
+| `PEDIDO_INVALIDO` | 400 | El cuerpo o los parámetros no cumplen las reglas. `errores` indica los campos |
+| `PRODUCTO_NO_ENCONTRADO` | 404 | El producto no existe |
+| `VARIANTE_INEXISTENTE` | **400** en el lote · **404** en la ficha | Ver la nota debajo. `variantes` indica cuáles |
+| `VARIANTE_DUPLICADA` | 409 | El producto ya tiene una variante con ese talle y color (5.9) |
+| `CONFLICTO_DE_VERSION` | 409 | La `version` enviada no es la actual (5.9, caso secundario) |
+| `ERROR_INTERNO` | 500 | Error inesperado. El detalle va al log, no al cliente |
+
+**Nota (diferencia a propósito):** en la consulta por lote, una variante inexistente da `400`, como pide el contrato `catalogo-pedidos-v1`, porque eso es lo que va a consumir Ventas. En la ficha individual da `404`, como Inventario.
+
+Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contrato. Internamente se manejan en centavos (D13).
+
 | Método y ruta | Función |
 |---|---|
-| `POST /v1/productos` | Crear (nace no publicado, con al menos una variante) |
-| `GET /v1/productos/{id}` | Obtener por id (`404` si no existe) |
-| `PUT /v1/productos/{id}` | Actualizar datos del producto (lleva `version`) |
-| `DELETE /v1/productos/{id}` | **Baja lógica**: despublica. `204` e idempotente |
-| `POST /v1/productos/{id}/publicar` | Publicar |
-| `GET /v1/productos` | Listar con filtros: `categoria`, `talle`, `color`, `precioMin`, `precioMax`, `q`, `publicado`, `orden`, `pagina`, `tamano`. Orden siempre desempatado por `_id` para que la paginación no repita ni saltee resultados |
-| `POST /v1/productos/{id}/variantes` | Agregar una variante (operación atómica de 5.9) |
-| `GET /v1/variantes?ids=a,b,c` | **Consulta por lote** (Ventas y panel): por variante, `productoId`, `nombre`, `categoria`, `talle`, `color`, `publicado` y precio vigente (`medioPago` opcional, por defecto `TRANSFERENCIA`). No filtra por `publicado`. Sigue la convención de `GET /v1/stock?variantes=…` de Inventario |
+| `POST /v1/admin/productos` | Crear (nace no publicado, con al menos una variante) |
+| `GET /v1/admin/productos/{id}` | Obtener por id (`404` si no existe) |
+| `PUT /v1/admin/productos/{id}` | Actualizar datos del producto (lleva `version`) |
+| `DELETE /v1/admin/productos/{id}` | **Baja lógica**: despublica. `204` e idempotente |
+| `POST /v1/admin/productos/{id}/publicar` | Publicar |
+| `GET /v1/admin/productos` | Listar con filtros: `categoria`, `talle`, `color`, `precioMin`, `precioMax`, `q`, `publicado`, `orden`, `pagina`, `tamano`. Orden siempre desempatado por `_id` para que la paginación no repita ni saltee resultados |
+| `POST /v1/admin/productos/{id}/variantes` | Agregar una variante (operación atómica de 5.9) |
+| `GET /v1/variantes?variantes=a,b,c` | **Consulta por lote** (Ventas y panel): de 1 a 200 ids separados por coma, y la respuesta va en `{"items": [...]}`, igual que `GET /v1/stock?variantes=…` de Inventario. Por variante devuelve `productoId`, `nombre`, `categoria`, `talle`, `color`, `publicado` y precio vigente (`medioPago` opcional, por defecto `TRANSFERENCIA`). No filtra por `publicado` |
 | `POST /v1/promociones`, `PUT /v1/promociones/{id}`, `GET /v1/promociones` | Gestionar promociones |
 | `GET /healthz`, `GET /readyz` | Sondas. La segunda verifica la conexión a MongoDB |
 
 - El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote **[?]**.
-- La ruta pública del contrato (`GET /v1/productos` con `items`, solo publicados) es **otra cosa** y se agrega en la etapa FAV como adaptador aparte. Las rutas de esta API son internas y pueden tener otro nombre si hace falta.
+- `GET /v1/productos` queda reservada para la ruta pública del contrato (con `items`, solo publicados), que se agrega en la etapa FAV como adaptador aparte (D14). Por eso todo el CRUD de administración está bajo `/v1/admin/productos`.
 - Estructura en capas: `handler` (HTTP y validación de entrada) → `service` (reglas y precio vigente) → `repository` (único lugar que habla con MongoDB). Sin estado en memoria.
 
 ---
@@ -347,7 +368,11 @@ Errores en `application/problem+json` con `codigo` estable, como el contrato de 
 | **Mínimo (FAV)** | Los 2 productos y 3 variantes del contrato, con los ids de la sección 3, punto 11 | Que el flujo completo siga funcionando al integrar |
 
 - Las variantes del conjunto de volumen **no existen en Inventario**: una compra sobre ellas fallaría allí. Por eso FAV carga solo el mínimo.
-- **Generador determinista** en Python (semilla fija), cuyos JSON ya generados se entregan. La carga corre dentro de Docker (`mongoimport` y `mongosh`), sin instalar nada.
+- **El TP carga los dos conjuntos.** `docker compose run --rm cargador` hace la carga completa (mínimo, volumen y promociones). `docker compose run --rm -e CARGA=minimo cargador` carga solo las categorías y los 2 productos del contrato, que es lo que usa FAV.
+- Archivos en `datos/`: `categorias.json` (13), `productos_minimo.json` (2, con los ids heredados exactos), `productos.json` (250 productos, 881 variantes) y `promociones.json` (14). En total son 279 documentos.
+- **Generador determinista** en Python (`datos/generar.py`, semilla fija), cuyos JSON ya generados se entregan. Para regenerarlos: `python datos/generar.py`. La carga corre dentro de Docker (`mongoimport` y `mongosh`), sin instalar nada.
+- `02_cargar` vacía las colecciones con `deleteMany` y vuelve a importar, así se puede repetir. No usa `mongoimport --drop`, porque borraría los índices de `01`. El índice único de `variantes.id` hace que la carga falle si hubiera un id repetido.
+- **Promociones respecto de la defensa (03/11/2026):** 6 vigentes, 4 vencidas y 4 futuras. Un jean está en "Semana del jean" (20%) y en la liquidación (30%), para mostrar que gana la mayor (D3).
 - **Casos límite:** producto despublicado; sin fotos ni atributos; talle único; con una sola variante y con muchas; precios mínimo y máximo; nombres con tildes y ñ; promoción vencida, futura, de medio de pago y de alcance `TIENDA`; fotos asociadas y no asociadas a un color.
 - **`03_verificar.js`:** comprueba cantidades (al menos 100 documentos), que toda categoría referenciada exista, que los ids de variante sean únicos, que cada talle pertenezca al sistema del producto y que ninguna promoción tenga la vigencia invertida.
 
@@ -482,6 +507,10 @@ Para el notebook: `pip install -r analisis/requirements.txt` y abrirlo con Jupyt
 | 8 | Contenido del evento `VarianteCreada` | **[?]** Equipo (Inventario) | Fuera de este trabajo |
 | 9 | Ids de variante y rutas de Inventario | Hay que **revisarlos antes de entregar**: el código leído es el de `development` y puede cambiar | — |
 | 10 | Los índices del servicio y los del script `01_…` deben coincidir | Riesgo de duplicación | Revisar al final |
+| 11 | Cómo se normalizan los espacios y la ñ en los ids (5.5) | Confirmado | Espacio → `-` (como `remera-basica`), ñ → `n`. Además, cualquier otro símbolo pasa a `-` y se quitan los `-` repetidos o de los extremos (`normalizar` en `datos/generar.py`; la función de Go tiene que dar lo mismo) |
+| 12 | Dos colores distintos que se normalizan igual (por ejemplo "Azul marino" y "azul-marino") generarían el mismo id | **[propuesta]** | El índice único lo rechaza y se responde `409 VARIANTE_DUPLICADA` |
+| 13 | Variante inexistente: `400` en el lote y `404` en la ficha | Decidido, a propósito (sección 7) | — |
+| 14 | Zona horaria de las vigencias de promociones | Confirmado | Se definen en hora de Argentina (UTC−3) y se guardan en UTC: "hasta el 30/11" es `2026-12-01T02:59:59Z` |
 
 ---
 
