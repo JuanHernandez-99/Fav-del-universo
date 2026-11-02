@@ -106,6 +106,7 @@ La prueba de concurrencia crea un producto nuevo cada vez, así que se puede rep
   jupyter lab analisis/catalogo.ipynb
   ```
   El notebook toma las credenciales de `tp-mongo/.env` y se conecta a `localhost:27017`.
+  Para regenerar la versión HTML (oscura, con una pestaña por indicador) a partir del notebook ejecutado: `python analisis/exportar_html.py`, usando el entorno de `requirements.txt`.
 
 ## Estructura de lo entregado
 

@@ -344,12 +344,31 @@ def productos_volumen(rng, minimo):
 
 # ---------- Promociones ----------
 
-def promociones(rng, productos):
-    def elegir(categoria):
-        return rng.choice([p["_id"] for p in productos if p["categoria"] == categoria and p["publicado"]])
+def cuota(n, minimo=0.20, maximo=0.30):
+    """Cuántos de n productos entran en una promoción para quedar entre el 20 % y el 30 %. Con pocos
+    productos puede no haber un entero en ese rango: se toma el más cercano al 25 %."""
+    validos = [k for k in range(1, n + 1) if minimo <= k / n <= maximo]
+    return min(validos or [1], key=lambda k: abs(k / n - 0.25))
 
-    # Un jean entra en "Semana del jean" (20%) y en la liquidación (30%): gana la mayor (D3).
-    liquidacion = [elegir("jeans"), elegir("remeras"), elegir("vestidos")]
+
+def promociones(rng, productos):
+    """Reparte las promociones vigentes para que la cobertura sea intermedia (no todo el catálogo):
+    todos los buzos y camperas, la mitad de los jeans y entre el 20 % y el 30 % del resto de las categorías."""
+    def publicados(categoria):
+        return [p["_id"] for p in productos if p["categoria"] == categoria and p["publicado"]]
+
+    def muestra(categoria, cantidad=None):
+        ids = publicados(categoria)
+        return sorted(rng.sample(ids, cantidad if cantidad is not None else cuota(len(ids))))
+
+    # "Semana del jean" (20 %): la mitad de los jeans publicados (redondeando hacia arriba).
+    jeans = muestra("jeans", (len(publicados("jeans")) + 1) // 2)
+    # "Semana de accesorios" (25 %): una parte de los accesorios y de los abanicos.
+    accesorios = muestra("accesorios") + muestra("abanicos")
+    # "Liquidación" (30 %): una parte del resto de las categorías, más un jean que ya está en la semana
+    # del jean: ese producto tiene dos promociones a la vez y gana la mayor (D3).
+    resto = ["bodys", "conjuntos", "polleras", "pantalones", "shorts", "tops", "vestidos", "remeras"]
+    liquidacion = [i for categoria in resto for i in muestra(categoria)] + [rng.choice(jeans)]
 
     def promo(pid, nombre, tipo, porcentaje, desde, hasta, alcance, ids=(), medio=None):
         return {"_id": pid, "nombre": nombre, "tipo": tipo, "porcentaje": porcentaje, "medioPago": medio,
@@ -367,13 +386,13 @@ def promociones(rng, productos):
               fecha_ar(2026, 10, 1), fecha_ar(2026, 12, 31, *fin), "CATEGORIA", ["vestidos"],
               medio="EFECTIVO"),
         promo("promo-semana-del-jean", "Semana del jean", "PORCENTAJE", 20,
-              fecha_ar(2026, 11, 1), fecha_ar(2026, 11, 15, *fin), "CATEGORIA", ["jeans"]),
+              fecha_ar(2026, 11, 1), fecha_ar(2026, 11, 15, *fin), "PRODUCTO", jeans),
         promo("promo-media-estacion", "Buzos y camperas de media estación", "PORCENTAJE", 15,
               fecha_ar(2026, 10, 15), fecha_ar(2026, 11, 10, *fin), "CATEGORIA", ["buzos", "camperas"]),
         promo("promo-liquidacion", "Liquidación de productos seleccionados", "PORCENTAJE", 30,
               fecha_ar(2026, 10, 20), fecha_ar(2026, 11, 20, *fin), "PRODUCTO", liquidacion),
         promo("promo-accesorios", "Semana de accesorios", "PORCENTAJE", 25,
-              fecha_ar(2026, 11, 2), fecha_ar(2026, 11, 8, *fin), "CATEGORIA", ["accesorios", "abanicos"]),
+              fecha_ar(2026, 11, 2), fecha_ar(2026, 11, 8, *fin), "PRODUCTO", accesorios),
         # Vencidas.
         promo("promo-hot-sale", "Hot Sale", "PORCENTAJE", 25,
               fecha_ar(2026, 5, 11), fecha_ar(2026, 5, 13, *fin), "TIENDA"),

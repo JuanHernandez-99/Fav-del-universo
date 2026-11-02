@@ -142,10 +142,10 @@ mostrar(
 // "promociones" las vigentes que lo alcanzan (por id, por categoría o a toda la tienda) y que
 // valen para el medio de pago; se queda con la de mayor porcentaje (no se acumulan, D3) y trunca
 // a centavos enteros (D5).
-// Resultado esperado: de los 205 productos publicados, 73 tienen una promoción vigente pagando por
-// transferencia (el medio por defecto, D4). Por ejemplo, el Abanico calado: $6.490 → $4.867,50.
-//   7b) El Jean mom tiro alto está en "Semana del jean" (20%) y en la liquidación (30%): gana la
-//       de 30%, $57.500 → $40.250.
+// Resultado esperado: de los 205 productos publicados, 79 tienen una promoción vigente pagando por
+// transferencia (el medio por defecto, D4). Por ejemplo, el Body de tiras liso: $23.490 → $16.443.
+//   7b) El Jean wide leg elastizado está en "Semana del jean" (20%) y en la liquidación (30%): gana la
+//       de 30%, $45.490 → $31.843.
 //   7c) La remera básica: por transferencia no tiene promoción ($15.000, como en el contrato);
 //       en efectivo aplica "10% pagando en efectivo" ($13.500).
 function precioVigente(fecha, medioPago) {

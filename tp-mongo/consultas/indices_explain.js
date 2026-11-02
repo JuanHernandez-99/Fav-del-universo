@@ -84,9 +84,9 @@ comparar("4b", "variantes_talle_color · lo mismo con condiciones sueltas (otra 
 comparar(5, "vigencia · promociones vigentes el 03/11/2026", () =>
   db.promociones.find({ "vigencia.desde": { $lte: HOY }, "vigencia.hasta": { $gte: HOY } }), { conLimites: true });
 
-// 6 · alcance — qué promociones alcanzan a una categoría.
-comparar(6, "alcance · promociones que alcanzan a los jeans", () =>
-  db.promociones.find({ "alcance.tipo": "CATEGORIA", "alcance.ids": "jeans" }));
+// 6 · alcance — qué promociones alcanzan a una categoría (hoy, los buzos: "Buzos y camperas de media estación").
+comparar(6, "alcance · promociones que alcanzan a los buzos", () =>
+  db.promociones.find({ "alcance.tipo": "CATEGORIA", "alcance.ids": "buzos" }));
 
 // Costo: espacio que ocupa cada índice. Además, cada escritura actualiza todos los índices; los
 // multikey tienen una entrada por variante (un producto con 24 variantes suma 24 entradas).

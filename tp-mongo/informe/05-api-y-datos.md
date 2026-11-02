@@ -85,7 +85,7 @@ Notebook de Jupyter con PyMongo, Pandas y Matplotlib que lee la base (`analisis/
 | 3 | % de productos con promoción vigente por categoría | ¿Qué se promociona y qué no? | Barras |
 | 4 | Variantes por talle y color | ¿Falta variedad en algún talle o color? | **Mapa de calor** |
 
-Cada indicador tiene su interpretación escrita. **Conclusión del análisis:** precio y variedad van en sentidos opuestos (las categorías más baratas tienen más variantes y la más cara, camperas, tiene pocas); las promociones se concentran en abrigo, jeans y accesorios, y dejan sin descuento a las prendas de primavera-verano; y la oferta de talles se concentra en los del medio y deja cortos los extremos. Recomendaciones: lanzar una promoción por categoría en tops, shorts y polleras (basta una promoción nueva, sin tocar productos, gracias a que viven en su propia colección) y ampliar talles y variedad en camperas y en los extremos de talle.
+Cada indicador tiene su interpretación escrita. **Conclusión del análisis:** precio y variedad van en sentidos opuestos (las categorías más baratas tienen más variantes y la más cara, camperas, tiene pocas); las promociones vigentes cubren el 39% del catálogo (todo el abrigo, la mitad de los jeans y alrededor de un cuarto del resto); y la oferta de talles se concentra en los del medio y deja cortos los extremos. Recomendaciones: sumar una promoción de verano por categoría en tops, shorts y polleras (basta una promoción nueva, sin tocar productos, gracias a que viven en su propia colección) y ampliar talles y variedad en camperas y en los extremos de talle.
 
 No se calculan indicadores de stock ni de rotación, porque el stock no está en esta base (D1).
 

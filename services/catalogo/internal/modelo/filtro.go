@@ -19,7 +19,7 @@ const (
 )
 
 // FiltroProductos son los parámetros del listado. Un campo vacío (o nil) no filtra. Los precios
-// están en centavos (D13) y se comparan contra el precio base [?] (sección 14, punto 7).
+// están en centavos (D13) y se comparan contra el precio base (sección 14, punto 7).
 type FiltroProductos struct {
 	Categoria string
 	Talle     string

@@ -54,9 +54,17 @@
       }
     },
     "alcance": {
-      "tipo": "CATEGORIA",
+      "tipo": "PRODUCTO",
       "ids": [
-        "jeans"
+        "prod-jean-cargo-con-dobladillo",
+        "prod-jean-cargo-con-roturas",
+        "prod-jean-mom-con-roturas",
+        "prod-jean-mom-tiro-alto",
+        "prod-jean-oxford-tiro-alto",
+        "prod-jean-recto-nevado",
+        "prod-jean-skinny-con-tachas",
+        "prod-jean-skinny-tiro-alto",
+        "prod-jean-wide-leg-elastizado"
       ]
     }
   },
@@ -99,9 +107,41 @@
     "alcance": {
       "tipo": "PRODUCTO",
       "ids": [
-        "prod-jean-mom-tiro-alto",
-        "prod-remera-manga-larga-rayada",
-        "prod-vestido-corto-de-fiesta"
+        "prod-body-de-tiras-liso",
+        "prod-body-escote-cuadrado-liso",
+        "prod-body-manga-larga-liso",
+        "prod-conjunto-de-plush-de-camisa-y-bermuda",
+        "prod-conjunto-de-plush-de-remera-y-short",
+        "prod-conjunto-de-plush-de-top-y-pollera",
+        "prod-minifalda-plisada",
+        "prod-minifalda-tableada",
+        "prod-pollera-cruzada",
+        "prod-pollera-de-lino",
+        "prod-jogger-tiro-alto",
+        "prod-pantalon-palazzo-ancho",
+        "prod-pantalon-palazzo-con-cordon",
+        "prod-pantalon-palazzo-con-pinzas",
+        "prod-pantalon-palazzo-de-sastreria",
+        "prod-pantalon-recto-de-gabardina",
+        "prod-short-con-roturas",
+        "prod-short-de-lino",
+        "prod-short-holgado",
+        "prod-top-corto-acanalado",
+        "prod-top-corto-estampado",
+        "prod-top-de-lino",
+        "prod-top-strapless-acanalado",
+        "prod-solero-con-espalda-descubierta",
+        "prod-vestido-camisero-de-lino",
+        "prod-vestido-camisero-de-raso",
+        "prod-vestido-con-volados",
+        "prod-vestido-cruzado",
+        "prod-musculosa-basica",
+        "prod-musculosa-con-nudo",
+        "prod-remera-con-frase",
+        "prod-remera-cuello-v-acanalada",
+        "prod-remera-manga-larga-con-nudo",
+        "prod-remera-manga-larga-lisa",
+        "prod-jean-wide-leg-elastizado"
       ]
     }
   },
@@ -120,10 +160,14 @@
       }
     },
     "alcance": {
-      "tipo": "CATEGORIA",
+      "tipo": "PRODUCTO",
       "ids": [
-        "accesorios",
-        "abanicos"
+        "prod-bufanda-trenzada",
+        "prod-cinto-de-lona",
+        "prod-cinto-tejido",
+        "prod-gorra-trenzada",
+        "prod-abanico-con-encaje",
+        "prod-abanico-de-bambu"
       ]
     }
   },

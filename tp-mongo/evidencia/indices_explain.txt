@@ -1,4 +1,4 @@
-Salida de consultas/indices_explain.js · 2026-11-02 01:18 · datos del cargador
+Salida de consultas/indices_explain.js · 2026-11-02 14:29 · datos del cargador
 productos: 252 documentos · promociones: 14 documentos
 
 === 1. variantes_id_unico · ¿qué es var-jean-mom-celeste-38?
@@ -55,25 +55,25 @@ productos: 252 documentos · promociones: 14 documentos
 
 === 5. vigencia · promociones vigentes el 03/11/2026
   SIN índice  COLLSCAN
-              claves examinadas: 0 · documentos examinados: 14 · devueltos: 6 · 0 ms
+              claves examinadas: 0 · documentos examinados: 14 · devueltos: 6 · 1 ms
   CON índice  FETCH <- IXSCAN(vigencia)
               claves examinadas: 11 · documentos examinados: 6 · devueltos: 6 · 0 ms
   límites del índice: [{"vigencia.desde":["[new Date(-9223372036854775808), new Date(1793718000000)]"],"vigencia.hasta":["[new Date(1793718000000), new Date(9223372036854775807)]"]}]
 
-=== 6. alcance · promociones que alcanzan a los jeans
+=== 6. alcance · promociones que alcanzan a los buzos
   SIN índice  COLLSCAN
               claves examinadas: 0 · documentos examinados: 14 · devueltos: 1 · 0 ms
   CON índice  FETCH <- IXSCAN(alcance)
               claves examinadas: 1 · documentos examinados: 1 · devueltos: 1 · 0 ms
 
 === Costo: tamaño de los índices
-  productos: datos 193.1 KB · índices 260.0 KB
+  productos: datos 193.1 KB · índices 252.0 KB
     _id_                         44.0 KB
     variantes_id_unico           60.0 KB
     publicado_categoria_precio   36.0 KB
-    texto_nombre_descripcion     68.0 KB
+    texto_nombre_descripcion     60.0 KB
     variantes_talle_color        52.0 KB
-  promociones: datos 3.2 KB · índices 108.0 KB
+  promociones: datos 4.7 KB · índices 108.0 KB
     _id_                         36.0 KB
     vigencia                     36.0 KB
     alcance                      36.0 KB

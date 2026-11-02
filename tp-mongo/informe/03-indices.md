@@ -31,7 +31,7 @@ Un índice es una estructura ordenada aparte (un *B-tree*) que va de los valores
 | `texto_nombre_descripcion` | Buscar "lino" | 252 → 42 | **42 → 42** |
 | `variantes_talle_color` | Talle M en negro (`$elemMatch`) | 252 → 8 | **8 → 8** |
 | `vigencia` | Promociones vigentes hoy | 14 → 6 | 6 → 6 |
-| `alcance` | Promociones de los jeans | 14 → 1 | 1 → 1 |
+| `alcance` | Promociones de los buzos | 14 → 1 | 1 → 1 |
 
 Los tiempos dan entre 0 y 1 ms en todos los casos. Con este volumen no hay diferencias de tiempo para mostrar, y la consigna lo anticipa: lo que se evalúa es la pertinencia de cada índice y la interpretación del plan.
 
@@ -91,7 +91,7 @@ Los tiempos dan entre 0 y 1 ms en todos los casos. Con este volumen no hay difer
 
 ### 6. `alcance`: `{ "alcance.tipo": 1, "alcance.ids": 1 }` (promociones)
 
-- **Para qué:** "¿qué promociones alcanzan a los jeans?".
+- **Para qué:** "¿qué promociones alcanzan a los buzos?".
 - **Resultado:** lee 1 documento contra 14. Es multikey sobre `alcance.ids`.
 - **Evaluación:** igual que el anterior, el beneficio con 14 promociones es mínimo y se justifica por el crecimiento esperado.
 
@@ -99,8 +99,8 @@ Los tiempos dan entre 0 y 1 ms en todos los casos. Con este volumen no hay difer
 
 | Colección | Datos | Índices |
 |---|---|---|
-| `productos` | 193 KB | **260 KB** (`_id` 44 · `variantes_id_unico` 60 · `publicado_categoria_precio` 36 · texto 68 · `variantes_talle_color` 52) |
-| `promociones` | 3 KB | **108 KB** (36 KB cada uno, que es el mínimo que reserva Mongo por índice) |
+| `productos` | 193 KB | **252 KB** (`_id` 44 · `variantes_id_unico` 60 · `publicado_categoria_precio` 36 · texto 60 · `variantes_talle_color` 52) |
+| `promociones` | 5 KB | **108 KB** (36 KB cada uno, que es el mínimo que reserva Mongo por índice) |
 
 - **Espacio:** en `productos`, los índices **ocupan más que los datos**. Los dos multikey de variantes tienen 881 entradas cada uno, y el de texto guarda cada palabra de nombre y descripción.
 - **Escrituras:** cada alta o cambio de un producto actualiza **todos** sus índices. Agregar una variante suma una entrada en cada índice multikey, y un producto con 24 variantes aporta 24 entradas a cada uno.
