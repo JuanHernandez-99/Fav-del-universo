@@ -28,6 +28,18 @@ type Producto struct {
 	Version       int            `bson:"version"`
 }
 
+// DatosProducto son los campos que el administrador carga al crear y puede cambiar con PUT.
+// No incluye el id (no cambia nunca), el sistema de talles (invalidaría las variantes), las
+// variantes ni publicado (tienen sus propias rutas).
+type DatosProducto struct {
+	Nombre      string
+	Descripcion string
+	Categoria   string
+	PrecioBase  Precio
+	Atributos   map[string]any
+	Fotos       []Foto
+}
+
 // Precio en centavos enteros (D13): nunca en coma flotante.
 type Precio struct {
 	Monto  int64  `bson:"monto"`

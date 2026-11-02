@@ -7,8 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
 	"math"
 	"net/http"
+	"net/url"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,8 +32,13 @@ func NuevoRouter(s *service.Servicio) http.Handler {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("GET /readyz", h.listo)
 
+	mux.HandleFunc("GET /v1/admin/productos", h.listarProductos)
 	mux.HandleFunc("POST /v1/admin/productos", h.crearProducto)
 	mux.HandleFunc("GET /v1/admin/productos/{id}", h.obtenerProducto)
+	mux.HandleFunc("PUT /v1/admin/productos/{id}", h.actualizarProducto)
+	mux.HandleFunc("DELETE /v1/admin/productos/{id}", h.despublicarProducto)
+	mux.HandleFunc("POST /v1/admin/productos/{id}/publicar", h.publicarProducto)
+	mux.HandleFunc("POST /v1/admin/productos/{id}/variantes", h.agregarVariante)
 
 	return mux
 }
@@ -101,28 +110,64 @@ func pesos(centavos int64) float64 { return float64(centavos) / 100 }
 
 // aCentavos convierte el monto recibido en pesos. Se redondea porque en coma flotante
 // 0.29 * 100 da 28.999…; ok es false si tenía más de 2 decimales.
+// También es false si el monto supera montoMaximoPesos: más allá, convertir a int64 desborda.
 func aCentavos(pesos float64) (centavos int64, ok bool) {
+	if math.Abs(pesos) > montoMaximoPesos {
+		return 0, false
+	}
 	redondeado := math.Round(pesos * 100)
 	return int64(redondeado), math.Abs(pesos*100-redondeado) < 1e-6
 }
 
-// pedidoProducto es lo que manda el administrador. No lleva ids, publicado ni version: los pone
-// el servidor, y como se rechazan los campos desconocidos, no se pueden forzar.
-type pedidoProducto struct {
-	Nombre        string `json:"nombre"`
-	Descripcion   string `json:"descripcion"`
-	Categoria     string `json:"categoria"`
-	SistemaTalles string `json:"sistemaTalles"`
-	PrecioBase    struct {
+// datosJSON son los campos editables, comunes al POST y al PUT. Los pedidos no llevan ids ni
+// publicado: los pone el servidor, y como se rechazan los campos desconocidos, no se pueden forzar.
+type datosJSON struct {
+	Nombre      string `json:"nombre"`
+	Descripcion string `json:"descripcion"`
+	Categoria   string `json:"categoria"`
+	PrecioBase  struct {
 		Monto  float64 `json:"monto"`
 		Moneda string  `json:"moneda"`
 	} `json:"precioBase"`
 	Atributos map[string]any `json:"atributos"`
 	Fotos     []fotoJSON     `json:"fotos"`
-	Variantes []struct {
+}
+
+// aModelo convierte el monto de pesos a centavos; falla si tiene más de 2 decimales.
+func (d datosJSON) aModelo() (modelo.DatosProducto, error) {
+	monto, ok := aCentavos(d.PrecioBase.Monto)
+	if !ok {
+		v := &modelo.ErrorValidacion{}
+		v.Agregar("precioBase.monto", "admite hasta 2 decimales y un máximo de %d pesos", montoMaximoPesos)
+		return modelo.DatosProducto{}, v
+	}
+	datos := modelo.DatosProducto{
+		Nombre:      d.Nombre,
+		Descripcion: d.Descripcion,
+		Categoria:   d.Categoria,
+		PrecioBase:  modelo.Precio{Monto: monto, Moneda: d.PrecioBase.Moneda},
+		Atributos:   d.Atributos,
+	}
+	for _, f := range d.Fotos {
+		datos.Fotos = append(datos.Fotos, modelo.Foto{URL: f.URL, Color: f.Color})
+	}
+	return datos, nil
+}
+
+type pedidoProducto struct {
+	datosJSON
+	SistemaTalles string `json:"sistemaTalles"`
+	Variantes     []struct {
 		Talle string `json:"talle"`
 		Color string `json:"color"`
 	} `json:"variantes"`
+}
+
+// pedidoActualizacion lleva la version que se leyó (control optimista). No admite sistemaTalles,
+// variantes ni publicado.
+type pedidoActualizacion struct {
+	datosJSON
+	Version int `json:"version"`
 }
 
 func (h *Handler) crearProducto(w http.ResponseWriter, r *http.Request) {
@@ -130,25 +175,12 @@ func (h *Handler) crearProducto(w http.ResponseWriter, r *http.Request) {
 	if !leerJSON(w, r, &pedido) {
 		return
 	}
-	monto, ok := aCentavos(pedido.PrecioBase.Monto)
-	if !ok {
-		v := &modelo.ErrorValidacion{}
-		v.Agregar("precioBase.monto", "admite hasta 2 decimales")
-		escribirError(w, r, v)
+	datos, err := pedido.aModelo()
+	if err != nil {
+		escribirError(w, r, err)
 		return
 	}
-
-	nuevo := service.NuevoProducto{
-		Nombre:        pedido.Nombre,
-		Descripcion:   pedido.Descripcion,
-		Categoria:     pedido.Categoria,
-		SistemaTalles: pedido.SistemaTalles,
-		PrecioBase:    modelo.Precio{Monto: monto, Moneda: pedido.PrecioBase.Moneda},
-		Atributos:     pedido.Atributos,
-	}
-	for _, f := range pedido.Fotos {
-		nuevo.Fotos = append(nuevo.Fotos, modelo.Foto{URL: f.URL, Color: f.Color})
-	}
+	nuevo := service.NuevoProducto{DatosProducto: datos, SistemaTalles: pedido.SistemaTalles}
 	for _, v := range pedido.Variantes {
 		nuevo.Variantes = append(nuevo.Variantes, service.NuevaVariante{Talle: v.Talle, Color: v.Color})
 	}
@@ -162,8 +194,166 @@ func (h *Handler) crearProducto(w http.ResponseWriter, r *http.Request) {
 	escribirJSON(w, http.StatusCreated, productoAJSON(p))
 }
 
+// agregarVariante es la operación atómica de PROYECTO.md 5.9: 201 si se agregó, 409 si el
+// producto ya tenía ese talle y color, 404 si el producto no existe.
+func (h *Handler) agregarVariante(w http.ResponseWriter, r *http.Request) {
+	var pedido struct {
+		Talle string `json:"talle"`
+		Color string `json:"color"`
+	}
+	if !leerJSON(w, r, &pedido) {
+		return
+	}
+	productoID := r.PathValue("id")
+	v, err := h.s.AgregarVariante(r.Context(), productoID, service.NuevaVariante{Talle: pedido.Talle, Color: pedido.Color})
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	w.Header().Set("Location", "/v1/admin/productos/"+productoID)
+	escribirJSON(w, http.StatusCreated, varianteJSON{v.ID, v.Talle, v.Color})
+}
+
 func (h *Handler) obtenerProducto(w http.ResponseWriter, r *http.Request) {
 	p, err := h.s.ObtenerProducto(r.Context(), r.PathValue("id"))
+	responderProducto(w, r, p, err)
+}
+
+// montoMaximoPesos acota los montos que se aceptan, para que en centavos entren en un int64.
+const montoMaximoPesos = 1_000_000_000
+
+// paginaJSON es la respuesta del listado: la lista va dentro de items, igual que en Inventario y
+// en el contrato.
+type paginaJSON struct {
+	Items   []productoJSON `json:"items"`
+	Pagina  int            `json:"pagina"`
+	Tamano  int            `json:"tamano"`
+	Total   int64          `json:"total"`
+	Paginas int64          `json:"paginas"`
+}
+
+func (h *Handler) listarProductos(w http.ResponseWriter, r *http.Request) {
+	f, err := parsearFiltro(r.URL.Query())
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	productos, total, err := h.s.ListarProductos(r.Context(), f)
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	items := make([]productoJSON, len(productos)) // vacío, no null, cuando no hay resultados
+	for i, p := range productos {
+		items[i] = productoAJSON(p)
+	}
+	escribirJSON(w, http.StatusOK, paginaJSON{
+		Items: items, Pagina: f.Pagina, Tamano: f.Tamano, Total: total,
+		Paginas: (total + int64(f.Tamano) - 1) / int64(f.Tamano),
+	})
+}
+
+var parametrosListado = map[string]bool{
+	"categoria": true, "talle": true, "color": true, "precioMin": true, "precioMax": true,
+	"q": true, "publicado": true, "orden": true, "pagina": true, "tamano": true,
+}
+
+// parsearFiltro revisa el formato de cada parámetro y junta todos los errores. Rechaza los
+// parámetros que no existen: un `categorias=jeans` con una letra de más, ignorado, devolvería todo
+// el catálogo sin avisar. Los precios llegan en pesos y se pasan a centavos.
+func parsearFiltro(q url.Values) (modelo.FiltroProductos, error) {
+	v := &modelo.ErrorValidacion{}
+	f := modelo.FiltroProductos{
+		Categoria: strings.TrimSpace(q.Get("categoria")),
+		Talle:     strings.ToUpper(strings.TrimSpace(q.Get("talle"))), // igual que al crear (punto 16)
+		Color:     strings.TrimSpace(q.Get("color")),
+		Texto:     strings.TrimSpace(q.Get("q")),
+		Orden:     modelo.Orden(strings.TrimSpace(q.Get("orden"))),
+		Pagina:    1,
+		Tamano:    modelo.TamanoPorDefecto,
+	}
+	if f.Orden == "" {
+		f.Orden = modelo.OrdenNuevos
+	}
+
+	for _, nombre := range slices.Sorted(maps.Keys(q)) {
+		if !parametrosListado[nombre] {
+			v.Agregar(nombre, "parámetro desconocido")
+		}
+	}
+
+	precio := func(nombre string) *int64 {
+		texto := strings.TrimSpace(q.Get(nombre))
+		if texto == "" {
+			return nil
+		}
+		pesos, err := strconv.ParseFloat(texto, 64)
+		centavos, ok := aCentavos(pesos)
+		if err != nil || !ok || centavos < 0 {
+			v.Agregar(nombre, "tiene que ser un monto en pesos, de 0 a %d, con hasta 2 decimales", montoMaximoPesos)
+			return nil
+		}
+		return &centavos
+	}
+	f.PrecioMin, f.PrecioMax = precio("precioMin"), precio("precioMax")
+
+	switch strings.ToLower(strings.TrimSpace(q.Get("publicado"))) {
+	case "":
+	case "true":
+		f.Publicado = new(true)
+	case "false":
+		f.Publicado = new(false)
+	default:
+		v.Agregar("publicado", "tiene que ser true o false")
+	}
+
+	entero := func(nombre string, destino *int) {
+		texto := strings.TrimSpace(q.Get(nombre))
+		if texto == "" {
+			return
+		}
+		n, err := strconv.Atoi(texto)
+		if err != nil {
+			v.Agregar(nombre, "tiene que ser un número entero")
+			return
+		}
+		*destino = n // el rango lo valida el servicio
+	}
+	entero("pagina", &f.Pagina)
+	entero("tamano", &f.Tamano)
+
+	return f, v.ComoError()
+}
+
+func (h *Handler) actualizarProducto(w http.ResponseWriter, r *http.Request) {
+	var pedido pedidoActualizacion
+	if !leerJSON(w, r, &pedido) {
+		return
+	}
+	datos, err := pedido.aModelo()
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	p, err := h.s.ActualizarProducto(r.Context(), r.PathValue("id"), pedido.Version, datos)
+	responderProducto(w, r, p, err)
+}
+
+func (h *Handler) publicarProducto(w http.ResponseWriter, r *http.Request) {
+	p, err := h.s.Publicar(r.Context(), r.PathValue("id"))
+	responderProducto(w, r, p, err)
+}
+
+// despublicarProducto es el DELETE: baja lógica, 204 e idempotente (D2).
+func (h *Handler) despublicarProducto(w http.ResponseWriter, r *http.Request) {
+	if err := h.s.Despublicar(r.Context(), r.PathValue("id")); err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func responderProducto(w http.ResponseWriter, r *http.Request, p modelo.Producto, err error) {
 	if err != nil {
 		escribirError(w, r, err)
 		return
@@ -222,6 +412,10 @@ func escribirError(w http.ResponseWriter, r *http.Request, err error) {
 		p.Detail = "Revisar los campos indicados en errores."
 	case errors.Is(err, modelo.ErrVarianteDuplicada):
 		p.Status, p.Codigo, p.Title = 409, "VARIANTE_DUPLICADA", "Variante duplicada"
+		p.Detail = "Ya existe una variante con ese talle y color, o con el mismo id."
+	case errors.Is(err, modelo.ErrConflictoDeVersion):
+		p.Status, p.Codigo, p.Title = 409, "CONFLICTO_DE_VERSION", "Conflicto de versión"
+		p.Detail = "El producto cambió desde que se leyó. Volver a leerlo y repetir el cambio con la versión nueva."
 	case errors.Is(err, modelo.ErrProductoNoEncontrado):
 		p.Status, p.Codigo, p.Title = 404, "PRODUCTO_NO_ENCONTRADO", "Producto no encontrado"
 		p.Detail = "No existe el producto " + r.PathValue("id") + "."

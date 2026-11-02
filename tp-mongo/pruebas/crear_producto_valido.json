@@ -1,0 +1,16 @@
+{
+  "nombre": "Remera lisa de prueba",
+  "descripcion": "Remera de algodón peinado.",
+  "categoria": "remeras",
+  "sistemaTalles": "LETRAS",
+  "precioBase": { "monto": 15999.90, "moneda": "ARS" },
+  "atributos": { "material": "algodón", "genero": "mujer" },
+  "fotos": [
+    { "url": "https://fav.example/fotos/remera-lisa-de-prueba-1.jpg", "color": null },
+    { "url": "https://fav.example/fotos/remera-lisa-de-prueba-2.jpg", "color": "Blanco" }
+  ],
+  "variantes": [
+    { "talle": "M", "color": "Blanco" },
+    { "talle": "L", "color": "Azul marino" }
+  ]
+}

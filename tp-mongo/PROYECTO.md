@@ -79,7 +79,7 @@ El criterio de evaluación suma 100 puntos. Cada fila es lo que hay que poder mo
 |---|---|---|---|
 | **Diseño documental y justificación** | 15 | Sección 5: colecciones, JSON, obligatorios y opcionales, anidados y arreglos, relaciones, embeber vs referenciar | ☐ |
 | **Implementación y calidad de los datos** | 10 | 100 documentos como mínimo (meta: 200 a 500). Scripts reproducibles, verificación de cantidades, variedad, atributos opcionales y casos límite. Cómo reiniciar la base | ☐ |
-| **Consultas y agregaciones** | 15 | 10 consultas diferentes, cada una con objetivo, comando y resultado esperado (sección 6). Variar solo un filtro no cuenta | ☐ |
+| **Consultas y agregaciones** | 15 | 10 consultas diferentes, cada una con objetivo, comando y resultado esperado (sección 6). Variar solo un filtro no cuenta | ☑ `consultas/consultas.js` (10 + 1 extra de texto) y `evidencia/consultas_salida.txt` |
 | **API y repositorios** | 20 | CRUD funcional, capa de repositorio, validación, ids inexistentes, códigos HTTP y mensajes de error. Demostrable por Swagger o Postman | ☐ |
 | **Índices y consistencia** | 10 | Al menos 2 índices, qué campos y por qué, `explain("executionStats")`, beneficio vs costo. Caso de consistencia: qué pasa si una parte falla, solución y prueba | ☐ |
 | **Análisis de datos** | 10 | Conexión, preparación, **3 indicadores como mínimo**, **2 visualizaciones diferentes**, interpretación escrita y conclusión con recomendación | ☐ |
@@ -287,7 +287,8 @@ Todos se crean en `scripts/01_crear_colecciones_e_indices.js`, que es lo que se 
 ```js
 db.productos.updateOne(
   { _id: idProducto,
-    variantes: { $not: { $elemMatch: { talle: "S", color: "Blanco" } } } },
+    variantes: { $not: { $elemMatch: { talle: "S", color: "Blanco" } } },
+    "variantes.id": { $ne: "var-remera-basica-blanco-s" } },   // "Blanco" y "blanco" dan el mismo id
   { $push: { variantes: { id: "var-remera-basica-blanco-s", talle: "S", color: "Blanco" } },
     $set: { actualizadoEn: new Date() },
     $inc: { version: 1 } }
@@ -445,7 +446,7 @@ cp .env.example .env
 docker compose up -d --build            # mongo, api y swagger-ui
 docker compose run --rm cargador        # crea colecciones e índices, carga datos y verifica
 curl localhost:8085/healthz
-docker compose exec mongo-catalogo mongosh --file /consultas/consultas.js
+docker compose exec mongo-catalogo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin catalogo --file /consultas/consultas.js'
 docker compose down -v                  # reinicia todo (borra el volumen)
 ```
 
@@ -508,6 +509,9 @@ Para el notebook: `pip install -r analisis/requirements.txt` y abrirlo con Jupyt
 | 9 | Ids de variante y rutas de Inventario | Hay que **revisarlos antes de entregar**: el código leído es el de `development` y puede cambiar | — |
 | 10 | Los índices del servicio y los del script `01_…` deben coincidir | Resuelto | El servicio crea solo `variantes_id_unico`, igual que el script (5.8). Probado: con la base vacía lo crea la API y después `01` no choca |
 | 15 | Unidad del monto al **recibir** (`POST`/`PUT`) | Confirmado | En pesos, con hasta 2 decimales (`15999.90`). Más decimales da `400`. Se convierte a centavos redondeando |
+| 17 | Qué cambia el `PUT` | **[propuesta]** | Reemplaza los datos editables: nombre, descripción, categoría, precio, atributos y fotos. Un opcional que no viene se quita. **No** cambia `sistemaTalles` (dejaría inválidos los talles de las variantes), ni las variantes, ni `publicado`, ni el id. Lleva `version` obligatoria |
+| 18 | Publicar o despublicar algo que ya estaba así | **[propuesta]** | No es error y no sube la `version`: `/publicar` responde `200` con el producto y `DELETE` responde `204`. Sobre un id inexistente, los dos dan `404` |
+| 19 | Cómo se filtra el listado | **[propuesta]** | `categoria`, `talle` y `color` son coincidencia exacta: el color distingue mayúsculas (`Celeste`, no `celeste`) y el talle se pasa a mayúscula. Con `talle` y `color` juntos se exige que sean **la misma variante** (`$elemMatch`). `q` busca con el índice de texto en español. `precioMin` y `precioMax` van en pesos y se comparan con el precio base (punto 7). Un parámetro desconocido da `400`, para que un error de tipeo no devuelva todo el catálogo sin avisar. Respuesta: `items`, `pagina`, `tamano`, `total` y `paginas`; `tamano` por defecto 20 y máximo 100. Órdenes: `nuevos` (por defecto), `precio_asc`, `precio_desc` y `nombre`, siempre desempatados por `_id` |
 | 16 | Talles escritos en minúscula (`"m"`) | **[propuesta]** | Se pasan a mayúscula antes de validar. El color se guarda como lo escribió el administrador (sin espacios en los extremos) |
 | 11 | Cómo se normalizan los espacios y la ñ en los ids (5.5) | Confirmado | Espacio → `-` (como `remera-basica`), ñ → `n`. Además, cualquier otro símbolo pasa a `-` y se quitan los `-` repetidos o de los extremos (`normalizar` en `datos/generar.py`; la función de Go tiene que dar lo mismo) |
 | 12 | Dos colores distintos que se normalizan igual (por ejemplo "Azul marino" y "azul-marino") generarían el mismo id | **[propuesta]** | El índice único lo rechaza y se responde `409 VARIANTE_DUPLICADA` |

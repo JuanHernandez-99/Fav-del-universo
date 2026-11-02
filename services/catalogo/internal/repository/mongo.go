@@ -76,6 +76,204 @@ func (r *Repositorio) ExisteCategoria(ctx context.Context, id string) (bool, err
 	return n > 0, err
 }
 
+// AgregarVariante es la operación atómica de PROYECTO.md 5.9. La condición "no tiene esa
+// variante" va dentro del filtro de un solo updateOne: MongoDB evalúa el filtro y aplica el cambio
+// sobre el documento sin que otro pedido se meta en el medio. Si 20 pedidos llegan juntos, solo el
+// primero encuentra el documento sin la variante; para los demás el filtro ya no coincide.
+//
+// Se compara por talle y color, y además por id: "Blanco" y "blanco" son colores distintos para
+// $elemMatch pero dan el mismo id, y el índice único no evita repetidos dentro del mismo arreglo.
+func (r *Repositorio) AgregarVariante(ctx context.Context, productoID string, v modelo.Variante, ahora time.Time) error {
+	filtro := bson.D{
+		{Key: "_id", Value: productoID},
+		{Key: "variantes", Value: bson.D{{Key: "$not", Value: bson.D{{Key: "$elemMatch", Value: bson.D{
+			{Key: "talle", Value: v.Talle}, {Key: "color", Value: v.Color},
+		}}}}}},
+		{Key: "variantes.id", Value: bson.D{{Key: "$ne", Value: v.ID}}},
+	}
+	cambio := bson.D{
+		{Key: "$push", Value: bson.D{{Key: "variantes", Value: v}}},
+		{Key: "$set", Value: bson.D{{Key: "actualizadoEn", Value: ahora}}},
+		{Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}}, // ADR-006: todo cambio sube la versión
+	}
+	res, err := r.productos.UpdateOne(ctx, filtro, cambio)
+	if mongo.IsDuplicateKeyError(err) { // el id ya lo usa otro producto
+		return modelo.ErrVarianteDuplicada
+	}
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 1 {
+		return nil
+	}
+	// No coincidió: o el producto no existe, o ya tenía la variante. Recién acá se distingue cuál.
+	if existe, err := r.existeProducto(ctx, productoID); err != nil {
+		return err
+	} else if !existe {
+		return modelo.ErrProductoNoEncontrado
+	}
+	return modelo.ErrVarianteDuplicada
+}
+
+// ListarProductos arma el filtro con los parámetros que vinieron y lo ejecuta con orden y
+// paginación. Devuelve la página pedida y el total de productos que cumplen el filtro.
+//
+// El orden siempre se desempata por _id: sin eso, productos con el mismo precio podrían salir en
+// distinto orden entre una página y la siguiente, y repetirse o saltearse.
+func (r *Repositorio) ListarProductos(ctx context.Context, f modelo.FiltroProductos) ([]modelo.Producto, int64, error) {
+	filtro := bson.D{}
+	if f.Categoria != "" {
+		filtro = append(filtro, bson.E{Key: "categoria", Value: f.Categoria})
+	}
+	if f.Publicado != nil {
+		filtro = append(filtro, bson.E{Key: "publicado", Value: *f.Publicado})
+	}
+	precio := bson.D{}
+	if f.PrecioMin != nil {
+		precio = append(precio, bson.E{Key: "$gte", Value: *f.PrecioMin})
+	}
+	if f.PrecioMax != nil {
+		precio = append(precio, bson.E{Key: "$lte", Value: *f.PrecioMax})
+	}
+	if len(precio) > 0 {
+		filtro = append(filtro, bson.E{Key: "precioBase.monto", Value: precio})
+	}
+	// Con talle y color juntos tienen que ser la misma variante: eso lo garantiza $elemMatch. Por
+	// separado, "variantes.talle" y "variantes.color" podrían coincidir en variantes distintas.
+	switch {
+	case f.Talle != "" && f.Color != "":
+		filtro = append(filtro, bson.E{Key: "variantes", Value: bson.D{{Key: "$elemMatch", Value: bson.D{
+			{Key: "talle", Value: f.Talle}, {Key: "color", Value: f.Color},
+		}}}})
+	case f.Talle != "":
+		filtro = append(filtro, bson.E{Key: "variantes.talle", Value: f.Talle})
+	case f.Color != "":
+		filtro = append(filtro, bson.E{Key: "variantes.color", Value: f.Color})
+	}
+	if f.Texto != "" {
+		filtro = append(filtro, bson.E{Key: "$text", Value: bson.D{{Key: "$search", Value: f.Texto}}})
+	}
+
+	var orden bson.D
+	switch f.Orden {
+	case modelo.OrdenPrecioAsc:
+		orden = bson.D{{Key: "precioBase.monto", Value: 1}, {Key: "_id", Value: 1}}
+	case modelo.OrdenPrecioDesc:
+		orden = bson.D{{Key: "precioBase.monto", Value: -1}, {Key: "_id", Value: 1}}
+	case modelo.OrdenNombre:
+		orden = bson.D{{Key: "nombre", Value: 1}, {Key: "_id", Value: 1}}
+	default:
+		orden = bson.D{{Key: "creadoEn", Value: -1}, {Key: "_id", Value: 1}}
+	}
+
+	total, err := r.productos.CountDocuments(ctx, filtro)
+	if err != nil {
+		return nil, 0, err
+	}
+	cursor, err := r.productos.Find(ctx, filtro, options.Find().
+		SetSort(orden).
+		SetSkip(int64((f.Pagina-1)*f.Tamano)).
+		SetLimit(int64(f.Tamano)))
+	if err != nil {
+		return nil, 0, err
+	}
+	var productos []modelo.Producto
+	if err := cursor.All(ctx, &productos); err != nil {
+		return nil, 0, err
+	}
+	return productos, total, nil
+}
+
+// ActualizarProducto es un PUT con control optimista de concurrencia (PROYECTO.md 5.9, caso
+// secundario): el filtro incluye la versión que leyó el administrador. Si otro cambio se coló, la
+// versión guardada ya es otra, el filtro no coincide y no se pisa nada. findOneAndUpdate devuelve el
+// documento ya actualizado en la misma operación.
+func (r *Repositorio) ActualizarProducto(ctx context.Context, id string, version int, d modelo.DatosProducto, ahora time.Time) (modelo.Producto, error) {
+	set := bson.D{
+		{Key: "nombre", Value: d.Nombre},
+		{Key: "categoria", Value: d.Categoria},
+		{Key: "precioBase", Value: d.PrecioBase},
+		{Key: "actualizadoEn", Value: ahora},
+	}
+	// Es un reemplazo completo de los datos editables: un opcional que no vino se quita del documento.
+	unset := bson.D{}
+	opcional := func(campo string, presente bool, valor any) {
+		if presente {
+			set = append(set, bson.E{Key: campo, Value: valor})
+		} else {
+			unset = append(unset, bson.E{Key: campo, Value: ""})
+		}
+	}
+	opcional("descripcion", d.Descripcion != "", d.Descripcion)
+	opcional("atributos", len(d.Atributos) > 0, d.Atributos)
+	opcional("fotos", len(d.Fotos) > 0, d.Fotos)
+
+	cambio := bson.D{{Key: "$set", Value: set}, {Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}}}
+	if len(unset) > 0 {
+		cambio = append(cambio, bson.E{Key: "$unset", Value: unset})
+	}
+
+	var p modelo.Producto
+	err := r.productos.FindOneAndUpdate(ctx,
+		bson.D{{Key: "_id", Value: id}, {Key: "version", Value: version}},
+		cambio,
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&p)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		if existe, errExiste := r.existeProducto(ctx, id); errExiste != nil {
+			return modelo.Producto{}, errExiste
+		} else if !existe {
+			return modelo.Producto{}, modelo.ErrProductoNoEncontrado
+		}
+		return modelo.Producto{}, modelo.ErrConflictoDeVersion
+	}
+	return p, err
+}
+
+// Publicar cambia publicado a true solo si estaba en false; así publicar dos veces no sube la
+// versión dos veces. Devuelve el producto como quedó.
+func (r *Repositorio) Publicar(ctx context.Context, id string, ahora time.Time) (modelo.Producto, error) {
+	var p modelo.Producto
+	err := r.productos.FindOneAndUpdate(ctx,
+		bson.D{{Key: "_id", Value: id}, {Key: "publicado", Value: false}},
+		cambioDePublicacion(true, ahora),
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&p)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return r.ObtenerProducto(ctx, id) // ya estaba publicado, o no existe (404)
+	}
+	return p, err
+}
+
+// Despublicar es la baja lógica del DELETE (D2). Idempotente: si ya estaba despublicado no cambia
+// nada y no es un error.
+func (r *Repositorio) Despublicar(ctx context.Context, id string, ahora time.Time) error {
+	res, err := r.productos.UpdateOne(ctx,
+		bson.D{{Key: "_id", Value: id}, {Key: "publicado", Value: true}},
+		cambioDePublicacion(false, ahora))
+	if err != nil || res.MatchedCount == 1 {
+		return err
+	}
+	if existe, err := r.existeProducto(ctx, id); err != nil {
+		return err
+	} else if !existe {
+		return modelo.ErrProductoNoEncontrado
+	}
+	return nil
+}
+
+func cambioDePublicacion(publicado bool, ahora time.Time) bson.D {
+	return bson.D{
+		{Key: "$set", Value: bson.D{{Key: "publicado", Value: publicado}, {Key: "actualizadoEn", Value: ahora}}},
+		{Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}},
+	}
+}
+
+func (r *Repositorio) existeProducto(ctx context.Context, id string) (bool, error) {
+	n, err := r.productos.CountDocuments(ctx, bson.D{{Key: "_id", Value: id}}, options.Count().SetLimit(1))
+	return n > 0, err
+}
+
 // InsertarProducto no pregunta antes si el id existe: inserta y deja que la base decida. Así no
 // hay carrera entre "leer" y "escribir" (sección 13). Una clave duplicada (E11000) se traduce según
 // el índice que la rechazó.
