@@ -81,8 +81,8 @@ El criterio de evaluación suma 100 puntos. Cada fila es lo que hay que poder mo
 | **Implementación y calidad de los datos** | 10 | 100 documentos como mínimo (meta: 200 a 500). Scripts reproducibles, verificación de cantidades, variedad, atributos opcionales y casos límite. Cómo reiniciar la base | ☐ |
 | **Consultas y agregaciones** | 15 | 10 consultas diferentes, cada una con objetivo, comando y resultado esperado (sección 6). Variar solo un filtro no cuenta | ☑ `consultas/consultas.js` (10 + 1 extra de texto) y `evidencia/consultas_salida.txt` |
 | **API y repositorios** | 20 | CRUD funcional, capa de repositorio, validación, ids inexistentes, códigos HTTP y mensajes de error. Demostrable por Swagger o Postman | ☐ |
-| **Índices y consistencia** | 10 | Al menos 2 índices, qué campos y por qué, `explain("executionStats")`, beneficio vs costo. Caso de consistencia: qué pasa si una parte falla, solución y prueba | ☐ |
-| **Análisis de datos** | 10 | Conexión, preparación, **3 indicadores como mínimo**, **2 visualizaciones diferentes**, interpretación escrita y conclusión con recomendación | ☐ |
+| **Índices y consistencia** | 10 | Al menos 2 índices, qué campos y por qué, `explain("executionStats")`, beneficio vs costo. Caso de consistencia: qué pasa si una parte falla, solución y prueba | ☑ `informe/03-indices.md`, `evidencia/indices_explain.txt` y `evidencia/concurrencia_variante.txt` |
+| **Análisis de datos** | 10 | Conexión, preparación, **3 indicadores como mínimo**, **2 visualizaciones diferentes**, interpretación escrita y conclusión con recomendación | ☑ `analisis/catalogo.ipynb` (ejecutado) y `analisis/catalogo.html`: 4 indicadores, barras, barras agrupadas y mapa de calor |
 | **Docker, reproducibilidad y pruebas** | 10 | Mongo con volumen, variables y archivo de ejemplo sin credenciales, API en el mismo Compose conectada por **nombre de servicio** (no `localhost`), cómo iniciar, detener y cargar datos, prueba desde un entorno limpio | ☐ |
 | **Documentación y defensa individual** | 10 | README con requisitos, comandos, carga y pruebas. Cada integrante explica modelo, consulta, índice y repositorio | ☐ |
 
