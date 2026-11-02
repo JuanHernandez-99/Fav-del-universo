@@ -2,3 +2,4 @@
 analisis/.venv/
 .ipynb_checkpoints/
 __pycache__/
+dist/

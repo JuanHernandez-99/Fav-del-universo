@@ -1,12 +1,10 @@
 # TP MongoDB · Catálogo de FAV · Guía de trabajo
 
-> **Versión 0.4** · 01/11/2026 · Entrega: **martes 3/11/2026**, en un `.zip`. No hay entregas parciales.
->
-> Convenciones: **[propuesta]** decisión provisoria nuestra · **[?]** pendiente de definir con alguien (ver sección 14).
+> **Versión 1.0** · 02/11/2026 · Entrega: **martes 3/11/2026**, en un `.zip`. No hay entregas parciales.
 >
 > **Para qué sirve este archivo:** es la fuente única de lo definido hasta hoy. Se deja en `tp-mongo/PROYECTO.md`. El informe de diseño que se entrega (`informe/01-diseno.md`) se arma a partir de la sección 5. Si algo de acá cambia, se cambia acá primero.
 >
-> **Para quien implemente (persona o asistente):** leer las secciones 2, 3 y 13 antes de escribir código. Si algo no está definido, no se inventa: se anota en la sección 14 y se usa lo provisorio indicado.
+> **Antes de tocar el código:** leer las secciones 2, 3 y 13. Las decisiones menores y los supuestos están en la sección 14.
 
 ---
 
@@ -35,7 +33,7 @@
 |---|---|---|
 | D1 | **El stock no está en Catálogo** | Es de Inventario (MySQL). Catálogo solo conoce el id de la variante. Si el profesor pregunta cómo se haría en Mongo, se contesta de forma oral (sección 12) |
 | D2 | **Despublicar en lugar de borrar** | `DELETE /v1/admin/productos/{id}` hace baja lógica (`publicado: false`), devuelve `204` y es idempotente. Los ids no se reutilizan |
-| D3 | **Las promociones no se acumulan** | Si aplican varias a un producto, gana la de mayor porcentaje **[propuesta]** |
+| D3 | **Las promociones no se acumulan** | Si aplican varias a un producto, gana la de mayor porcentaje |
 | D4 | **El precio público asume transferencia** | Si no se indica `medioPago`, vale `TRANSFERENCIA`. No se implementa ninguna pasarela de pagos |
 | D5 | **Redondeo hacia abajo a 2 decimales** | Se calcula en **centavos enteros** y se trunca, para evitar errores de coma flotante (`0.29 * 100 = 28.999…`) |
 | D6 | **Un producto puede venderse en el local sin estar publicado** | Publicado solo habilita la web. La consulta por lote no filtra por `publicado` |
@@ -79,18 +77,18 @@ El criterio de evaluación suma 100 puntos. Cada fila es lo que hay que poder mo
 
 | Criterio | Pts | Se cumple con | Listo |
 |---|---|---|---|
-| **Diseño documental y justificación** | 15 | Sección 5: colecciones, JSON, obligatorios y opcionales, anidados y arreglos, relaciones, embeber vs referenciar | ☐ |
-| **Implementación y calidad de los datos** | 10 | 100 documentos como mínimo (meta: 200 a 500). Scripts reproducibles, verificación de cantidades, variedad, atributos opcionales y casos límite. Cómo reiniciar la base | ☐ |
+| **Diseño documental y justificación** | 15 | Sección 5: colecciones, JSON, obligatorios y opcionales, anidados y arreglos, relaciones, embeber vs referenciar | ☑ `informe/01-diseno.md` |
+| **Implementación y calidad de los datos** | 10 | 100 documentos como mínimo (meta: 200 a 500). Scripts reproducibles, verificación de cantidades, variedad, atributos opcionales y casos límite. Cómo reiniciar la base | ☑ `datos/`, `scripts/` y `evidencia/` (279 documentos) |
 | **Consultas y agregaciones** | 15 | 10 consultas diferentes, cada una con objetivo, comando y resultado esperado (sección 6). Variar solo un filtro no cuenta | ☑ `consultas/consultas.js` (10 + 1 extra de texto) y `evidencia/consultas_salida.txt` |
-| **API y repositorios** | 20 | CRUD funcional, capa de repositorio, validación, ids inexistentes, códigos HTTP y mensajes de error. Demostrable por Swagger o Postman | ☐ |
+| **API y repositorios** | 20 | CRUD funcional, capa de repositorio, validación, ids inexistentes, códigos HTTP y mensajes de error. Demostrable por Swagger o Postman | ☑ `services/catalogo/`, `api/openapi.yaml` y Swagger UI en `localhost:8086` |
 | **Índices y consistencia** | 10 | Al menos 2 índices, qué campos y por qué, `explain("executionStats")`, beneficio vs costo. Caso de consistencia: qué pasa si una parte falla, solución y prueba | ☑ `informe/03-indices.md`, `evidencia/indices_explain.txt` y `evidencia/concurrencia_variante.txt` |
 | **Análisis de datos** | 10 | Conexión, preparación, **3 indicadores como mínimo**, **2 visualizaciones diferentes**, interpretación escrita y conclusión con recomendación | ☑ `analisis/catalogo.ipynb` (ejecutado) y `analisis/catalogo.html`: 4 indicadores, barras, barras agrupadas y mapa de calor |
-| **Docker, reproducibilidad y pruebas** | 10 | Mongo con volumen, variables y archivo de ejemplo sin credenciales, API en el mismo Compose conectada por **nombre de servicio** (no `localhost`), cómo iniciar, detener y cargar datos, prueba desde un entorno limpio | ☐ |
-| **Documentación y defensa individual** | 10 | README con requisitos, comandos, carga y pruebas. Cada integrante explica modelo, consulta, índice y repositorio | ☐ |
+| **Docker, reproducibilidad y pruebas** | 10 | Mongo con volumen, variables y archivo de ejemplo sin credenciales, API en el mismo Compose conectada por **nombre de servicio** (no `localhost`), cómo iniciar, detener y cargar datos, prueba desde un entorno limpio | ☐ falta la prueba desde el zip (sección 16) |
+| **Documentación y defensa individual** | 10 | README con requisitos, comandos, carga y pruebas. Cada integrante explica modelo, consulta, índice y repositorio | ☐ `README.md` e `informe/` hechos; falta ensayar la defensa |
 
 **Entregables (sección 7 de la consigna):** informe técnico · scripts y datos · código de la aplicación · análisis de datos · despliegue · presentación y demostración. No incluir contraseñas, tokens ni secretos.
 
-**Extensiones opcionales que conviene tomar** (son baratas y suman): índice de texto, validación de esquema con `$jsonSchema`, pruebas de integración y prueba de concurrencia.
+**Extensiones opcionales de la consigna** (sección 10 de la consigna): índice de texto ☑ (`texto_nombre_descripcion`) · validación de esquema con `$jsonSchema` ☑ (script `01`, `pruebas/validacion_esquema.js`) · prueba de concurrencia ☑ (`pruebas/concurrencia_variante.py`) · pruebas de integración ☐ (quedan para la etapa FAV) · tablero interactivo ☐ (D11, opcional).
 
 ---
 
@@ -123,9 +121,9 @@ FAV es una tienda de ropa que hoy vende solo en el local y lleva el stock en un 
 | RF-08 | Listado con filtros, orden y paginación | HU-02 |
 | RF-09 | Consulta por lote de variantes *(recortado del TP, etapa FAV)* | ADR-005, ADR-001 |
 
-**Sistemas de talles (RN-02):** `LETRAS` (XS, S, M, L, XL, XXL) · `NUMERICO_PAR` (32, 34, 36, 38, 40, 42, 44, 46) · `NUMERICO_1_4` (1, 2, 3, 4) · `UNICO` (valor `U` **[propuesta]**).
+**Sistemas de talles (RN-02):** `LETRAS` (XS, S, M, L, XL, XXL) · `NUMERICO_PAR` (32, 34, 36, 38, 40, 42, 44, 46) · `NUMERICO_1_4` (1, 2, 3, 4) · `UNICO` (valor `U`).
 
-**Categorías (RN-17), 13:** tops, bodys, remeras, buzos, camperas, jeans, pantalones, polleras, shorts, vestidos, conjuntos, abanicos, accesorios. Una por producto **[propuesta]**.
+**Categorías (RN-17), 13:** tops, bodys, remeras, buzos, camperas, jeans, pantalones, polleras, shorts, vestidos, conjuntos, abanicos, accesorios. Una por producto.
 
 ### 5.3 Colecciones
 
@@ -167,7 +165,7 @@ Son tres: `productos` (entidad principal), `categorias` y `promociones`.
 | `precioBase` | objeto | Sí | `monto`: entero `int64` en **centavos**, mayor a 0 (1500000 = $15.000,00, D13). El precio es **del producto**: las variantes no tienen precio propio. `moneda`: `ARS` |
 | `publicado` | boolean | Sí | `false` por defecto (HU-03.1) |
 | `atributos` | objeto libre | No | Puede variar por categoría. Es la parte flexible del modelo |
-| `fotos` | arreglo | No | `url` obligatoria, `color` opcional (RN-03). Solo la URL. La **primera** es la principal (`fotoUrl` del contrato) **[?]** |
+| `fotos` | arreglo | No | `url` obligatoria, `color` opcional (RN-03). Solo la URL. La **primera** es la principal (`fotoUrl` del contrato) |
 | `variantes` | arreglo | Sí (1+) | `id`, `talle`, `color` obligatorios. **Sin stock** |
 | `creadoEn`, `actualizadoEn` | fecha | Sí | "Novedad" se ordena por `creadoEn` |
 | `version` | entero | Sí | Empieza en 1. **Sube con todo cambio**: editar, publicar, despublicar, agregar variante |
@@ -211,7 +209,7 @@ El `_id` coincide con el valor `categoria` del contrato (`remeras`, `jeans`, `bu
 | `tipo` | `PORCENTAJE` o `MEDIO_PAGO` (RN-05). 2x1 y promociones bancarias quedan fuera de v1 |
 | `medioPago` | Solo si `tipo` es `MEDIO_PAGO`: `EFECTIVO`, `TRANSFERENCIA` o `MERCADO_PAGO` (RN-18) |
 | `vigencia` | `desde` y `hasta` **obligatorias**, con `desde < hasta` (HU-05.2) |
-| `alcance` | A qué productos se aplica: `PRODUCTO`, `CATEGORIA` o `TIENDA`, con los ids correspondientes. Los tres quedan soportados porque el SPEC no fijó cuál usa el cliente **[?]** |
+| `alcance` | A qué productos se aplica: `PRODUCTO`, `CATEGORIA` o `TIENDA`, con los ids correspondientes. Los tres quedan soportados porque el SPEC no fijó cuál usa el cliente |
 
 Una promoción se cancela o se acorta editando su vigencia.
 
@@ -231,7 +229,7 @@ La decisión responde a los patrones de acceso (lectura frecuente de la ficha co
 - `_id` y `variantes[].id` son **textos legibles**, no `ObjectId`, porque así los usan el contrato e Inventario.
 - Hasta 100 caracteres, porque Inventario lo exige (`VARCHAR(100)`). Si el id generado pasa el límite, se rechaza con `400`. **No cambian nunca**, ni al renombrar el producto ni al corregir el color de una variante.
 - Los genera el **servidor**, en una sola función que también usa el cargador de datos (D12):
-  - Producto: `prod-` + nombre normalizado. Si el id ya existe, se agrega un sufijo numérico **[propuesta]**.
+  - Producto: `prod-` + nombre normalizado. Si el id ya existe, se agrega un sufijo numérico.
   - Variante: `var-` + producto (sin el `prod-`) + color + talle, todo normalizado. Por ejemplo, `prod-remera-basica` en Blanco, talle M, da `var-remera-basica-blanco-m`.
   - Normalizar: minúsculas, sin acentos, sin espacios. Cómo se reemplazan los espacios y la ñ está en la sección 14.
 - Los 3 ids del contrato son **heredados** y no siguen esta regla. Se cargan tal cual (sección 3, punto 11).
@@ -357,7 +355,7 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | *(Recortado del TP, etapa FAV, sección 15)* `POST /v1/promociones`, `PUT /v1/promociones/{id}`, `GET /v1/promociones` | Gestionar promociones |
 | `GET /healthz`, `GET /readyz` | Sondas. La segunda verifica la conexión a MongoDB |
 
-- El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote **[?]**.
+- El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote (etapa FAV).
 - `GET /v1/productos` queda reservada para la ruta pública del contrato (con `items`, solo publicados), que se agrega en la etapa FAV como adaptador aparte (D14). Por eso todo el CRUD de administración está bajo `/v1/admin/productos`.
 - Estructura en capas: `handler` (HTTP y validación de entrada) → `service` (reglas y precio vigente) → `repository` (único lugar que habla con MongoDB). Sin estado en memoria.
 
@@ -401,7 +399,7 @@ Notebook de Jupyter con PyMongo, Pandas y Matplotlib, que lee la base del proyec
 
 ## 10. Estructura del repositorio y del zip
 
-El zip es la copia de estas dos carpetas más un `README.md` en la raíz. Se arma con un script.
+El zip es la copia de estas dos carpetas más un `README.md` en la raíz. Se arma con `python tp-mongo/empaquetar.py` (sección 16), que deja afuera el `.env`, `CLAUDE.md`, el repositorio git y los archivos temporales.
 
 ```
 services/catalogo/                # el servicio, el mismo que usará FAV
@@ -410,19 +408,20 @@ services/catalogo/                # el servicio, el mismo que usará FAV
 ├── Dockerfile · go.mod · go.sum
 └── README.md
 tp-mongo/
+├── README.md                     # requisitos, comandos, carga y pruebas
 ├── PROYECTO.md                   # este archivo
-├── docker-compose.yml            # mongo-catalogo + catalogo + swagger-ui + cargador (+ analisis opcional)
+├── docker-compose.yml            # mongo-catalogo + catalogo + swagger-ui + cargador
 ├── .env.example                  # sin credenciales reales
-├── informe/                      # diseño, consultas e índices, consistencia, conclusiones
+├── informe/                      # 00 a 06: resumen, diseño, consultas, índices, consistencia, API y datos, conclusiones
 ├── datos/                        # generador y JSON
 ├── scripts/                      # 01 crear colecciones e índices · 02 cargar · 03 verificar
 ├── consultas/consultas.js        # las 10, comentadas
 ├── api/openapi.yaml              # para Swagger
-├── pruebas/                      # requests de ejemplo y script de concurrencia
+├── pruebas/                      # requests de ejemplo, concurrencia y validación de esquema
 ├── analisis/                     # notebook, versión HTML, requirements.txt
-├── evidencia/                    # salidas, explain, concurrencia, capturas
+├── evidencia/                    # salidas de consultas, explain, concurrencia y esquema
 ├── guion-demo.md
-└── empaquetar.sh
+└── empaquetar.py                 # arma el zip de la entrega
 ```
 
 ### Docker Compose
@@ -490,35 +489,38 @@ Para el notebook: `pip install -r analisis/requirements.txt` y abrirlo con Jupyt
 - **Logs** en JSON con `slog`, con `servicio` e `instancia` en cada línea. Sondas sin loguear.
 - **Errores** en `application/problem+json` con `codigo` estable.
 - **Operaciones críticas dentro de la base:** la condición va dentro del filtro de la actualización, nunca "leer, decidir y escribir".
-- **Tests:** unitarios del precio vigente y de las validaciones; de integración del repositorio contra un Mongo real; de concurrencia sobre la variante repetida.
+- **Tests:** unitarios de ids, montos, filtros, CORS y talles del esquema; de concurrencia sobre la variante repetida. Quedan para la etapa FAV los unitarios del precio vigente y los de integración del repositorio contra un Mongo real.
 - **Secretos:** nunca en el repositorio. `.env` va en `.gitignore`; solo se entrega `.env.example`.
 - **Commits** chicos y frecuentes, en `services-catalogo-mongo`.
 
 ---
 
-## 14. Pendientes y supuestos
+## 14. Decisiones menores y supuestos
 
-| # | Tema | Estado | Provisorio |
-|---|---|---|---|
-| 1 | Alcance de las promociones (producto, categoría o tienda) | **[?]** Cliente | Los tres soportados |
-| 2 | Si hay dos promociones aplicables, cuál gana | **[propuesta]** | La de mayor porcentaje |
-| 3 | Valor del talle en el sistema "talle único" | **[propuesta]** | `U` |
-| 4 | Una sola categoría por producto | **[propuesta]** (RN-17) | Un string |
-| 5 | Cuál es la foto principal | **[?]** | La primera del arreglo |
-| 6 | Dónde se guardan las fotos | **[?]** ADR-003 | Solo URL |
-| 7 | El listado filtra y ordena por precio base o vigente | **[?]** | Base |
-| 8 | Contenido del evento `VarianteCreada` | **[?]** Equipo (Inventario) | Fuera de este trabajo |
-| 9 | Ids de variante y rutas de Inventario | Hay que **revisarlos antes de entregar**: el código leído es el de `development` y puede cambiar | — |
-| 10 | Los índices del servicio y los del script `01_…` deben coincidir | Resuelto | El servicio crea solo `variantes_id_unico`, igual que el script (5.8). Probado: con la base vacía lo crea la API y después `01` no choca |
-| 15 | Unidad del monto al **recibir** (`POST`/`PUT`) | Confirmado | En pesos, con hasta 2 decimales (`15999.90`). Más decimales da `400`. Se convierte a centavos redondeando |
-| 17 | Qué cambia el `PUT` | **[propuesta]** | Reemplaza los datos editables: nombre, descripción, categoría, precio, atributos y fotos. Un opcional que no viene se quita. **No** cambia `sistemaTalles` (dejaría inválidos los talles de las variantes), ni las variantes, ni `publicado`, ni el id. Lleva `version` obligatoria |
-| 18 | Publicar o despublicar algo que ya estaba así | **[propuesta]** | No es error y no sube la `version`: `/publicar` responde `200` con el producto y `DELETE` responde `204`. Sobre un id inexistente, los dos dan `404` |
-| 19 | Cómo se filtra el listado | **[propuesta]** | `categoria`, `talle` y `color` son coincidencia exacta: el color distingue mayúsculas (`Celeste`, no `celeste`) y el talle se pasa a mayúscula. Con `talle` y `color` juntos se exige que sean **la misma variante** (`$elemMatch`). `q` busca con el índice de texto en español. `precioMin` y `precioMax` van en pesos y se comparan con el precio base (punto 7). Un parámetro desconocido da `400`, para que un error de tipeo no devuelva todo el catálogo sin avisar. Respuesta: `items`, `pagina`, `tamano`, `total` y `paginas`; `tamano` por defecto 20 y máximo 100. Órdenes: `nuevos` (por defecto), `precio_asc`, `precio_desc` y `nombre`, siempre desempatados por `_id` |
-| 16 | Talles escritos en minúscula (`"m"`) | **[propuesta]** | Se pasan a mayúscula antes de validar. El color se guarda como lo escribió el administrador (sin espacios en los extremos) |
-| 11 | Cómo se normalizan los espacios y la ñ en los ids (5.5) | Confirmado | Espacio → `-` (como `remera-basica`), ñ → `n`. Además, cualquier otro símbolo pasa a `-` y se quitan los `-` repetidos o de los extremos (`normalizar` en `datos/generar.py`; la función de Go tiene que dar lo mismo) |
-| 12 | Dos colores distintos que se normalizan igual (por ejemplo "Azul marino" y "azul-marino") generarían el mismo id | **[propuesta]** | El índice único lo rechaza y se responde `409 VARIANTE_DUPLICADA` |
-| 13 | Variante inexistente: `400` en el lote y `404` en la ficha | Decidido, a propósito (sección 7) | — |
-| 14 | Zona horaria de las vigencias de promociones | Confirmado | Se definen en hora de Argentina (UTC−3) y se guardan en UTC: "hasta el 30/11" es `2026-12-01T02:59:59Z` |
+| # | Tema | Decisión |
+|---|---|---|
+| 1 | Alcance de las promociones | Los tres soportados: `PRODUCTO`, `CATEGORIA` y `TIENDA` |
+| 2 | Si hay dos promociones aplicables, cuál gana | La de mayor porcentaje (D3) |
+| 3 | Valor del talle en el sistema "talle único" | `U` |
+| 4 | Categorías por producto (RN-17) | Una sola, guardada como string |
+| 5 | Cuál es la foto principal | La primera del arreglo (`fotoUrl` del contrato) |
+| 6 | Dónde se guardan las fotos | Solo la URL |
+| 7 | El listado filtra y ordena por precio base o vigente | Precio base. El vigente se calcula en la etapa FAV (sección 15) |
+| 8 | Contenido del evento `VarianteCreada` | Fuera de este trabajo (sección 15) |
+| 9 | Ids de variante y rutas de Inventario | Verificados el 02/11/2026 contra `services/inventario`: los tres ids del contrato existen en `002_datos_de_ejemplo.sql` y la consulta por lote de Inventario es `GET /v1/stock?variantes=…` |
+| 10 | Índices del servicio y del script `01_…` | El servicio crea solo `variantes_id_unico`, igual que el script (5.8). Con la base vacía lo crea la API y después `01` no choca |
+| 11 | Cómo se normalizan los espacios y la ñ en los ids (5.5) | Espacio → `-` (como `remera-basica`), ñ → `n`. Cualquier otro símbolo pasa a `-` y se quitan los `-` repetidos o de los extremos (`normalizar` en `datos/generar.py`; la función de Go da lo mismo y un test lo comprueba) |
+| 12 | Dos colores que se normalizan igual ("Azul marino" y "azul-marino") | Generarían el mismo id: el índice único lo rechaza y se responde `409 VARIANTE_DUPLICADA` |
+| 13 | Variante inexistente | `400` en el lote y `404` en la ficha, a propósito (sección 7) |
+| 14 | Zona horaria de las vigencias | Se definen en hora de Argentina (UTC−3) y se guardan en UTC: "hasta el 30/11" es `2026-12-01T02:59:59Z` |
+| 15 | Unidad del monto al **recibir** (`POST`/`PUT`) | En pesos, con hasta 2 decimales (`15999.90`). Más decimales da `400`. Se convierte a centavos redondeando |
+| 16 | Talles escritos en minúscula (`"m"`) | Se pasan a mayúscula antes de validar. El color se guarda como lo escribió el administrador, sin espacios en los extremos y sin lista cerrada de colores |
+| 17 | Qué cambia el `PUT` | Reemplaza los datos editables: nombre, descripción, categoría, precio, atributos y fotos. Un opcional que no viene se quita. **No** cambia `sistemaTalles` (dejaría inválidos los talles de las variantes), ni las variantes, ni `publicado`, ni el id. Lleva `version` obligatoria |
+| 18 | Publicar o despublicar algo que ya estaba así | No es error y no sube la `version`: `/publicar` responde `200` con el producto y `DELETE` responde `204`. Sobre un id inexistente, los dos dan `404` |
+| 19 | Cómo se filtra el listado | `categoria`, `talle` y `color` son coincidencia exacta: el color distingue mayúsculas (`Celeste`, no `celeste`) y el talle se pasa a mayúscula. Con `talle` y `color` juntos se exige que sean **la misma variante** (`$elemMatch`). `q` busca con el índice de texto en español. `precioMin` y `precioMax` van en pesos y se comparan con el precio base (punto 7). Un parámetro desconocido da `400`, para que un error de tipeo no devuelva todo el catálogo sin avisar. Respuesta: `items`, `pagina`, `tamano`, `total` y `paginas`; `tamano` por defecto 20 y máximo 100. Órdenes: `nuevos` (por defecto), `precio_asc`, `precio_desc` y `nombre`, siempre desempatados por `_id` |
+| 20 | Producto con un nombre que ya existe | Se acepta: el id lleva un sufijo numérico (`-2`, `-3`…), según 5.5 |
+
+Los puntos 1, 5, 6 y 8 dependen de lo que defina el equipo de FAV. Se resolvieron así para el TP y se confirman en la etapa siguiente; ninguno cambia lo entregado.
 
 ---
 
@@ -538,15 +540,10 @@ Sin cambiar lo anterior:
 
 ---
 
-## 16. Plan hasta el martes
+## 16. Antes de entregar
 
-| Día | Persona A (API) | Persona B (datos, consultas, análisis) |
-|---|---|---|
-| **Sáb 31** | Esqueleto Go en capas, conexión a Mongo, Compose con `mongo-catalogo` y `catalogo`, `/healthz` | Generador de datos, scripts 01 a 03, y las primeras consultas |
-| **Dom 1** | CRUD, validaciones, errores, variante atómica y prueba de concurrencia, consulta por lote | Las 10 consultas, índices con `explain`, e informe de consultas e índices |
-| **Lun 2** | `openapi.yaml`, README, tests del repositorio, prueba desde un entorno limpio | Notebook con 4 indicadores y 2 tipos de gráfico, HTML, informe técnico y guion de la demo |
-| **Mar 3** | Empaquetar y entregar el zip | |
-
-**Antes de entregar, el lunes:** cada uno explica al otro sus partes (la defensa es individual), se hace una prueba completa desde cero y se revisa el punto 9 de la sección 14.
+1. Armar el zip con `python tp-mongo/empaquetar.py` (genera `tp-mongo/dist/catalogo-mongo.zip` y comprueba que no lleve secretos).
+2. Prueba completa desde cero con **ese zip**, en otra carpeta y solo con Docker (sección 11).
+3. Ensayar la demo y la defensa: cada integrante explica el modelo, ejecuta una consulta, justifica un índice y describe el repositorio.
 
 **Definición de terminado:** el checklist de la sección 4 está tildado, `docker compose up` más la carga funcionan desde cero en una máquina limpia, y el zip no contiene secretos.
