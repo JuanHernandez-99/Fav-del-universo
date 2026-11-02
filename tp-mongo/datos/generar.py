@@ -361,8 +361,11 @@ def promociones(rng, productos):
         # Vigentes el día de la defensa (03/11/2026).
         promo("promo-efectivo-tienda", "10% pagando en efectivo", "MEDIO_PAGO", 10,
               fecha_ar(2026, 11, 1), fecha_ar(2026, 11, 30, *fin), "TIENDA", medio="EFECTIVO"),
-        promo("promo-mercado-pago", "5% con Mercado Pago", "MEDIO_PAGO", 5,
-              fecha_ar(2026, 10, 1), fecha_ar(2026, 12, 31, *fin), "TIENDA", medio="MERCADO_PAGO"),
+        # Por ahora los datos usan solo efectivo y transferencia. No hay una de transferencia vigente:
+        # el precio público asume transferencia (D4) y bajaría el precio de todo el catálogo.
+        promo("promo-efectivo-vestidos", "15% en efectivo en vestidos", "MEDIO_PAGO", 15,
+              fecha_ar(2026, 10, 1), fecha_ar(2026, 12, 31, *fin), "CATEGORIA", ["vestidos"],
+              medio="EFECTIVO"),
         promo("promo-semana-del-jean", "Semana del jean", "PORCENTAJE", 20,
               fecha_ar(2026, 11, 1), fecha_ar(2026, 11, 15, *fin), "CATEGORIA", ["jeans"]),
         promo("promo-media-estacion", "Buzos y camperas de media estación", "PORCENTAJE", 15,

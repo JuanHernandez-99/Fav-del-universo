@@ -19,11 +19,11 @@
     }
   },
   {
-    "_id": "promo-mercado-pago",
-    "nombre": "5% con Mercado Pago",
+    "_id": "promo-efectivo-vestidos",
+    "nombre": "15% en efectivo en vestidos",
     "tipo": "MEDIO_PAGO",
-    "porcentaje": 5,
-    "medioPago": "MERCADO_PAGO",
+    "porcentaje": 15,
+    "medioPago": "EFECTIVO",
     "vigencia": {
       "desde": {
         "$date": "2026-10-01T03:00:00Z"
@@ -33,8 +33,10 @@
       }
     },
     "alcance": {
-      "tipo": "TIENDA",
-      "ids": []
+      "tipo": "CATEGORIA",
+      "ids": [
+        "vestidos"
+      ]
     }
   },
   {
