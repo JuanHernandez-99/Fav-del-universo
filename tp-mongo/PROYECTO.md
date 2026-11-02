@@ -263,7 +263,7 @@ La respuesta debería indicar el precio base, el vigente y la promoción aplicad
 
 ### 5.8 Índices
 
-Se crean al arrancar (idempotente, porque dos réplicas pueden arrancar a la vez) y también en `scripts/01_crear_colecciones_e_indices.js`, que es lo que se muestra en la defensa. **Las dos listas tienen que ser iguales** (sección 14).
+Todos se crean en `scripts/01_crear_colecciones_e_indices.js`, que es lo que se muestra en la defensa. Además, el servicio crea al arrancar **solo `variantes_id_unico`**, porque de él depende una regla (que un id de variante no se repita) y no solo el rendimiento: así la regla vale aunque nadie haya corrido el cargador. Es idempotente, así que dos réplicas pueden arrancar a la vez. Tiene que tener el mismo nombre y la misma definición en los dos lugares.
 
 | Consulta | Índice |
 |---|---|
@@ -506,7 +506,9 @@ Para el notebook: `pip install -r analisis/requirements.txt` y abrirlo con Jupyt
 | 7 | El listado filtra y ordena por precio base o vigente | **[?]** | Base |
 | 8 | Contenido del evento `VarianteCreada` | **[?]** Equipo (Inventario) | Fuera de este trabajo |
 | 9 | Ids de variante y rutas de Inventario | Hay que **revisarlos antes de entregar**: el código leído es el de `development` y puede cambiar | — |
-| 10 | Los índices del servicio y los del script `01_…` deben coincidir | Riesgo de duplicación | Revisar al final |
+| 10 | Los índices del servicio y los del script `01_…` deben coincidir | Resuelto | El servicio crea solo `variantes_id_unico`, igual que el script (5.8). Probado: con la base vacía lo crea la API y después `01` no choca |
+| 15 | Unidad del monto al **recibir** (`POST`/`PUT`) | Confirmado | En pesos, con hasta 2 decimales (`15999.90`). Más decimales da `400`. Se convierte a centavos redondeando |
+| 16 | Talles escritos en minúscula (`"m"`) | **[propuesta]** | Se pasan a mayúscula antes de validar. El color se guarda como lo escribió el administrador (sin espacios en los extremos) |
 | 11 | Cómo se normalizan los espacios y la ñ en los ids (5.5) | Confirmado | Espacio → `-` (como `remera-basica`), ñ → `n`. Además, cualquier otro símbolo pasa a `-` y se quitan los `-` repetidos o de los extremos (`normalizar` en `datos/generar.py`; la función de Go tiene que dar lo mismo) |
 | 12 | Dos colores distintos que se normalizan igual (por ejemplo "Azul marino" y "azul-marino") generarían el mismo id | **[propuesta]** | El índice único lo rechaza y se responde `409 VARIANTE_DUPLICADA` |
 | 13 | Variante inexistente: `400` en el lote y `404` en la ficha | Decidido, a propósito (sección 7) | — |
