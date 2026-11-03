@@ -84,6 +84,7 @@ El mock de Ventas llama a Inventario por el gateway (puerto interno 8081, sin pu
 
 - **Chequeo activo** de `/readyz` **[?]**: con `healthcheck` en Docker Compose o con otra herramienta, si las pruebas de caída muestran que el chequeo pasivo no alcanza (ADR-010).
 - **Replicar Catálogo** cuando deje de ser un mock.
+- **Un algoritmo que mire la carga en lugar de round robin**, por ejemplo `least_conn` (cada pedido va a la réplica con menos conexiones activas). Round robin reparte por turnos sin saber si una réplica está ocupada con pedidos lentos. Se evalúa con las pruebas de carga (ADR-013).
 - **Cantidad de réplicas** según las pruebas de carga (ADR-013).
 - **Gateway redundante** en el despliegue con URL pública **[?]**.
 

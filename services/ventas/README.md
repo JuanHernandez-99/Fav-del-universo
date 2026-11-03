@@ -18,12 +18,14 @@ No modifica el stock: se lo pide a [Inventario](../inventario). No consulta a Us
 
 | Con | Cómo | Para qué |
 |---|---|---|
-| Ventas → Catálogo | HTTP, con timeout | Precio vigente **[propuesta]** |
+| Ventas → Catálogo | HTTP, con timeout | Datos y precio de las variantes, por lote (`GET /v1/variantes`) |
 | Ventas → Inventario | HTTP, con idempotencia | Reservar, liberar, confirmar y descontar |
 | Ventas → Mercado Pago | HTTP, con timeout y circuit breaker | Crear el pago |
 | Mercado Pago → Ventas | Aviso por el gateway | Resultado del pago |
 | Ventas → proveedor de mail | Fuera de la transacción de la venta | Mails al comprador y al administrador |
 | Inventario → Ventas | Evento `ReservaVencida` | Pasar la venta a *Vencida* |
+
+**Variantes no publicadas.** La consulta por lote de Catálogo no filtra por `publicado`: lo informa en cada variante y Ventas decide. En la compra online y en los pedidos del contrato público, una variante con `publicado: false` se rechaza con `400 VARIANTE_INEXISTENTE`, como indica el contrato. En la venta del local se acepta: publicado solo habilita la web (RN-04).
 
 ## Capacidad compartida: pedidos
 
