@@ -68,8 +68,10 @@ type DetalleVariante struct {
 	Color      string `bson:"color"`
 	Publicado  bool   `bson:"publicado"`
 	PrecioBase Precio `bson:"precioBase"`
-	// Precio es el que se cobra, en centavos. Lo calcula el servicio; no viene de la base.
-	Precio int64 `bson:"-"`
+	// Precio es el que se cobra, en centavos, y Promocion la que se aplicó (nil si ninguna). Los
+	// calcula el servicio; no vienen de la base.
+	Precio    int64      `bson:"-"`
+	Promocion *Promocion `bson:"-"`
 }
 
 // MaximoVariantesPorLote acota la consulta por lote: Ventas arma pedidos de a lo sumo 20 variantes y

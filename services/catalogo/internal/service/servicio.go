@@ -34,6 +34,9 @@ type Repositorio interface {
 	// ObtenerVariantes devuelve las variantes que existan entre esos ids, con los datos de su
 	// producto y sin filtrar por publicado. Sin orden garantizado.
 	ObtenerVariantes(ctx context.Context, ids []string) ([]modelo.DetalleVariante, error)
+	// PromocionesVigentes devuelve las promociones vigentes en ese momento, de cualquier alcance y
+	// medio de pago. A qué producto se aplica cada una lo decide PrecioVigente.
+	PromocionesVigentes(ctx context.Context, ahora time.Time) ([]modelo.Promocion, error)
 }
 
 type Servicio struct {

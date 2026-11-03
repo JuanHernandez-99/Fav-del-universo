@@ -366,17 +366,26 @@ func responderProducto(w http.ResponseWriter, r *http.Request, p modelo.Producto
 
 // ---------- Consulta por lote ----------
 
-// detalleVarianteJSON es una variante con los datos de su producto. El precio va en pesos con 2
-// decimales, como el contrato, y es el que se cobra (hoy el precio base, ver service.precioVigente).
+// detalleVarianteJSON es una variante con los datos de su producto. Los precios van en pesos con 2
+// decimales, como el contrato. precio es el que se cobra (service.PrecioVigente); promocion explica
+// la diferencia con precioBase y no viene si no se aplicó ninguna.
 type detalleVarianteJSON struct {
-	VarianteID string  `json:"varianteId"`
-	ProductoID string  `json:"productoId"`
-	Nombre     string  `json:"nombre"`
-	Categoria  string  `json:"categoria"`
-	Talle      string  `json:"talle"`
-	Color      string  `json:"color"`
-	Publicado  bool    `json:"publicado"`
-	Precio     float64 `json:"precio"`
+	VarianteID string         `json:"varianteId"`
+	ProductoID string         `json:"productoId"`
+	Nombre     string         `json:"nombre"`
+	Categoria  string         `json:"categoria"`
+	Talle      string         `json:"talle"`
+	Color      string         `json:"color"`
+	Publicado  bool           `json:"publicado"`
+	Precio     float64        `json:"precio"`
+	PrecioBase float64        `json:"precioBase"`
+	Promocion  *promocionJSON `json:"promocion,omitempty"`
+}
+
+type promocionJSON struct {
+	PromocionID string `json:"promocionId"`
+	Nombre      string `json:"nombre"`
+	Porcentaje  int    `json:"porcentaje"`
 }
 
 // consultarVariantes atiende GET /v1/variantes?variantes=a,b,c[&medioPago=EFECTIVO]. Rechaza los
@@ -405,7 +414,14 @@ func (h *Handler) consultarVariantes(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]detalleVarianteJSON, len(detalles))
 	for i, d := range detalles {
-		items[i] = detalleVarianteJSON{d.VarianteID, d.ProductoID, d.Nombre, d.Categoria, d.Talle, d.Color, d.Publicado, pesos(d.Precio)}
+		items[i] = detalleVarianteJSON{
+			VarianteID: d.VarianteID, ProductoID: d.ProductoID, Nombre: d.Nombre, Categoria: d.Categoria,
+			Talle: d.Talle, Color: d.Color, Publicado: d.Publicado,
+			Precio: pesos(d.Precio), PrecioBase: pesos(d.PrecioBase.Monto),
+		}
+		if p := d.Promocion; p != nil {
+			items[i].Promocion = &promocionJSON{p.ID, p.Nombre, p.Porcentaje}
+		}
 	}
 	escribirJSON(w, http.StatusOK, struct {
 		Items []detalleVarianteJSON `json:"items"`

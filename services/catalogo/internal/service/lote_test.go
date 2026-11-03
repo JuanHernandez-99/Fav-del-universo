@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
 )
@@ -15,8 +16,13 @@ import (
 // y cualquier llamada de más haría fallar el test.
 type repoDeVariantes struct {
 	Repositorio
-	existentes map[string]modelo.DetalleVariante
-	pedidos    [][]string
+	existentes  map[string]modelo.DetalleVariante
+	promociones []modelo.Promocion
+	pedidos     [][]string
+}
+
+func (r *repoDeVariantes) PromocionesVigentes(context.Context, time.Time) ([]modelo.Promocion, error) {
+	return r.promociones, nil
 }
 
 func (r *repoDeVariantes) ObtenerVariantes(_ context.Context, ids []string) ([]modelo.DetalleVariante, error) {

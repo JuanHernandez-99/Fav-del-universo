@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/service"
@@ -13,6 +14,14 @@ import (
 
 // repoFalso responde solo la consulta por lote; el resto de la interfaz queda nil.
 type repoFalso struct{ service.Repositorio }
+
+// PromocionesVigentes devuelve un 10 % pagando en efectivo para toda la tienda.
+func (repoFalso) PromocionesVigentes(context.Context, time.Time) ([]modelo.Promocion, error) {
+	efectivo := "EFECTIVO"
+	return []modelo.Promocion{{ID: "promo-efectivo-tienda", Nombre: "10% pagando en efectivo", Tipo: "MEDIO_PAGO", Porcentaje: 10,
+		MedioPago: &efectivo, Alcance: modelo.Alcance{Tipo: "TIENDA"},
+		Vigencia: modelo.Vigencia{Desde: time.Now().Add(-time.Hour), Hasta: time.Now().Add(time.Hour)}}}, nil
+}
 
 func (repoFalso) ObtenerVariantes(_ context.Context, ids []string) ([]modelo.DetalleVariante, error) {
 	var encontradas []modelo.DetalleVariante
@@ -46,11 +55,27 @@ func TestConsultarVariantesHTTP(t *testing.T) {
 	item := cuerpo["items"].([]any)[0].(map[string]any)
 	// El precio sale en pesos con decimales (el monto interno son 1.599.990 centavos).
 	esperado := map[string]any{"varianteId": "var-remera-basica-blanca-m", "productoId": "prod-remera-basica", "nombre": "Remera básica",
-		"categoria": "remeras", "talle": "M", "color": "Blanco", "publicado": true, "precio": 15999.9}
+		"categoria": "remeras", "talle": "M", "color": "Blanco", "publicado": true, "precio": 15999.9, "precioBase": 15999.9}
 	for campo, valor := range esperado {
 		if item[campo] != valor {
 			t.Errorf("%s = %v, se esperaba %v", campo, item[campo], valor)
 		}
+	}
+}
+
+// Con medioPago=EFECTIVO se aplica el 10% de la tienda: 1.599.990 centavos dan 1.439.991.
+func TestConsultarVariantesConPromocionHTTP(t *testing.T) {
+	codigo, cuerpo := pedir(t, "/v1/variantes?variantes=var-remera-basica-blanca-m&medioPago=efectivo")
+	if codigo != 200 {
+		t.Fatalf("código %d: %v", codigo, cuerpo)
+	}
+	item := cuerpo["items"].([]any)[0].(map[string]any)
+	promocion, _ := item["promocion"].(map[string]any)
+	if item["precio"] != 14399.91 || item["precioBase"] != 15999.9 || promocion["promocionId"] != "promo-efectivo-tienda" || promocion["porcentaje"] != 10.0 {
+		t.Errorf("precio con la promoción de efectivo: %v", item)
+	}
+	if _, cuerpo := pedir(t, "/v1/variantes?variantes=var-remera-basica-blanca-m"); cuerpo["items"].([]any)[0].(map[string]any)["promocion"] != nil {
+		t.Error("por transferencia (por defecto) no aplica la promoción de efectivo, y promocion no tiene que venir")
 	}
 }
 

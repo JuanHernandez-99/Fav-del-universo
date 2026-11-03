@@ -17,9 +17,10 @@ import (
 )
 
 type Repositorio struct {
-	cliente    *mongo.Client
-	productos  *mongo.Collection
-	categorias *mongo.Collection
+	cliente     *mongo.Client
+	productos   *mongo.Collection
+	categorias  *mongo.Collection
+	promociones *mongo.Collection
 }
 
 // indiceVariantes tiene que coincidir en nombre y definición con el de
@@ -36,7 +37,12 @@ func Conectar(uri, base string) (*Repositorio, error) {
 		return nil, err
 	}
 	db := cliente.Database(base)
-	return &Repositorio{cliente: cliente, productos: db.Collection("productos"), categorias: db.Collection("categorias")}, nil
+	return &Repositorio{
+		cliente:     cliente,
+		productos:   db.Collection("productos"),
+		categorias:  db.Collection("categorias"),
+		promociones: db.Collection("promociones"),
+	}, nil
 }
 
 // AsegurarIndices crea al arrancar el único índice del que depende una regla: que un id de
@@ -322,4 +328,23 @@ func (r *Repositorio) ObtenerVariantes(ctx context.Context, ids []string) ([]mod
 		return nil, err
 	}
 	return detalles, nil
+}
+
+// PromocionesVigentes trae las promociones cuya vigencia incluye ese momento. Usa el índice vigencia
+// del script 01. Son pocas (una tienda tiene unas pocas a la vez), por eso se traen todas y el filtro
+// por alcance y medio de pago lo hace el servicio.
+func (r *Repositorio) PromocionesVigentes(ctx context.Context, ahora time.Time) ([]modelo.Promocion, error) {
+	filtro := bson.D{
+		{Key: "vigencia.desde", Value: bson.D{{Key: "$lte", Value: ahora}}},
+		{Key: "vigencia.hasta", Value: bson.D{{Key: "$gte", Value: ahora}}},
+	}
+	cursor, err := r.promociones.Find(ctx, filtro)
+	if err != nil {
+		return nil, err
+	}
+	var promociones []modelo.Promocion
+	if err := cursor.All(ctx, &promociones); err != nil {
+		return nil, err
+	}
+	return promociones, nil
 }

@@ -228,7 +228,7 @@ paths:
         - De 1 a 200 ids separados por coma. Los repetidos se responden una vez, en el orden pedido.
         - No filtra por `publicado`: cada ítem lo informa y quien llama decide. Ventas rechaza los no publicados en la compra online y en los pedidos públicos.
         - Si algún id no existe: `400 VARIANTE_INEXISTENTE`, con la lista de los que faltan.
-        - `precio` está en pesos. Hoy es el precio base; el precio con promociones se suma sin cambiar el formato.
+        - Precios en pesos. `precio` es el que se cobra: el base con la promoción vigente de mayor porcentaje para ese medio de pago (no se acumulan). `promocion` no viene si no se aplica ninguna.
       parameters:
         - name: variantes
           in: query
@@ -250,7 +250,7 @@ paths:
                   items: { type: array, items: { $ref: "#/components/schemas/DetalleVariante" } }
               example:
                 items:
-                  - { varianteId: var-remera-basica-blanca-m, productoId: prod-remera-basica, nombre: Remera básica, categoria: remeras, talle: M, color: Blanco, publicado: true, precio: 15000 }
+                  - { varianteId: var-remera-basica-blanca-m, productoId: prod-remera-basica, nombre: Remera básica, categoria: remeras, talle: M, color: Blanco, publicado: true, precio: 15000, precioBase: 15000 }
         "400":
           description: Pedido inválido (`PEDIDO_INVALIDO`) o alguna variante no existe (`VARIANTE_INEXISTENTE`).
           content:
@@ -413,7 +413,15 @@ components:
         talle: { type: string, example: M }
         color: { type: string, example: Blanco }
         publicado: { type: boolean }
-        precio: { type: number, description: "Precio que se cobra, en pesos.", example: 15000 }
+        precio: { type: number, description: "Precio que se cobra, en pesos.", example: 13500 }
+        precioBase: { type: number, example: 15000 }
+        promocion:
+          type: object
+          description: La promoción aplicada. No viene si no hay ninguna.
+          properties:
+            promocionId: { type: string, example: promo-efectivo-tienda }
+            nombre: { type: string, example: 10% pagando en efectivo }
+            porcentaje: { type: integer, example: 10 }
     Pagina:
       type: object
       properties:

@@ -345,7 +345,7 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real en parte: productos y consulta por lote, sin precio vigente con promociones ni capacidad publicada (la sigue atendiendo el mock). Ventas es un mock; Usuarios y el frontend no están | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real en parte: productos y consulta por lote con precio vigente, sin gestión de promociones por API ni capacidad publicada (la sigue atendiendo el mock). Ventas es un mock; Usuarios y el frontend no están | — |
 | Gateway único | Punto único de falla; la validación del JWT no está (se usa `X-Admin-Key`) | ADR-012 |
 | Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |
 | Publicador a RabbitMQ | El outbox se escribe, pero nadie lo publica; sin consumo idempotente ni DLQ | ADR-005 |

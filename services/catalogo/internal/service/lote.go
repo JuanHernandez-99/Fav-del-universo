@@ -9,7 +9,7 @@ import (
 )
 
 // ConsultarVariantes responde la consulta por lote de Ventas y del panel (RF-09): por cada id pedido,
-// los datos de la variante y de su producto, con el precio que se cobra. Los ids repetidos se
+// los datos de la variante y de su producto, con el precio que se cobra (PrecioVigente). Los ids repetidos se
 // responden una sola vez y el resultado respeta el orden del pedido.
 //
 // Si algún id no existe devuelve *modelo.ErrVariantesInexistentes con todos los que faltan, y no
@@ -50,6 +50,13 @@ func (s *Servicio) ConsultarVariantes(ctx context.Context, ids []string, medioPa
 	if err != nil {
 		return nil, err
 	}
+	// Una sola consulta de promociones para todo el lote. Si falla, no se responde con el precio base:
+	// Ventas cobraría de más.
+	momento := ahora()
+	promociones, err := s.repo.PromocionesVigentes(ctx, momento)
+	if err != nil {
+		return nil, err
+	}
 	porID := make(map[string]modelo.DetalleVariante, len(encontradas))
 	for _, d := range encontradas {
 		porID[d.VarianteID] = d
@@ -63,18 +70,11 @@ func (s *Servicio) ConsultarVariantes(ctx context.Context, ids []string, medioPa
 			faltan = append(faltan, id)
 			continue
 		}
-		d.Precio = precioVigente(d, medioPago)
+		d.Precio, d.Promocion = PrecioVigente(d.PrecioBase.Monto, d.ProductoID, d.Categoria, medioPago, promociones, momento)
 		resultado = append(resultado, d)
 	}
 	if len(faltan) > 0 {
 		return nil, &modelo.ErrVariantesInexistentes{IDs: faltan}
 	}
 	return resultado, nil
-}
-
-// precioVigente es el precio que se cobra por la variante, en centavos. Por ahora es el precio base:
-// el cálculo con promociones (DISENO.md 5.7, mayor porcentaje, truncado a centavos) entra acá sin
-// cambiar la respuesta del endpoint.
-func precioVigente(d modelo.DetalleVariante, _ string) int64 {
-	return d.PrecioBase.Monto
 }

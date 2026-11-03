@@ -2,7 +2,7 @@
 
 Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, categorías, precios base, promociones y publicación. Calcula el **precio vigente**.
 
-> Estado: **CRUD de productos y consulta por lote implementados**. Quedan el precio vigente con promociones (hoy el lote devuelve el precio base), las promociones por API y lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
+> Estado: **CRUD de productos y consulta por lote con precio vigente implementados**. Quedan las promociones por API, la capacidad publicada (`GET /v1/productos`) y lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
 
 ## Qué hay hoy
 
