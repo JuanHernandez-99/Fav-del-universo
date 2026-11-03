@@ -8,7 +8,7 @@ Reglas:
 - Antes de usar ids, rutas o contratos de otro servicio, leé su código real.
 - Si algo choca con la consigna (`docs/Enunciado TP Final.pdf`) o con un ADR, avisame antes de hacerlo.
 - Nunca subas `.env` ni credenciales.
-- Commits solo cuando te lo indique, sin línea de coautor. Nunca `push`.
+- **No hagas commits sin que te lo pida explícitamente.** Que te pida hacer o terminar una tarea no es pedir el commit. Cuando lo pida: sin línea de coautor. Nunca `push`.
 - La documentación es concisa y relevante: no se documenta lo que todavía no existe ni se afirma lo que no se verificó.
 
 ## Modo de trabajo
