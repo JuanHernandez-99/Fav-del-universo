@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Los resultados esperados salen de `normalizar` de tp-mongo/datos/generar.py.
+// Los resultados esperados salen de `normalizar` de db/datos/generar.py.
 func TestNormalizarIgualQuePython(t *testing.T) {
 	casos := map[string]string{
 		"Tapado de paño":          "tapado-de-pano",
@@ -47,9 +47,9 @@ func TestIDs(t *testing.T) {
 // TestIDsDeLosDatosGenerados recalcula en Go los 881 ids de variante que generó Python y los
 // compara. Si alguna vez difieren, un producto creado por la API no seguiría la misma regla.
 func TestIDsDeLosDatosGenerados(t *testing.T) {
-	contenido, err := os.ReadFile("../../../../tp-mongo/datos/productos.json")
+	contenido, err := os.ReadFile("../../db/datos/productos.json")
 	if err != nil {
-		t.Skip("no está tp-mongo/datos/productos.json:", err)
+		t.Fatal("no se pudo leer db/datos/productos.json:", err)
 	}
 	var productos []struct {
 		ID        string `json:"_id"`

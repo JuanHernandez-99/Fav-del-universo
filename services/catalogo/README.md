@@ -9,12 +9,14 @@ Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, c
 | | |
 |---|---|
 | **API** | CRUD de productos bajo `/v1/admin/productos`, publicar, agregar variante (operación atómica) y listado con filtros, orden y paginación. Sondas `/healthz` y `/readyz` |
-| **Consulta por lote** | `GET /v1/variantes?variantes=a,b,c` (hasta 200 ids), para Ventas. Detalle en `tp-mongo/api/openapi.yaml` |
+| **Consulta por lote** | `GET /v1/variantes?variantes=a,b,c` (hasta 200 ids), para Ventas. Detalle en `api/openapi.yaml` |
 | **Código** | Go, en capas `handler` → `service` → `repository` (único que habla con MongoDB). Sin estado en memoria |
 | **Base** | MongoDB con tres colecciones (`productos`, `categorias`, `promociones`), índices y validación de esquema |
-| **Documentación** | Especificación en `tp-mongo/api/openapi.yaml` y decisiones en `tp-mongo/PROYECTO.md` |
+| **Documentación** | Especificación en `api/openapi.yaml` y decisiones en `DISENO.md` |
 
-Se levanta con el Compose de `tp-mongo/`, que construye la imagen de esta carpeta (ver el `README.md` de esa carpeta). Los tests se corren con `go test ./...`.
+Se levanta con el `docker-compose.yml` de la raíz: dos réplicas detrás del gateway, más `catalogo-init`, que prepara la base (`DISENO.md`, sección 8). Desde afuera se entra por el gateway, en `/catalogo/`, con la cabecera `X-Admin-Key`. Ventas usa la entrada interna `http://gateway:8081/catalogo/`. Tests: `go test ./...`.
+
+Carpetas: `api/` (OpenAPI), `db/` (scripts, datos de ejemplo y consultas de MongoDB) y `pruebas/` (concurrencia y esquema).
 
 | | |
 |---|---|

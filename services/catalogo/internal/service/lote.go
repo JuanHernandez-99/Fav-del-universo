@@ -73,7 +73,7 @@ func (s *Servicio) ConsultarVariantes(ctx context.Context, ids []string, medioPa
 }
 
 // precioVigente es el precio que se cobra por la variante, en centavos. Por ahora es el precio base:
-// el cálculo con promociones (PROYECTO.md 5.7, mayor porcentaje, truncado a centavos) entra acá sin
+// el cálculo con promociones (DISENO.md 5.7, mayor porcentaje, truncado a centavos) entra acá sin
 // cambiar la respuesta del endpoint.
 func precioVigente(d modelo.DetalleVariante, _ string) int64 {
 	return d.PrecioBase.Monto

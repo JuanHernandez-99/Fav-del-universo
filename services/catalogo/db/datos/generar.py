@@ -1,4 +1,4 @@
-"""Genera los datos de prueba del catálogo (PROYECTO.md sección 8).
+"""Genera los datos de prueba del catálogo (DISENO.md sección 8).
 
 Determinista: con la misma semilla produce siempre los mismos archivos. Escribe Extended JSON
 ($numberLong, $date), que es el formato que entiende mongoimport.
@@ -9,7 +9,7 @@ Archivos:
   productos.json          el volumen del TP (250 productos)
   promociones.json        vigentes, vencidas y futuras respecto de la defensa (03/11/2026)
 
-Uso, desde tp-mongo/:  python datos/generar.py
+Uso, desde services/catalogo/:  python db/datos/generar.py
 """
 
 import json
@@ -137,7 +137,7 @@ FRASES = ["Ideal para el día a día.", "Corte relajado.", "Edición limitada.",
           "Combina con todo.", "Lavar a mano.", "Nueva temporada."]
 
 
-# ---------- Ids (PROYECTO.md 5.5) ----------
+# ---------- Ids (DISENO.md 5.5) ----------
 
 def normalizar(texto):
     """Minúsculas, sin acentos (la ñ queda n) y todo lo que no sea letra o número pasa a '-'.

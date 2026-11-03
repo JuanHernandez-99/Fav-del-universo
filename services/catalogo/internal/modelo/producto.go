@@ -1,4 +1,4 @@
-// Package modelo tiene los tipos del dominio que comparten las capas (PROYECTO.md 5.3).
+// Package modelo tiene los tipos del dominio que comparten las capas (DISENO.md 5.3).
 // Los tags bson indican el nombre de cada campo en el documento de MongoDB.
 package modelo
 
@@ -58,7 +58,7 @@ type Variante struct {
 }
 
 // DetalleVariante es una variante junto con los datos de su producto: lo que Ventas y el panel
-// piden por lote (PROYECTO.md sección 7). Los tags bson son los de la proyección del repositorio.
+// piden por lote (DISENO.md sección 7). Los tags bson son los de la proyección del repositorio.
 type DetalleVariante struct {
 	VarianteID string `bson:"varianteId"`
 	ProductoID string `bson:"productoId"`

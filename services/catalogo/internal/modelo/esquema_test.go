@@ -8,13 +8,12 @@ import (
 	"testing"
 )
 
-// El validador $jsonSchema de MongoDB (tp-mongo/scripts/01_crear_colecciones_e_indices.js) repite los
+// El validador $jsonSchema de MongoDB (db/scripts/01_crear_colecciones_e_indices.js) repite los
 // sistemas de talles de SistemasTalles. Este test falla si las dos listas se separan.
-// Se saltea si no está la carpeta tp-mongo (por ejemplo, en el repositorio completo de FAV).
 func TestSistemasDeTallesIgualQueElEsquemaDeMongo(t *testing.T) {
-	script, err := os.ReadFile("../../../../tp-mongo/scripts/01_crear_colecciones_e_indices.js")
+	script, err := os.ReadFile("../../db/scripts/01_crear_colecciones_e_indices.js")
 	if err != nil {
-		t.Skipf("no está el script de Mongo: %v", err)
+		t.Fatalf("no se pudo leer el script de Mongo: %v", err)
 	}
 
 	bloque := regexp.MustCompile(`(?s)const TALLES = \{(.*?)\};`).FindSubmatch(script)

@@ -11,8 +11,10 @@ info:
     - Los errores son `application/problem+json` con un `codigo` estable.
     - El catálogo no maneja stock: es de Inventario.
 servers:
-  - url: http://localhost:8085
-    description: API del Compose de tp-mongo
+  - url: http://localhost:8080/catalogo
+    description: Gateway de FAV (local)
+security:
+  - ClaveAdmin: []
 tags:
   - name: Productos
   - name: Variantes
@@ -277,6 +279,12 @@ paths:
         "503": { description: La base no responde. }
 
 components:
+  securitySchemes:
+    ClaveAdmin:
+      type: apiKey
+      in: header
+      name: X-Admin-Key
+      description: Clave provisoria del panel, la valida el gateway (ADMIN_API_KEY).
   parameters:
     ProductoId:
       name: id

@@ -1,4 +1,4 @@
-// 01 · Crea las colecciones y los índices del catálogo (PROYECTO.md 5.3 y 5.8).
+// 01 · Crea las colecciones y los índices del catálogo (DISENO.md 5.3 y 5.8).
 // Idempotente: se puede correr varias veces. createIndex no hace nada si el índice ya existe igual.
 // Uso: mongosh -u ... -p ... --authenticationDatabase admin catalogo --file 01_crear_colecciones_e_indices.js
 

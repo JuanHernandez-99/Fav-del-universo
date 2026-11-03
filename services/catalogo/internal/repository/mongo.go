@@ -23,7 +23,7 @@ type Repositorio struct {
 }
 
 // indiceVariantes tiene que coincidir en nombre y definición con el de
-// tp-mongo/scripts/01_crear_colecciones_e_indices.js; si difiere, Mongo rechaza la creación.
+// db/scripts/01_crear_colecciones_e_indices.js; si difiere, Mongo rechaza la creación.
 const indiceVariantes = "variantes_id_unico"
 
 // Conectar arma el cliente. No abre la conexión todavía: el driver conecta recién en la primera
@@ -76,7 +76,7 @@ func (r *Repositorio) ExisteCategoria(ctx context.Context, id string) (bool, err
 	return n > 0, err
 }
 
-// AgregarVariante es la operación atómica de PROYECTO.md 5.9. La condición "no tiene esa
+// AgregarVariante es la operación atómica de DISENO.md 5.9. La condición "no tiene esa
 // variante" va dentro del filtro de un solo updateOne: MongoDB evalúa el filtro y aplica el cambio
 // sobre el documento sin que otro pedido se meta en el medio. Si 20 pedidos llegan juntos, solo el
 // primero encuentra el documento sin la variante; para los demás el filtro ya no coincide.
@@ -184,7 +184,7 @@ func (r *Repositorio) ListarProductos(ctx context.Context, f modelo.FiltroProduc
 	return productos, total, nil
 }
 
-// ActualizarProducto es un PUT con control optimista de concurrencia (PROYECTO.md 5.9, caso
+// ActualizarProducto es un PUT con control optimista de concurrencia (DISENO.md 5.9, caso
 // secundario): el filtro incluye la versión que leyó el administrador. Si otro cambio se coló, la
 // versión guardada ya es otra, el filtro no coincide y no se pisa nada. findOneAndUpdate devuelve el
 // documento ya actualizado en la misma operación.

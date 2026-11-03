@@ -158,7 +158,7 @@ func armarVariantes(productoID string, nuevas []NuevaVariante) ([]modelo.Variant
 
 // ---------- Variantes ----------
 
-// AgregarVariante suma una variante a un producto existente (PROYECTO.md 5.9). Lee el producto
+// AgregarVariante suma una variante a un producto existente (DISENO.md 5.9). Lee el producto
 // solo para validar el talle contra su sistema; la regla de no duplicar la decide la base, en la
 // misma operación que escribe.
 func (s *Servicio) AgregarVariante(ctx context.Context, productoID string, nv NuevaVariante) (modelo.Variante, error) {
@@ -232,7 +232,7 @@ func limpiarVariante(nv NuevaVariante) NuevaVariante {
 	return NuevaVariante{Talle: strings.ToUpper(strings.TrimSpace(nv.Talle)), Color: strings.TrimSpace(nv.Color)}
 }
 
-// validarNuevo junta todos los problemas y los devuelve juntos (PROYECTO.md 5.6).
+// validarNuevo junta todos los problemas y los devuelve juntos (DISENO.md 5.6).
 func (s *Servicio) validarNuevo(ctx context.Context, n NuevoProducto) error {
 	v := &modelo.ErrorValidacion{}
 	if err := s.validarDatos(ctx, v, n.DatosProducto); err != nil {

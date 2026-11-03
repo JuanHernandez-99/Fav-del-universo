@@ -1,32 +1,33 @@
-"""Prueba de concurrencia del caso de consistencia (PROYECTO.md 5.9).
+"""Prueba de concurrencia del caso de consistencia (DISENO.md 5.9).
 
 20 pedidos simultáneos intentan agregar la misma variante (S / Blanco) a un producto nuevo.
 Resultado esperado: exactamente un 201, diecinueve 409, el producto con una sola variante S / Blanco
-y la versión subida una sola vez. El resultado se guarda en evidencia/concurrencia_variante.txt.
+y la versión subida una sola vez.
 
-Uso, con la API levantada (solo usa la biblioteca estándar de Python):
-  python pruebas/concurrencia_variante.py [url_base]      # por defecto http://localhost:8085
+Uso, con FAV levantado (solo usa la biblioteca estándar de Python). Entra por el gateway, con la clave
+de administración (ADMIN_API_KEY):
+  python services/catalogo/pruebas/concurrencia_variante.py [url_base]   # por defecto http://localhost:8080/catalogo
 """
 
 import json
+import os
 import sys
 import threading
 import urllib.error
 import urllib.request
 from collections import Counter
 from datetime import datetime
-from pathlib import Path
 
-BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8085"
+BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8080/catalogo"
+CLAVE_ADMIN = os.environ.get("ADMIN_API_KEY", "clave-admin-local")
 PEDIDOS = 20
 VARIANTE = {"talle": "S", "color": "Blanco"}
-EVIDENCIA = Path(__file__).resolve().parent.parent / "evidencia" / "concurrencia_variante.txt"
 
 
 def pedir(metodo, ruta, cuerpo=None):
     datos = json.dumps(cuerpo).encode("utf-8") if cuerpo is not None else None
     pedido = urllib.request.Request(BASE + ruta, data=datos, method=metodo,
-                                    headers={"Content-Type": "application/json"})
+                                    headers={"Content-Type": "application/json", "X-Admin-Key": CLAVE_ADMIN})
     try:
         with urllib.request.urlopen(pedido, timeout=10) as r:
             return r.status, json.loads(r.read() or b"null")
@@ -35,11 +36,9 @@ def pedir(metodo, ruta, cuerpo=None):
 
 
 def main():
-    lineas = []
 
     def anotar(texto=""):
         print(texto)
-        lineas.append(texto)
 
     # 1. Un producto nuevo, que nace con una sola variante (M / Blanco).
     estado, producto = pedir("POST", "/v1/admin/productos", {
@@ -89,9 +88,6 @@ def main():
     resultado = "RESULTADO: OK" if all(chequeos.values()) else "RESULTADO: FALLA"
     anotar(resultado)
 
-    EVIDENCIA.parent.mkdir(exist_ok=True)
-    EVIDENCIA.write_text("\n".join(lineas) + "\n", encoding="utf-8")
-    print(f"(guardado en {EVIDENCIA})")
     sys.exit(0 if all(chequeos.values()) else 1)
 
 

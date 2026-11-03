@@ -4,7 +4,7 @@
 # `mongoimport --drop` porque eso borraría también los índices que crea 01.
 #
 # CARGA=completa (por defecto): los 2 productos del contrato + el volumen del TP + promociones.
-# CARGA=minimo: solo categorías y los 2 productos del contrato, lo que usa FAV (PROYECTO.md sección 8).
+# CARGA=minimo: solo categorías y los 2 productos del contrato, lo que usa FAV (DISENO.md sección 8).
 set -eu
 
 CARGA="${CARGA:-completa}"

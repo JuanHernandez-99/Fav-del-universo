@@ -197,7 +197,7 @@ func (h *Handler) crearProducto(w http.ResponseWriter, r *http.Request) {
 	escribirJSON(w, http.StatusCreated, productoAJSON(p))
 }
 
-// agregarVariante es la operación atómica de PROYECTO.md 5.9: 201 si se agregó, 409 si el
+// agregarVariante es la operación atómica de DISENO.md 5.9: 201 si se agregó, 409 si el
 // producto ya tenía ese talle y color, 404 si el producto no existe.
 func (h *Handler) agregarVariante(w http.ResponseWriter, r *http.Request) {
 	var pedido struct {

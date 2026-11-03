@@ -1,6 +1,6 @@
 package modelo
 
-// Orden del listado de productos. Siempre se desempata por _id (PROYECTO.md sección 7).
+// Orden del listado de productos. Siempre se desempata por _id (DISENO.md sección 7).
 type Orden string
 
 const (

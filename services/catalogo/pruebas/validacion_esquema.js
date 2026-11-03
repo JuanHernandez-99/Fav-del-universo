@@ -1,5 +1,6 @@
 // Prueba de la validación de esquema ($jsonSchema): cada inserción inválida tiene que ser rechazada.
-// Uso: docker compose exec -T mongo-catalogo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin catalogo --file /pruebas/validacion_esquema.js'
+// Uso, desde la raíz del repo:
+//   docker compose exec -T mongo-catalogo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin catalogo' < services/catalogo/pruebas/validacion_esquema.js
 const base = { _id: "prod-x", nombre: "X", categoria: "remeras", sistemaTalles: "LETRAS", precioBase: { monto: NumberLong("100"), moneda: "ARS" }, publicado: false, variantes: [{ id: "var-x-b-m", talle: "M", color: "B" }], creadoEn: new Date(), actualizadoEn: new Date(), version: 1 };
 const casos = {
   "precio decimal": { ...base, precioBase: { monto: 15.5, moneda: "ARS" } },

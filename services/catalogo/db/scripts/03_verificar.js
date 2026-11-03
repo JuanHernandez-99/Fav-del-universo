@@ -1,4 +1,4 @@
-// 03 · Verifica cantidades y consistencia básica de los datos cargados (PROYECTO.md sección 8).
+// 03 · Verifica cantidades y consistencia básica de los datos cargados (DISENO.md sección 8).
 // Cada chequeo es una consulta. Si alguno falla, termina con código 1 y el cargador falla.
 // Uso: mongosh -u ... -p ... --authenticationDatabase admin catalogo --file 03_verificar.js
 

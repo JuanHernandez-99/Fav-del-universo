@@ -1,8 +1,8 @@
-// Las 10 consultas del TP (consigna 5.3 y PROYECTO.md sección 6), más una extra de búsqueda de texto.
+// Las 10 consultas del TP (consigna 5.3 y DISENO.md sección 6), más una extra de búsqueda de texto.
 // Cada una responde una pregunta del dominio y tiene objetivo, comando y resultado esperado.
 //
-// Uso (desde tp-mongo/, con los datos cargados por el cargador):
-//   docker compose exec mongo-catalogo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin catalogo --file /consultas/consultas.js'
+// Uso, desde la raíz del repo, con los datos de volumen cargados (CARGA=completa):
+//   docker compose exec -T mongo-catalogo sh -c 'mongosh --quiet -u "$MONGO_INITDB_ROOT_USERNAME" -p "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin catalogo' < services/catalogo/db/consultas.js
 //
 // Convenciones:
 // - Los montos se guardan en centavos (D13): 10.000 pesos se escribe 1000000. Para leer más fácil,
@@ -138,7 +138,7 @@ mostrar(
 // ---------------------------------------------------------------------------------------------
 // Consulta 7 · Pipeline de agregación ($lookup, $addFields, $project)
 // Pregunta: ¿cuál es el precio vigente de cada producto, con su promoción?
-// Objetivo: el cálculo de PROYECTO.md 5.7 hecho en la base. Por cada producto busca en
+// Objetivo: el cálculo de DISENO.md 5.7 hecho en la base. Por cada producto busca en
 // "promociones" las vigentes que lo alcanzan (por id, por categoría o a toda la tienda) y que
 // valen para el medio de pago; se queda con la de mayor porcentaje (no se acumulan, D3) y trunca
 // a centavos enteros (D5).

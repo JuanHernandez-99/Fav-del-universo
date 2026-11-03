@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Errores de negocio. El handler los traduce a códigos HTTP (PROYECTO.md sección 7).
+// Errores de negocio. El handler los traduce a códigos HTTP (DISENO.md sección 7).
 var (
 	ErrProductoNoEncontrado = errors.New("producto no encontrado")
 	ErrVarianteDuplicada    = errors.New("ya existe una variante con ese id")

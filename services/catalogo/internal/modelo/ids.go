@@ -17,8 +17,8 @@ const LargoMaximoID = 100
 var noAlfanumerico = regexp.MustCompile(`[^a-z0-9]+`)
 
 // Normalizar deja minúsculas sin acentos (la ñ queda n) y cambia todo lo que no sea letra o número
-// por '-' (PROYECTO.md 5.5 y sección 14, punto 11). Tiene que dar lo mismo que `normalizar` de
-// tp-mongo/datos/generar.py: NFD separa la letra de su acento y después se quitan los acentos.
+// por '-' (DISENO.md 5.5 y sección 14, punto 11). Tiene que dar lo mismo que `normalizar` de
+// db/datos/generar.py: NFD separa la letra de su acento y después se quitan los acentos.
 func Normalizar(texto string) string {
 	sinAcentos, _, _ := transform.String(
 		transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn))), strings.ToLower(texto))
