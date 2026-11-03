@@ -31,6 +31,9 @@ type Repositorio interface {
 	Despublicar(ctx context.Context, id string, ahora time.Time) error
 	// ListarProductos devuelve la página pedida y el total que cumple el filtro.
 	ListarProductos(ctx context.Context, f modelo.FiltroProductos) ([]modelo.Producto, int64, error)
+	// ObtenerVariantes devuelve las variantes que existan entre esos ids, con los datos de su
+	// producto y sin filtrar por publicado. Sin orden garantizado.
+	ObtenerVariantes(ctx context.Context, ids []string) ([]modelo.DetalleVariante, error)
 }
 
 type Servicio struct {

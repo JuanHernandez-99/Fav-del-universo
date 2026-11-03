@@ -2,13 +2,14 @@
 
 Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, categorías, precios base, promociones y publicación. Calcula el **precio vigente**.
 
-> Estado: **CRUD de productos implementado** (TP de MongoDB). Quedan para la etapa FAV el precio vigente, la consulta por lote, las promociones por API y lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
+> Estado: **CRUD de productos y consulta por lote implementados**. Quedan el precio vigente con promociones (hoy el lote devuelve el precio base), las promociones por API y lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
 
 ## Qué hay hoy
 
 | | |
 |---|---|
 | **API** | CRUD de productos bajo `/v1/admin/productos`, publicar, agregar variante (operación atómica) y listado con filtros, orden y paginación. Sondas `/healthz` y `/readyz` |
+| **Consulta por lote** | `GET /v1/variantes?variantes=a,b,c` (hasta 200 ids), para Ventas. Detalle en `tp-mongo/api/openapi.yaml` |
 | **Código** | Go, en capas `handler` → `service` → `repository` (único que habla con MongoDB). Sin estado en memoria |
 | **Base** | MongoDB con tres colecciones (`productos`, `categorias`, `promociones`), índices y validación de esquema |
 | **Documentación** | Especificación en `tp-mongo/api/openapi.yaml` y decisiones en `tp-mongo/PROYECTO.md` |

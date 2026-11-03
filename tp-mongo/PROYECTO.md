@@ -351,7 +351,7 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | `POST /v1/admin/productos/{id}/publicar` | Publicar |
 | `GET /v1/admin/productos` | Listar con filtros: `categoria`, `talle`, `color`, `precioMin`, `precioMax`, `q`, `publicado`, `orden`, `pagina`, `tamano`. Orden siempre desempatado por `_id` para que la paginación no repita ni saltee resultados |
 | `POST /v1/admin/productos/{id}/variantes` | Agregar una variante (operación atómica de 5.9) |
-| *(Recortado del TP, etapa FAV, sección 15)* `GET /v1/variantes?variantes=a,b,c` | **Consulta por lote** (Ventas y panel): de 1 a 200 ids separados por coma, y la respuesta va en `{"items": [...]}`, igual que `GET /v1/stock?variantes=…` de Inventario. Por variante devuelve `productoId`, `nombre`, `categoria`, `talle`, `color`, `publicado` y precio vigente (`medioPago` opcional, por defecto `TRANSFERENCIA`). No filtra por `publicado` |
+| `GET /v1/variantes?variantes=a,b,c` | **Consulta por lote** *(implementada en la etapa FAV; `precio` es hoy el precio base)* (Ventas y panel): de 1 a 200 ids separados por coma, y la respuesta va en `{"items": [...]}`, igual que `GET /v1/stock?variantes=…` de Inventario. Por variante devuelve `productoId`, `nombre`, `categoria`, `talle`, `color`, `publicado` y precio vigente (`medioPago` opcional, por defecto `TRANSFERENCIA`). No filtra por `publicado` |
 | *(Recortado del TP, etapa FAV, sección 15)* `POST /v1/promociones`, `PUT /v1/promociones/{id}`, `GET /v1/promociones` | Gestionar promociones |
 | `GET /healthz`, `GET /readyz` | Sondas. La segunda verifica la conexión a MongoDB |
 

@@ -216,6 +216,52 @@ paths:
                 detail: Ya existe una variante con ese talle y color, o con el mismo id.
                 codigo: VARIANTE_DUPLICADA
 
+  /v1/variantes:
+    get:
+      tags: [Variantes]
+      summary: Consulta por lote (Ventas y panel)
+      description: |
+        Datos de varias variantes y de su producto, con el precio que se cobra. Lo usa Ventas al crear una venta.
+
+        - De 1 a 200 ids separados por coma. Los repetidos se responden una vez, en el orden pedido.
+        - No filtra por `publicado`: cada ítem lo informa y quien llama decide. Ventas rechaza los no publicados en la compra online y en los pedidos públicos.
+        - Si algún id no existe: `400 VARIANTE_INEXISTENTE`, con la lista de los que faltan.
+        - `precio` está en pesos. Hoy es el precio base; el precio con promociones se suma sin cambiar el formato.
+      parameters:
+        - name: variantes
+          in: query
+          required: true
+          description: "Ids de variante separados por coma. Ej.: var-remera-basica-blanca-m,var-jean-mom-celeste-38"
+          schema: { type: string }
+        - name: medioPago
+          in: query
+          description: "Medio de pago para el precio. Por defecto TRANSFERENCIA (D4)."
+          schema: { type: string, enum: [EFECTIVO, TRANSFERENCIA, MERCADO_PAGO], default: TRANSFERENCIA }
+      responses:
+        "200":
+          description: Una entrada por variante pedida.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/DetalleVariante" } }
+              example:
+                items:
+                  - { varianteId: var-remera-basica-blanca-m, productoId: prod-remera-basica, nombre: Remera básica, categoria: remeras, talle: M, color: Blanco, publicado: true, precio: 15000 }
+        "400":
+          description: Pedido inválido (`PEDIDO_INVALIDO`) o alguna variante no existe (`VARIANTE_INEXISTENTE`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+              example:
+                type: https://fav.example/errores/variante-inexistente
+                title: Variante inexistente
+                status: 400
+                detail: No existen las variantes indicadas en variantes.
+                codigo: VARIANTE_INEXISTENTE
+                variantes: [var-nada]
+
   /healthz:
     get:
       tags: [Sondas]
@@ -349,6 +395,17 @@ components:
         creadoEn: { type: string, format: date-time }
         actualizadoEn: { type: string, format: date-time }
         version: { type: integer, description: Empieza en 1 y sube con cada cambio. }
+    DetalleVariante:
+      type: object
+      properties:
+        varianteId: { type: string, example: var-remera-basica-blanca-m }
+        productoId: { type: string, example: prod-remera-basica }
+        nombre: { type: string, example: Remera básica }
+        categoria: { type: string, example: remeras }
+        talle: { type: string, example: M }
+        color: { type: string, example: Blanco }
+        publicado: { type: boolean }
+        precio: { type: number, description: "Precio que se cobra, en pesos.", example: 15000 }
     Pagina:
       type: object
       properties:
@@ -368,7 +425,7 @@ components:
         detail: { type: string }
         codigo:
           type: string
-          enum: [PEDIDO_INVALIDO, PRODUCTO_NO_ENCONTRADO, VARIANTE_DUPLICADA, CONFLICTO_DE_VERSION, NO_DISPONIBLE, ERROR_INTERNO]
+          enum: [PEDIDO_INVALIDO, PRODUCTO_NO_ENCONTRADO, VARIANTE_INEXISTENTE, VARIANTE_DUPLICADA, CONFLICTO_DE_VERSION, NO_DISPONIBLE, ERROR_INTERNO]
         errores:
           type: array
           items:
@@ -376,3 +433,7 @@ components:
             properties:
               campo: { type: string }
               mensaje: { type: string }
+        variantes:
+          type: array
+          description: Ids que no existen (solo en VARIANTE_INEXISTENTE).
+          items: { type: string }

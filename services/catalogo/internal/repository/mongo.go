@@ -289,3 +289,37 @@ func (r *Repositorio) InsertarProducto(ctx context.Context, p modelo.Producto) e
 	}
 	return err
 }
+
+// ObtenerVariantes busca por lote las variantes con esos ids y las devuelve junto con los datos de su
+// producto. Usa el índice multikey variantes_id_unico en el primer $match; el segundo, después del
+// $unwind, deja solo las variantes pedidas y no las demás del mismo producto. No filtra por publicado
+// (D6): el que llama decide. Devuelve solo las que existen y en cualquier orden; el servicio detecta
+// las que faltan.
+func (r *Repositorio) ObtenerVariantes(ctx context.Context, ids []string) ([]modelo.DetalleVariante, error) {
+	enLista := bson.D{{Key: "variantes.id", Value: bson.D{{Key: "$in", Value: ids}}}}
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: enLista}},
+		{{Key: "$unwind", Value: "$variantes"}},
+		{{Key: "$match", Value: enLista}},
+		{{Key: "$project", Value: bson.D{
+			{Key: "_id", Value: 0},
+			{Key: "productoId", Value: "$_id"},
+			{Key: "nombre", Value: 1},
+			{Key: "categoria", Value: 1},
+			{Key: "publicado", Value: 1},
+			{Key: "precioBase", Value: 1},
+			{Key: "varianteId", Value: "$variantes.id"},
+			{Key: "talle", Value: "$variantes.talle"},
+			{Key: "color", Value: "$variantes.color"},
+		}}},
+	}
+	cursor, err := r.productos.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	var detalles []modelo.DetalleVariante
+	if err := cursor.All(ctx, &detalles); err != nil {
+		return nil, err
+	}
+	return detalles, nil
+}

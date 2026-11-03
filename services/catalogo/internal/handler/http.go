@@ -40,6 +40,9 @@ func NuevoRouter(s *service.Servicio) http.Handler {
 	mux.HandleFunc("POST /v1/admin/productos/{id}/publicar", h.publicarProducto)
 	mux.HandleFunc("POST /v1/admin/productos/{id}/variantes", h.agregarVariante)
 
+	// Consulta por lote: la usan Ventas (precio y datos de la variante) y el panel.
+	mux.HandleFunc("GET /v1/variantes", h.consultarVariantes)
+
 	return mux
 }
 
@@ -361,6 +364,54 @@ func responderProducto(w http.ResponseWriter, r *http.Request, p modelo.Producto
 	escribirJSON(w, http.StatusOK, productoAJSON(p))
 }
 
+// ---------- Consulta por lote ----------
+
+// detalleVarianteJSON es una variante con los datos de su producto. El precio va en pesos con 2
+// decimales, como el contrato, y es el que se cobra (hoy el precio base, ver service.precioVigente).
+type detalleVarianteJSON struct {
+	VarianteID string  `json:"varianteId"`
+	ProductoID string  `json:"productoId"`
+	Nombre     string  `json:"nombre"`
+	Categoria  string  `json:"categoria"`
+	Talle      string  `json:"talle"`
+	Color      string  `json:"color"`
+	Publicado  bool    `json:"publicado"`
+	Precio     float64 `json:"precio"`
+}
+
+// consultarVariantes atiende GET /v1/variantes?variantes=a,b,c[&medioPago=EFECTIVO]. Rechaza los
+// parámetros desconocidos, igual que el listado. El rango de ids y el medio de pago los valida el servicio.
+func (h *Handler) consultarVariantes(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	v := &modelo.ErrorValidacion{}
+	for _, nombre := range slices.Sorted(maps.Keys(q)) {
+		if nombre != "variantes" && nombre != "medioPago" {
+			v.Agregar(nombre, "parámetro desconocido")
+		}
+	}
+	if err := v.ComoError(); err != nil {
+		escribirError(w, r, err)
+		return
+	}
+
+	var ids []string
+	if lista := q.Get("variantes"); lista != "" {
+		ids = strings.Split(lista, ",")
+	}
+	detalles, err := h.s.ConsultarVariantes(r.Context(), ids, strings.ToUpper(strings.TrimSpace(q.Get("medioPago"))))
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	items := make([]detalleVarianteJSON, len(detalles))
+	for i, d := range detalles {
+		items[i] = detalleVarianteJSON{d.VarianteID, d.ProductoID, d.Nombre, d.Categoria, d.Talle, d.Color, d.Publicado, pesos(d.Precio)}
+	}
+	escribirJSON(w, http.StatusOK, struct {
+		Items []detalleVarianteJSON `json:"items"`
+	}{items})
+}
+
 // ---------- Sondas ----------
 
 func (h *Handler) listo(w http.ResponseWriter, r *http.Request) {
@@ -401,15 +452,22 @@ type problema struct {
 	Detail  string                 `json:"detail,omitempty"`
 	Codigo  string                 `json:"codigo"`
 	Errores []modelo.CampoInvalido `json:"errores,omitempty"`
+	// Variantes lista los ids que no existen (VARIANTE_INEXISTENTE).
+	Variantes []string `json:"variantes,omitempty"`
 }
 
 func escribirError(w http.ResponseWriter, r *http.Request, err error) {
 	p := problema{Detail: err.Error()}
 	var validacion *modelo.ErrorValidacion
+	var inexistentes *modelo.ErrVariantesInexistentes
 	switch {
 	case errors.As(err, &validacion):
 		p.Status, p.Codigo, p.Title, p.Errores = 400, "PEDIDO_INVALIDO", "Pedido inválido", validacion.Campos
 		p.Detail = "Revisar los campos indicados en errores."
+	case errors.As(err, &inexistentes):
+		// 400 y no 404: así lo pide el contrato para el lote, que es lo que va a consumir Ventas (D15).
+		p.Status, p.Codigo, p.Title, p.Variantes = 400, "VARIANTE_INEXISTENTE", "Variante inexistente", inexistentes.IDs
+		p.Detail = "No existen las variantes indicadas en variantes."
 	case errors.Is(err, modelo.ErrVarianteDuplicada):
 		p.Status, p.Codigo, p.Title = 409, "VARIANTE_DUPLICADA", "Variante duplicada"
 		p.Detail = "Ya existe una variante con ese talle y color, o con el mismo id."

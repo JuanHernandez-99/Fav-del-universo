@@ -45,3 +45,13 @@ func (e *ErrorValidacion) ComoError() error {
 	}
 	return e
 }
+
+// ErrVariantesInexistentes lista los ids pedidos por lote que no existen, en el orden en que se
+// pidieron. El handler lo traduce a 400 VARIANTE_INEXISTENTE, como pide el contrato (D15).
+type ErrVariantesInexistentes struct {
+	IDs []string
+}
+
+func (e *ErrVariantesInexistentes) Error() string {
+	return "variantes inexistentes: " + strings.Join(e.IDs, ", ")
+}

@@ -56,3 +56,27 @@ type Variante struct {
 	Talle string `bson:"talle"`
 	Color string `bson:"color"`
 }
+
+// DetalleVariante es una variante junto con los datos de su producto: lo que Ventas y el panel
+// piden por lote (PROYECTO.md sección 7). Los tags bson son los de la proyección del repositorio.
+type DetalleVariante struct {
+	VarianteID string `bson:"varianteId"`
+	ProductoID string `bson:"productoId"`
+	Nombre     string `bson:"nombre"`
+	Categoria  string `bson:"categoria"`
+	Talle      string `bson:"talle"`
+	Color      string `bson:"color"`
+	Publicado  bool   `bson:"publicado"`
+	PrecioBase Precio `bson:"precioBase"`
+	// Precio es el que se cobra, en centavos. Lo calcula el servicio; no viene de la base.
+	Precio int64 `bson:"-"`
+}
+
+// MaximoVariantesPorLote acota la consulta por lote: Ventas arma pedidos de a lo sumo 20 variantes y
+// el panel pide una página de variantes a la vez.
+const MaximoVariantesPorLote = 200
+
+// MediosDePago son los de RN-18. Si el pedido no indica uno vale MedioPagoPorDefecto (D4).
+var MediosDePago = []string{"EFECTIVO", "TRANSFERENCIA", "MERCADO_PAGO"}
+
+const MedioPagoPorDefecto = "TRANSFERENCIA"
