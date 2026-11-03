@@ -33,7 +33,7 @@ Los cuatro servicios tienen problemas de distinta naturaleza (ARCHITECTURE §4):
 | -------------- | ----------------------------------------- | ---------------- |
 | **Inventario** | Hexagonal (puertos y adaptadores)         | **Implementado** |
 | **Ventas**     | Hexagonal                                 | _Previsto_       |
-| **Catálogo**   | Capas: Handler → Service → Repository     | _Previsto_       |
+| **Catálogo**   | Capas: Handler → Service → Repository     | **Implementado en parte** |
 | **Usuarios**   | Capas                                     | _Previsto_       |
 
 Las razones de cada estilo están en ARCHITECTURE §4. Este ADR registra cómo quedó aplicado en Inventario, que es el único servicio real de esta entrega.

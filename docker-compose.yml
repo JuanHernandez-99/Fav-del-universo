@@ -1,7 +1,7 @@
 # Arranque local con un solo comando:   docker compose up --build
 # Funciona sin .env (usa valores de prueba). Para cambiarlos: cp .env.example .env
 #
-# Entrega 2: Inventario es el servicio real (dos réplicas detrás del gateway). Catálogo, Ventas
+# Inventario y Catálogo son servicios reales (dos réplicas cada uno, detrás del gateway). Ventas
 # y el gimnasio están simulados. Lo que todavía no se usa queda en el perfil `completo`:
 #   docker compose --profile completo up
 #
@@ -46,6 +46,49 @@ services:
       timeout: 5s
       retries: 20
 
+  # ---------- Catálogo (real) ----------
+  catalogo:
+    build: ./services/catalogo
+    deploy: { replicas: 2 } # ADR-012
+    environment:
+      MONGO_HOST: mongo-catalogo:27017
+      MONGO_DB: ${MONGO_DB:-catalogo}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
+    depends_on:
+      mongo-catalogo: { condition: service_healthy }
+      catalogo-init: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  # Prepara la base al levantar: esquema e índices siempre; datos de ejemplo solo si está vacía.
+  # CATALOGO_CARGA=completa suma el volumen de prueba; CATALOGO_RECARGAR=true vacía y recarga.
+  catalogo-init:
+    image: mongo:7
+    entrypoint: ["sh", "/scripts/cargar.sh"]
+    environment:
+      MONGO_DB: ${MONGO_DB:-catalogo}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
+      CARGA: ${CATALOGO_CARGA:-minimo}
+      RECARGAR: ${CATALOGO_RECARGAR:-false}
+    volumes:
+      - ./services/catalogo/db/scripts:/scripts:ro
+      - ./services/catalogo/db/datos:/datos:ro
+    depends_on:
+      mongo-catalogo: { condition: service_healthy }
+
+  mongo-catalogo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
+    volumes: [mongo-catalogo-data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ---------- Gateway ----------
   gateway:
     image: nginx:1.28-alpine
@@ -56,7 +99,7 @@ services:
     volumes:
       - ./gateway/templates:/etc/nginx/templates:ro
     ports: ["8080:8080"]
-    depends_on: [inventario, catalogo-ventas-mock]
+    depends_on: [inventario, catalogo, catalogo-ventas-mock]
 
   # ---------- Dependencias simuladas ----------
   # Catálogo y Ventas: atiende la capacidad publicada y aparta el stock en Inventario.
@@ -86,19 +129,6 @@ services:
     ports: ["9090:9090"]
 
   # ---------- Previsto (perfil `completo`) ----------
-  mongo-catalogo:
-    profiles: [completo]
-    image: mongo:7
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
-    volumes: [mongo-catalogo-data:/data/db]
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   mysql-ventas:
     profiles: [completo]
     image: mysql:8.4

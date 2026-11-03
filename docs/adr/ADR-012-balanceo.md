@@ -31,7 +31,7 @@ Ya existe un API Gateway con nginx (autenticación por clave, límite por grupo,
 
 | Aspecto | Valor |
 |---|---|
-| Réplicas de Inventario | 2 |
+| Réplicas | Inventario: 2. Catálogo: 2, con el mismo mecanismo (`upstream catalogo`) |
 | Algoritmo | Round robin (por turnos) |
 | Descubrimiento | DNS de Docker (`resolver 127.0.0.11 valid=5s` y `resolve` en el upstream): una réplica con IP nueva entra sin reiniciar nginx |
 | Detección de fallas | Pasiva: 2 fallas en 10 s sacan a la réplica del balanceo durante 10 s (`max_fails=2 fail_timeout=10s`) |
@@ -83,7 +83,6 @@ El mock de Ventas llama a Inventario por el gateway (puerto interno 8081, sin pu
 ## Pendientes
 
 - **Chequeo activo** de `/readyz` **[?]**: con `healthcheck` en Docker Compose o con otra herramienta, si las pruebas de caída muestran que el chequeo pasivo no alcanza (ADR-010).
-- **Replicar Catálogo** cuando deje de ser un mock.
 - **Un algoritmo que mire la carga en lugar de round robin**, por ejemplo `least_conn` (cada pedido va a la réplica con menos conexiones activas). Round robin reparte por turnos sin saber si una réplica está ocupada con pedidos lentos. Se evalúa con las pruebas de carga (ADR-013).
 - **Cantidad de réplicas** según las pruebas de carga (ADR-013).
 - **Gateway redundante** en el despliegue con URL pública **[?]**.

@@ -28,7 +28,10 @@ const cantidades = {
 const variantes = db.productos.aggregate([{ $unwind: "$variantes" }, { $count: "n" }]).toArray()[0]?.n ?? 0;
 const total = cantidades.categorias + cantidades.productos + cantidades.promociones;
 print(`documentos: ${JSON.stringify(cantidades)} · total ${total} · variantes ${variantes}`);
-chequear("al menos 100 documentos (consigna 5.2)", total >= 100 ? [] : [`hay ${total}`]);
+// El volumen solo se exige con la carga completa; la mínima (la de FAV) son 15 documentos.
+if (process.env.CARGA !== "minimo") {
+  chequear("al menos 100 documentos", total >= 100 ? [] : [`hay ${total}`]);
+}
 
 // Productos
 const categorias = db.categorias.distinct("_id");

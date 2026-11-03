@@ -4,6 +4,7 @@
 go 1.26.0
 
 use (
+	./services/catalogo
 	./services/inventario
 	./mocks/catalogo-ventas
 )

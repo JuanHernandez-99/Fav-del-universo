@@ -7,7 +7,7 @@ Juan Hernandez - 2325917
 
 Sistema de venta online y control de stock para **FAV**, una tienda de indumentaria femenina que hoy vende solo en el local y lleva el stock en un Excel. Es también el Trabajo Práctico Integrador de **Arquitectura de Software 2026**.
 
-> **Estado: Entrega 2.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). Catálogo y Ventas están simulados con un mock y Usuarios y el frontend todavía no existen. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
+> **Estado: Entrega 2.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). **Catálogo** funciona en parte (2 réplicas con MongoDB: productos y consulta por lote de variantes). Ventas está simulado con un mock y Usuarios y el frontend todavía no existen. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: parte del diseño, todavía no implementado.
 
@@ -77,7 +77,7 @@ Con Docker, desde la raíz:
 docker compose up --build
 ```
 
-No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas), su MySQL con stock de ejemplo, el gateway, los mocks de Catálogo/Ventas y del gimnasio, Jaeger y Prometheus.
+No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) y su MongoDB con los productos de ejemplo, el gateway, los mocks de Catálogo/Ventas (capacidad publicada) y del gimnasio, Jaeger y Prometheus.
 
 | Qué | Dónde |
 |---|---|
@@ -85,7 +85,7 @@ No hace falta crear un `.env`: todas las variables tienen valores por defecto pa
 | Jaeger (trazas) | http://localhost:16686 |
 | Prometheus (métricas) | http://localhost:9090 |
 
-Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/README.md). Perfil con el resto de la infraestructura (MongoDB, MySQL de Ventas y Usuarios, RabbitMQ): `docker compose --profile completo up`.
+Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/README.md). Catálogo: [`services/catalogo/README.md`](services/catalogo/README.md). Perfil con el resto de la infraestructura (MySQL de Ventas y Usuarios, RabbitMQ): `docker compose --profile completo up`.
 
 ## Estructura del repositorio
 

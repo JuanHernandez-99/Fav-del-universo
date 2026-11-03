@@ -1,6 +1,6 @@
 # API Gateway (nginx). La imagen oficial reemplaza las ${VARIABLES} al arrancar.
-# Entrega 2: rutea la capacidad publicada al mock de Catálogo y Ventas, y las rutas de
-# administración a las réplicas de Inventario, con balanceo y verificación de disponibilidad (ADR-012).
+# Rutea la capacidad publicada al mock de Catálogo y Ventas, y las rutas de administración a las
+# réplicas de Inventario y de Catálogo, con balanceo y verificación de disponibilidad (ADR-012).
 
 # DNS interno de Docker. `resolve` en cada upstream vuelve a consultarlo cada 5 s,
 # así una réplica nueva o reiniciada (con otra IP) entra al balanceo sin reiniciar nginx.
@@ -11,6 +11,13 @@ upstream inventario {
     # Round robin entre todas las IPs del nombre `inventario` (una por réplica).
     # Una réplica que falla 2 veces en 10 s queda fuera 10 s (verificación pasiva).
     server inventario:8080 resolve max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
+
+# Catálogo: mismo criterio que Inventario.
+upstream catalogo {
+    zone catalogo 64k;
+    server catalogo:8080 resolve max_fails=2 fail_timeout=10s;
     keepalive 16;
 }
 
@@ -89,14 +96,29 @@ server {
         proxy_pass http://inventario/;
     }
 
+    # Panel de administración: productos y variantes de Catálogo.
+    location /catalogo/ {
+        if ($admin_valido = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        proxy_set_header X-User-Id "admin";
+        proxy_set_header X-User-Role "administrador";
+        proxy_pass http://catalogo/;
+    }
+
     default_type application/problem+json;
 }
 
 # ---------- Entrada interna (red de Docker, sin puerto publicado) ----------
-# Ventas llama a Inventario por acá, así sus llamadas también se reparten entre las réplicas.
+# Ventas llama a Inventario y a Catálogo por acá, así sus llamadas también se reparten entre las réplicas.
 server {
     listen 8081;
     access_log /dev/stdout json;
+
+    # Catálogo: por ejemplo, la consulta por lote GET /catalogo/v1/variantes?variantes=...
+    location /catalogo/ {
+        proxy_pass http://catalogo/;
+    }
 
     location / {
         proxy_pass http://inventario;

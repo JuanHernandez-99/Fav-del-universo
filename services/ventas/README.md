@@ -18,7 +18,7 @@ No modifica el stock: se lo pide a [Inventario](../inventario). No consulta a Us
 
 | Con | Cómo | Para qué |
 |---|---|---|
-| Ventas → Catálogo | HTTP, con timeout | Datos y precio de las variantes, por lote (`GET /v1/variantes`) |
+| Ventas → Catálogo | HTTP, con timeout | Datos y precio de las variantes, por lote: `GET http://gateway:8081/catalogo/v1/variantes?variantes=…` |
 | Ventas → Inventario | HTTP, con idempotencia | Reservar, liberar, confirmar y descontar |
 | Ventas → Mercado Pago | HTTP, con timeout y circuit breaker | Crear el pago |
 | Mercado Pago → Ventas | Aviso por el gateway | Resultado del pago |
