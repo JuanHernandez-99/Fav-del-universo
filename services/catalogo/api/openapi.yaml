@@ -18,6 +18,7 @@ security:
 tags:
   - name: Productos
   - name: Variantes
+  - name: Promociones
   - name: Sondas
 
 paths:
@@ -228,6 +229,68 @@ paths:
       responses:
         "200":
           description: Catálogo publicado. Ver el esquema `Catalogo` del contrato.
+  /v1/promociones:
+    get:
+      tags: [Promociones]
+      summary: Listar todas, vencidas incluidas
+      responses:
+        "200":
+          description: Las más recientes primero, dentro de `items`. Sin paginar.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Promocion" } }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+    post:
+      tags: [Promociones]
+      summary: Crear una promoción
+      description: |
+        El servidor genera el id. Inicio y fin son obligatorios (HU-05.2). No se acumulan: si aplican varias, gana la de mayor porcentaje.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PromocionNueva" }
+            example:
+              nombre: Verano en remeras
+              tipo: PORCENTAJE
+              porcentaje: 20
+              medioPago: null
+              vigencia: { desde: "2026-12-01T00:00:00-03:00", hasta: "2026-12-31T23:59:59-03:00" }
+              alcance: { tipo: CATEGORIA, ids: [remeras] }
+      responses:
+        "201":
+          description: Creada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Promocion" }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+  /v1/promociones/{id}:
+    put:
+      tags: [Promociones]
+      summary: Reemplazar una promoción
+      description: Una promoción se cancela o se acorta editando su vigencia; no se borra. El id no cambia.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PromocionNueva" }
+      responses:
+        "200":
+          description: Actualizada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Promocion" }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+        "404":
+          description: `PROMOCION_NO_ENCONTRADA`.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
   /v1/variantes:
     get:
       tags: [Variantes]
@@ -340,6 +403,41 @@ components:
             codigo: CONFLICTO_DE_VERSION
 
   schemas:
+    PromocionNueva:
+      type: object
+      required: [nombre, tipo, porcentaje, vigencia, alcance]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        tipo: { type: string, enum: [PORCENTAJE, MEDIO_PAGO] }
+        porcentaje: { type: integer, minimum: 1, maximum: 100 }
+        medioPago:
+          type: string
+          nullable: true
+          enum: [EFECTIVO, TRANSFERENCIA, MERCADO_PAGO, null]
+          description: Obligatorio con tipo MEDIO_PAGO; en otro caso, null o ausente.
+        vigencia:
+          type: object
+          required: [desde, hasta]
+          properties:
+            desde: { type: string, format: date-time }
+            hasta: { type: string, format: date-time }
+        alcance:
+          type: object
+          required: [tipo]
+          properties:
+            tipo: { type: string, enum: [PRODUCTO, CATEGORIA, TIENDA] }
+            ids:
+              type: array
+              items: { type: string }
+              description: Productos o categorías existentes. Vacío con TIENDA.
+    Promocion:
+      allOf:
+        - $ref: "#/components/schemas/PromocionNueva"
+        - type: object
+          required: [promocionId]
+          properties:
+            promocionId: { type: string }
     Precio:
       type: object
       required: [monto, moneda]

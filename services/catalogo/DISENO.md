@@ -270,6 +270,7 @@ Errores en `application/problem+json` con `codigo` estable, como el contrato de 
 | `VARIANTE_INEXISTENTE` | **400** en el lote · **404** en la ficha | Ver la nota debajo. `variantes` indica cuáles |
 | `VARIANTE_DUPLICADA` | 409 | El producto ya tiene una variante con ese talle y color (5.9) |
 | `CONFLICTO_DE_VERSION` | 409 | La `version` enviada no es la actual (5.9, caso secundario) |
+| `PROMOCION_NO_ENCONTRADA` | 404 | La promoción no existe |
 | `ERROR_INTERNO` | 500 | Error inesperado. El detalle va al log, no al cliente |
 
 **Nota (diferencia a propósito):** en la consulta por lote, una variante inexistente da `400`, como pide el contrato `catalogo-pedidos-v1`, porque eso es lo que va a consumir Ventas. En la ficha individual da `404`, como Inventario.
@@ -286,7 +287,7 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | `GET /v1/admin/productos` | Listar con filtros: `categoria`, `talle`, `color`, `precioMin`, `precioMax`, `q`, `publicado`, `orden`, `pagina`, `tamano`. Orden siempre desempatado por `_id` para que la paginación no repita ni saltee resultados |
 | `POST /v1/admin/productos/{id}/variantes` | Agregar una variante (operación atómica de 5.9) |
 | `GET /v1/variantes?variantes=a,b,c` | **Consulta por lote** (Ventas y panel): de 1 a 200 ids separados por coma, y la respuesta va en `{"items": [...]}`, igual que `GET /v1/stock?variantes=…` de Inventario. Por variante devuelve `productoId`, `nombre`, `categoria`, `talle`, `color`, `publicado` y precio vigente (`medioPago` opcional, por defecto `TRANSFERENCIA`). No filtra por `publicado` |
-| *(Pendiente, sección 15)* `POST /v1/promociones`, `PUT /v1/promociones/{id}`, `GET /v1/promociones` | Gestionar promociones |
+| `POST /v1/promociones`, `PUT /v1/promociones/{id}`, `GET /v1/promociones` | Gestionar promociones. El servidor genera el id (`promo-` + nombre normalizado). No hay `DELETE`: se cancela editando la vigencia (5.3) |
 | `GET /healthz`, `GET /readyz` | Sondas. La segunda verifica la conexión a MongoDB |
 
 - El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote (etapa FAV).
@@ -348,6 +349,8 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | 18 | Publicar o despublicar algo que ya estaba así | No es error y no sube la `version`: `/publicar` responde `200` con el producto y `DELETE` responde `204`. Sobre un id inexistente, los dos dan `404` |
 | 19 | Cómo se filtra el listado | `categoria`, `talle` y `color` son coincidencia exacta: el color distingue mayúsculas (`Celeste`, no `celeste`) y el talle se pasa a mayúscula. Con `talle` y `color` juntos se exige que sean **la misma variante** (`$elemMatch`). `q` busca con el índice de texto en español. `precioMin` y `precioMax` van en pesos y se comparan con el precio base (punto 7). Un parámetro desconocido da `400`, para que un error de tipeo no devuelva todo el catálogo sin avisar. Respuesta: `items`, `pagina`, `tamano`, `total` y `paginas`; `tamano` por defecto 20 y máximo 100. Órdenes: `nuevos` (por defecto), `precio_asc`, `precio_desc` y `nombre`, siempre desempatados por `_id` |
 | 20 | Producto con un nombre que ya existe | Se acepta: el id lleva un sufijo numérico (`-2`, `-3`…), según 5.5 |
+| 21 | Ids del alcance de una promoción | Tienen que existir: con un error de tipeo la promoción no se aplicaría a nada, sin avisar. **[propuesta]** |
+| 22 | Edición concurrente de una promoción | Gana la última: no lleva `version`, porque hay un solo administrador (RN-23). **[propuesta]** |
 
 Los puntos 1, 5, 6 y 8 dependen de lo que defina el equipo de FAV. Se resolvieron así y se confirman con el equipo.
 
@@ -357,7 +360,6 @@ Los puntos 1, 5, 6 y 8 dependen de lo que defina el equipo de FAV. Se resolviero
 
 Sin cambiar lo anterior:
 
-- **Gestión de promociones por API** (`/v1/promociones`). Hoy se cargan con los datos de ejemplo.
 - **Evento `VarianteCreada`** con outbox (ni se publica ni se consume hoy). Si se guarda junto con el producto en una transacción, requiere replica set.
 - **Eventos de cambio de producto** para el indexador, con la `version` ya presente, y el **motor de búsqueda** (ADR-006) en lugar del índice de texto de Mongo.
 - **Caché** con Redis (ADR-007), como capa delante del repositorio.

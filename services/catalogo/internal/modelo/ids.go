@@ -35,6 +35,15 @@ func IDProducto(nombre string, intento int) string {
 	return id
 }
 
+// IDPromocion arma el id como IDProducto: promo-verano-en-remeras, con sufijo si ya está en uso.
+func IDPromocion(nombre string, intento int) string {
+	id := "promo-" + Normalizar(nombre)
+	if intento > 1 {
+		id = fmt.Sprintf("%s-%d", id, intento)
+	}
+	return id
+}
+
 // IDVariante arma `var-<producto>-<color>-<talle>` (D12). Una vez creado no cambia nunca.
 func IDVariante(productoID, color, talle string) (string, error) {
 	id := "var-" + strings.TrimPrefix(productoID, "prod-") + "-" + Normalizar(color) + "-" + Normalizar(talle)

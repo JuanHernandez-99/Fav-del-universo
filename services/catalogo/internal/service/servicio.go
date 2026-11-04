@@ -39,6 +39,11 @@ type Repositorio interface {
 	// PromocionesVigentes devuelve las promociones vigentes en ese momento, de cualquier alcance y
 	// medio de pago. A qué producto se aplica cada una lo decide PrecioVigente.
 	PromocionesVigentes(ctx context.Context, ahora time.Time) ([]modelo.Promocion, error)
+	// InsertarPromocion deja que la base decida si el id está libre: modelo.ErrIDPromocionEnUso si no.
+	InsertarPromocion(ctx context.Context, p modelo.Promocion) error
+	// ReemplazarPromocion devuelve modelo.ErrPromocionNoEncontrada si no existe.
+	ReemplazarPromocion(ctx context.Context, p modelo.Promocion) error
+	ListarPromociones(ctx context.Context) ([]modelo.Promocion, error)
 }
 
 type Servicio struct {

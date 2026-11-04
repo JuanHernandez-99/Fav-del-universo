@@ -117,7 +117,7 @@ Los tests de integración usan la base `ventas_test`, no la del servicio.
 
 **Verificado el 04/11/2026** con el sistema levantado por Docker: compra con los dos medios, pedido externo, aviso duplicado, pago rechazado, firma inválida, cancelación, avance de estados, venta del local con físico negativo, vencimiento por RabbitMQ, mensaje inválido a la DLQ, y caídas de Mercado Pago, Inventario y RabbitMQ.
 
-**Sin probar:** la API real de Mercado Pago; `/v1/mis-compras` por el gateway (necesita el JWT); el circuit breaker abierto con el sistema levantado (solo con un test del adaptador); una compra con promoción vigente; y el reintento de mails con Mailpit caído.
+**Sin probar:** la API real de Mercado Pago; `/v1/mis-compras` por el gateway (necesita el JWT); el circuit breaker abierto con el sistema levantado (solo con un test del adaptador); y el reintento de mails con Mailpit caído.
 
 ## Configuración
 

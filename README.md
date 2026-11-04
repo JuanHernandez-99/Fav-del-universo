@@ -7,7 +7,7 @@ Juan Hernandez - 2325917
 
 Sistema de venta online y control de stock para **FAV**, una tienda de indumentaria femenina que hoy vende solo en el local y lleva el stock en un Excel. Es también el Trabajo Práctico Integrador de **Arquitectura de Software 2026**.
 
-> **Estado: Entrega 2.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). **Catálogo** funciona en parte (2 réplicas con MongoDB: productos, consulta por lote y catálogo público; faltan las promociones por API). **Ventas** funciona (con Mercado Pago simulado y mails en Mailpit, [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). Usuarios y el frontend todavía no existen. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
+> **Estado: Entrega 2.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). **Catálogo** funciona en parte (2 réplicas con MongoDB: productos, promociones, consulta por lote y catálogo público; faltan sus eventos, trazas y métricas). **Ventas** funciona (con Mercado Pago simulado y mails en Mailpit, [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). Usuarios y el frontend todavía no existen. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: parte del diseño, todavía no implementado.
 

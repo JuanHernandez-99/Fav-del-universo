@@ -8,12 +8,15 @@ import (
 
 // Errores de negocio. El handler los traduce a códigos HTTP (DISENO.md sección 7).
 var (
-	ErrProductoNoEncontrado = errors.New("producto no encontrado")
-	ErrVarianteDuplicada    = errors.New("ya existe una variante con ese id")
-	ErrConflictoDeVersion   = errors.New("el producto cambió desde que se leyó")
+	ErrProductoNoEncontrado  = errors.New("producto no encontrado")
+	ErrVarianteDuplicada     = errors.New("ya existe una variante con ese id")
+	ErrConflictoDeVersion    = errors.New("el producto cambió desde que se leyó")
+	ErrPromocionNoEncontrada = errors.New("promoción no encontrada")
 	// ErrIDProductoEnUso lo devuelve el repositorio cuando el _id ya existe; el servicio reintenta
 	// con un sufijo numérico. No llega al cliente.
 	ErrIDProductoEnUso = errors.New("el id de producto ya está en uso")
+	// ErrIDPromocionEnUso: lo mismo, para las promociones.
+	ErrIDPromocionEnUso = errors.New("el id de promoción ya está en uso")
 )
 
 // ErrorValidacion lista todos los campos que no cumplen las reglas, no solo el primero.

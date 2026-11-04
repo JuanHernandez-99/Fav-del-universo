@@ -2,13 +2,14 @@
 
 Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, categorías, precios base, promociones y publicación. Calcula el **precio vigente**.
 
-> Estado: **CRUD de productos y consulta por lote con precio vigente implementados**. También atiende la capacidad publicada (`GET /v1/productos`). Quedan las promociones por API y lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
+> Estado: **CRUD de productos y consulta por lote con precio vigente implementados**. También atiende la capacidad publicada (`GET /v1/productos`) y la gestión de promociones. Queda lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
 
 ## Qué hay hoy
 
 | | |
 |---|---|
 | **API** | CRUD de productos bajo `/v1/admin/productos`, publicar, agregar variante (operación atómica) y listado con filtros, orden y paginación. Sondas `/healthz` y `/readyz` |
+| **Promociones** | `GET`, `POST /v1/promociones` y `PUT /v1/promociones/{id}`. Por el gateway, en `/catalogo/`. Se cancela editando la vigencia |
 | **Consulta por lote** | `GET /v1/variantes?variantes=a,b,c` (hasta 200 ids), para Ventas. Detalle en `api/openapi.yaml` |
 | **Código** | Go, en capas `handler` → `service` → `repository` (único que habla con MongoDB). Sin estado en memoria |
 | **Base** | MongoDB con tres colecciones (`productos`, `categorias`, `promociones`), índices y validación de esquema |

@@ -55,6 +55,10 @@ func NuevoRouter(s *service.Servicio, opcionesRouter ...Opcion) http.Handler {
 	// Consulta por lote: la usan Ventas (precio y datos de la variante) y el panel.
 	mux.HandleFunc("GET /v1/variantes", h.consultarVariantes)
 
+	mux.HandleFunc("GET /v1/promociones", h.listarPromociones)
+	mux.HandleFunc("POST /v1/promociones", h.crearPromocion)
+	mux.HandleFunc("PUT /v1/promociones/{id}", h.actualizarPromocion)
+
 	if !o.sinCapacidadPublica {
 		mux.HandleFunc("GET /v1/productos", h.listarCatalogoPublico)
 	}
@@ -509,6 +513,9 @@ func escribirError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, modelo.ErrProductoNoEncontrado):
 		p.Status, p.Codigo, p.Title = 404, "PRODUCTO_NO_ENCONTRADO", "Producto no encontrado"
 		p.Detail = "No existe el producto " + r.PathValue("id") + "."
+	case errors.Is(err, modelo.ErrPromocionNoEncontrada):
+		p.Status, p.Codigo, p.Title = 404, "PROMOCION_NO_ENCONTRADA", "Promoción no encontrada"
+		p.Detail = "No existe la promoción " + r.PathValue("id") + "."
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		w.Header().Set("Retry-After", "1")
 		p.Status, p.Codigo, p.Title, p.Detail = 503, "NO_DISPONIBLE", "Servicio no disponible", ""

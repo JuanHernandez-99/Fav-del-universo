@@ -344,7 +344,7 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real en parte: productos y consulta por lote con precio vigente, sin gestión de promociones por API. **Ventas** es real. La capacidad publicada ya no pasa por mocks. Usuarios y el frontend no están | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote y catálogo público, sin eventos ni trazas ni métricas. **Ventas** es real. La capacidad publicada ya no pasa por mocks. Usuarios y el frontend no están | — |
 | Gateway único | Punto único de falla; la validación del JWT no está (se usa `X-Admin-Key`) | ADR-012 |
 | Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |
 | Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |

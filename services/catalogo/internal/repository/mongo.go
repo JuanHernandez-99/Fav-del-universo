@@ -345,6 +345,41 @@ func (r *Repositorio) ObtenerVariantes(ctx context.Context, ids []string) ([]mod
 	return detalles, nil
 }
 
+// InsertarPromocion inserta y deja que la base decida si el id está libre, igual que InsertarProducto.
+func (r *Repositorio) InsertarPromocion(ctx context.Context, p modelo.Promocion) error {
+	_, err := r.promociones.InsertOne(ctx, p)
+	if mongo.IsDuplicateKeyError(err) {
+		return modelo.ErrIDPromocionEnUso
+	}
+	return err
+}
+
+// ReemplazarPromocion cambia el documento completo; el _id es el mismo. Es una sola operación atómica.
+func (r *Repositorio) ReemplazarPromocion(ctx context.Context, p modelo.Promocion) error {
+	res, err := r.promociones.ReplaceOne(ctx, bson.D{{Key: "_id", Value: p.ID}}, p)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return modelo.ErrPromocionNoEncontrada
+	}
+	return nil
+}
+
+// ListarPromociones trae todas, vencidas incluidas, las más recientes primero. Son pocas: no se paginan.
+func (r *Repositorio) ListarPromociones(ctx context.Context) ([]modelo.Promocion, error) {
+	cursor, err := r.promociones.Find(ctx, bson.D{},
+		options.Find().SetSort(bson.D{{Key: "vigencia.desde", Value: -1}, {Key: "_id", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	var promociones []modelo.Promocion
+	if err := cursor.All(ctx, &promociones); err != nil {
+		return nil, err
+	}
+	return promociones, nil
+}
+
 // PromocionesVigentes trae las promociones cuya vigencia incluye ese momento. Usa el índice vigencia
 // del script 01. Son pocas (una tienda tiene unas pocas a la vez), por eso se traen todas y el filtro
 // por alcance y medio de pago lo hace el servicio.
