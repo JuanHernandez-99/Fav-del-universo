@@ -1,5 +1,5 @@
 # API Gateway (nginx). La imagen oficial reemplaza las ${VARIABLES} al arrancar.
-# Rutea la capacidad publicada (pedidos a Ventas, productos al mock), la tienda a Ventas y las rutas de
+# Rutea la capacidad publicada (productos a Catálogo, pedidos a Ventas), la tienda a Ventas y las rutas de
 # administración a Inventario, Catálogo y Ventas, con balanceo y verificación de disponibilidad (ADR-012).
 
 # DNS interno de Docker. `resolve` en cada upstream vuelve a consultarlo cada 5 s,
@@ -25,11 +25,6 @@ upstream ventas {
     zone ventas 64k;
     server ventas:8080 resolve max_fails=2 fail_timeout=10s;
     keepalive 16;
-}
-
-upstream catalogo_ventas {
-    zone catalogo_ventas 64k;
-    server catalogo-ventas-mock:8080 resolve;
 }
 
 # Correlation id: se respeta el del cliente; si no viene, se usa el id del pedido de nginx (ADR-005, punto 7).
@@ -89,7 +84,7 @@ server {
             return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
         }
         limit_req zone=por_grupo burst=20 nodelay;
-        proxy_pass http://catalogo_ventas;
+        proxy_pass http://catalogo;
     }
 
     location = /v1/pedidos {

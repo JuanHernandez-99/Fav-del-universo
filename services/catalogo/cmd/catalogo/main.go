@@ -56,9 +56,14 @@ func correr() error {
 
 	s := service.Nuevo(repo)
 
+	var opcionesRouter []handler.Opcion
+	if os.Getenv("CAPACIDAD_PUBLICA_ACTIVA") == "false" {
+		opcionesRouter = append(opcionesRouter, handler.SinCapacidadPublica())
+	}
+
 	servidor := &http.Server{
 		Addr:              ":" + variable("CATALOGO_PUERTO", "8080"),
-		Handler:           handler.ConCORS(conLimiteDeTiempo(handler.NuevoRouter(s), 4*time.Second), os.Getenv("CORS_ORIGENES")),
+		Handler:           handler.ConCORS(conLimiteDeTiempo(handler.NuevoRouter(s, opcionesRouter...), 4*time.Second), os.Getenv("CORS_ORIGENES")),
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      10 * time.Second,
 	}

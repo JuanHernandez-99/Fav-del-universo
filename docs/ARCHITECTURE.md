@@ -217,7 +217,7 @@ Se simula un **pico de demanda** como los que describe el cliente (cambio de tem
 
 - **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Catálogo con dos réplicas), MongoDB, tres MySQL y RabbitMQ. Redis, el motor de búsqueda y las herramientas de observabilidad se suman cuando se incorporen. Los secretos (incluida la clave privada del token) van en un archivo `.env` que no se sube al repositorio.
 - **Balanceo:** en la Entrega 2 el servicio replicado es **Inventario** (2 réplicas con `deploy.replicas`), detrás de un gateway nginx con round robin y verificación pasiva ([ADR-012](adr/ADR-012-balanceo.md), D12). Catálogo también tiene 2 réplicas, con el mismo mecanismo.
-- **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), Ventas y su MySQL, RabbitMQ, Mailpit, simulador de Mercado Pago, mocks de `GET /v1/productos` y del gimnasio, Jaeger y Prometheus. El perfil `completo` suma el MySQL de Usuarios.
+- **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), Ventas y su MySQL, RabbitMQ, Mailpit, simulador de Mercado Pago, mock del gimnasio, Jaeger y Prometheus. El perfil `completo` suma el MySQL de Usuarios.
 - **Nube:** para que el grupo de proveedores use la capacidad con una URL pública se despliegan el gateway, Catálogo, Ventas e Inventario con sus bases. **[?]** proveedor de nube.
 
 ## 13. Estructura del repositorio
@@ -344,7 +344,7 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real en parte: productos y consulta por lote con precio vigente, sin gestión de promociones por API ni `GET /v1/productos` (lo sigue atendiendo el mock). **Ventas** es real. Usuarios y el frontend no están | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real en parte: productos y consulta por lote con precio vigente, sin gestión de promociones por API. **Ventas** es real. La capacidad publicada ya no pasa por mocks. Usuarios y el frontend no están | — |
 | Gateway único | Punto único de falla; la validación del JWT no está (se usa `X-Admin-Key`) | ADR-012 |
 | Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |
 | Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |

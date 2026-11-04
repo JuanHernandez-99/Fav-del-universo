@@ -2,7 +2,7 @@
 
 Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, categorías, precios base, promociones y publicación. Calcula el **precio vigente**.
 
-> Estado: **CRUD de productos y consulta por lote con precio vigente implementados**. Quedan las promociones por API, la capacidad publicada (`GET /v1/productos`) y lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
+> Estado: **CRUD de productos y consulta por lote con precio vigente implementados**. También atiende la capacidad publicada (`GET /v1/productos`). Quedan las promociones por API y lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
 
 ## Qué hay hoy
 
@@ -39,7 +39,11 @@ No sabe cuántas unidades hay: la disponibilidad es de [Inventario](../inventari
 
 ## Capacidad compartida: catálogo
 
-Catálogo expone al grupo de proveedores los productos publicados con sus variantes y el precio vigente (`GET /v1/productos`, contrato [`catalogo-pedidos-v1`](../../docs/contracts/catalogo-pedidos-v1.openapi.yaml)). Entra por un adaptador aparte, que se puede desactivar ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)).
+Catálogo expone al grupo de proveedores los productos publicados con sus variantes y el precio vigente (`GET /v1/productos`, contrato [`catalogo-pedidos-v1`](../../docs/contracts/catalogo-pedidos-v1.openapi.yaml)). Entra por un adaptador aparte, que se apaga con `CAPACIDAD_PUBLICA_ACTIVA=false` ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)).
+
+```bash
+curl localhost:8080/v1/productos -H "X-API-Key: clave-grupo-proveedores"
+```
 
 ## Más información
 

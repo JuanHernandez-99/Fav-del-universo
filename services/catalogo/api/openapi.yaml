@@ -218,6 +218,16 @@ paths:
                 detail: Ya existe una variante con ese talle y color, o con el mismo id.
                 codigo: VARIANTE_DUPLICADA
 
+  /v1/productos:
+    get:
+      tags: [Productos]
+      summary: Catálogo público (capacidad publicada)
+      description: |
+        Definido por el contrato `catalogo-pedidos-v1` (`docs/contracts/`), que es la referencia. Solo publicados, sin stock y
+        sin paginar, con el precio vigente para transferencia. Por el gateway se accede en `/v1/productos` con `X-API-Key`.
+      responses:
+        "200":
+          description: Catálogo publicado. Ver el esquema `Catalogo` del contrato.
   /v1/variantes:
     get:
       tags: [Variantes]

@@ -1,6 +1,6 @@
 # Mock · Catálogo y Ventas
 
-> **Ventas ya es real:** el gateway envía `POST /v1/pedidos` al servicio. Este mock solo atiende `GET /v1/productos`, hasta que lo haga Catálogo; su `POST /v1/pedidos` no recibe tráfico.
+> **Ya no se usa:** Catálogo y Ventas son reales y este mock salió del `docker-compose.yml`. El código queda como referencia.
 
 Atiende la capacidad publicada ([`catalogo-pedidos-v1`](../../docs/contracts/catalogo-pedidos-v1.openapi.yaml)). A diferencia del mock con Prism ([`catalogo-pedidos-v1`](../catalogo-pedidos-v1)), **aparta stock de verdad en Inventario**.
 
@@ -9,4 +9,3 @@ Atiende la capacidad publicada ([`catalogo-pedidos-v1`](../../docs/contracts/cat
 
 No guarda ventas: el `pedidoId` es el id de la reserva. Las claves usadas se recuerdan en memoria para responder `CLAVE_IDEMPOTENCIA_REUTILIZADA`; si el mock se reinicia, igual no se duplica nada porque Inventario conserva la reserva.
 
-Se levanta con el `docker-compose.yml` de la raíz, detrás del gateway (`http://localhost:8080`, header `X-API-Key: clave-grupo-proveedores`).

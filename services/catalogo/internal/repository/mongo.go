@@ -190,6 +190,21 @@ func (r *Repositorio) ListarProductos(ctx context.Context, f modelo.FiltroProduc
 	return productos, total, nil
 }
 
+// ProductosPublicados trae el catálogo público completo: el contrato no pagina y son del orden de
+// cientos de productos (ADR-008). Se ordena por _id para que la respuesta sea estable entre réplicas.
+func (r *Repositorio) ProductosPublicados(ctx context.Context) ([]modelo.Producto, error) {
+	cursor, err := r.productos.Find(ctx, bson.D{{Key: "publicado", Value: true}},
+		options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	var productos []modelo.Producto
+	if err := cursor.All(ctx, &productos); err != nil {
+		return nil, err
+	}
+	return productos, nil
+}
+
 // ActualizarProducto es un PUT con control optimista de concurrencia (DISENO.md 5.9, caso
 // secundario): el filtro incluye la versión que leyó el administrador. Si otro cambio se coló, la
 // versión guardada ya es otra, el filtro no coincide y no se pisa nada. findOneAndUpdate devuelve el

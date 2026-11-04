@@ -7,7 +7,7 @@ Juan Hernandez - 2325917
 
 Sistema de venta online y control de stock para **FAV**, una tienda de indumentaria femenina que hoy vende solo en el local y lleva el stock en un Excel. Es también el Trabajo Práctico Integrador de **Arquitectura de Software 2026**.
 
-> **Estado: Entrega 2.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). **Catálogo** funciona en parte (2 réplicas con MongoDB: productos y consulta por lote de variantes). **Ventas** funciona (con Mercado Pago simulado y mails en Mailpit, [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). `GET /v1/productos` sigue en un mock, y Usuarios y el frontend todavía no existen. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
+> **Estado: Entrega 2.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). **Catálogo** funciona en parte (2 réplicas con MongoDB: productos, consulta por lote y catálogo público; faltan las promociones por API). **Ventas** funciona (con Mercado Pago simulado y mails en Mailpit, [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). Usuarios y el frontend todavía no existen. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: parte del diseño, todavía no implementado.
 
@@ -79,7 +79,7 @@ Con Docker, desde la raíz:
 docker compose up --build
 ```
 
-No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) y su MongoDB con los productos de ejemplo, Ventas y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, los mocks de `GET /v1/productos` y del gimnasio, Jaeger y Prometheus.
+No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) y su MongoDB con los productos de ejemplo, Ventas y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger y Prometheus.
 
 | Qué | Dónde |
 |---|---|
@@ -104,7 +104,7 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 ├── services/               catalogo, inventario, ventas, usuarios
 ├── gateway/
 ├── frontend/
-├── mocks/                  Mercado Pago, GET /v1/productos, contrato con Prism y gimnasio
+├── mocks/                  Mercado Pago, contrato con Prism y gimnasio
 ├── observabilidad/         configuración de Prometheus
 ├── loadtest/               guion de prueba de carga (k6, sin ejecutar)
 ├── docker-compose.yml      arranque local

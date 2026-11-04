@@ -290,7 +290,7 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | `GET /healthz`, `GET /readyz` | Sondas. La segunda verifica la conexión a MongoDB |
 
 - El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote (etapa FAV).
-- `GET /v1/productos` queda reservada para la ruta pública del contrato (con `items`, solo publicados), que se agrega en la etapa FAV como adaptador aparte (D14). Por eso todo el CRUD de administración está bajo `/v1/admin/productos`.
+- `GET /v1/productos` es la ruta pública del contrato (con `items`, solo publicados y sin paginar), en un adaptador aparte (`handler/publico.go`, D14). El precio es el vigente para transferencia (D4). Se apaga con `CAPACIDAD_PUBLICA_ACTIVA=false` (ADR-008). Por eso todo el CRUD de administración está bajo `/v1/admin/productos`.
 - Estructura en capas: `handler` (HTTP y validación de entrada) → `service` (reglas y precio vigente) → `repository` (único lugar que habla con MongoDB). Sin estado en memoria.
 
 ---
@@ -358,12 +358,11 @@ Los puntos 1, 5, 6 y 8 dependen de lo que defina el equipo de FAV. Se resolviero
 Sin cambiar lo anterior:
 
 - **Gestión de promociones por API** (`/v1/promociones`). Hoy se cargan con los datos de ejemplo.
-- **Adaptador del contrato público** `catalogo-pedidos-v1` (solo publicados, sin stock, `fotoUrl`), aparte del API de administración, y la separación de rutas en el gateway (hoy `/v1/productos` y `/v1/pedidos` van al mismo mock).
 - **Evento `VarianteCreada`** con outbox (ni se publica ni se consume hoy). Si se guarda junto con el producto en una transacción, requiere replica set.
 - **Eventos de cambio de producto** para el indexador, con la `version` ya presente, y el **motor de búsqueda** (ADR-006) en lugar del índice de texto de Mongo.
 - **Caché** con Redis (ADR-007), como capa delante del repositorio.
 - **Observabilidad**: correlation id, trazas y métricas (ADR-011).
-- **Dos réplicas** detrás del gateway, e identidad con los encabezados `X-User-*`.
+- **Identidad** con los encabezados `X-User-*`.
 - **Tests de contrato** contra el YAML publicado.
 - El **stock sigue siendo de Inventario**.
 

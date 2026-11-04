@@ -2,7 +2,7 @@
 # Funciona sin .env (usa valores de prueba). Para cambiarlos: cp .env.example .env
 #
 # Inventario y Catálogo son servicios reales (dos réplicas cada uno, detrás del gateway), y Ventas
-# también. Mercado Pago, el gimnasio y GET /v1/productos están simulados. Lo que todavía no se usa
+# también. Mercado Pago y el gimnasio están simulados. Lo que todavía no se usa
 # queda en el perfil `completo`:
 #   docker compose --profile completo up
 #
@@ -156,16 +156,9 @@ services:
     volumes:
       - ./gateway/templates:/etc/nginx/templates:ro
     ports: ["8080:8080"]
-    depends_on: [inventario, catalogo, ventas, catalogo-ventas-mock]
+    depends_on: [inventario, catalogo, ventas]
 
   # ---------- Dependencias simuladas ----------
-  # Atiende GET /v1/productos hasta que Catálogo exponga la capacidad publicada.
-  catalogo-ventas-mock:
-    build: ./mocks/catalogo-ventas
-    environment:
-      <<: *otel
-      INVENTARIO_URL: http://gateway:8081 # pasa por el balanceo
-
   # Mercado Pago (ADR-014).
   mercadopago-simulador:
     build: ./mocks/mercadopago-simulador

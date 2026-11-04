@@ -24,7 +24,19 @@ type Handler struct {
 	s *service.Servicio
 }
 
-func NuevoRouter(s *service.Servicio) http.Handler {
+// Opcion ajusta qué rutas expone el router.
+type Opcion func(*opciones)
+
+type opciones struct{ sinCapacidadPublica bool }
+
+// SinCapacidadPublica apaga GET /v1/productos, para cuando el sistema pase al cliente (ADR-008).
+func SinCapacidadPublica() Opcion { return func(o *opciones) { o.sinCapacidadPublica = true } }
+
+func NuevoRouter(s *service.Servicio, opcionesRouter ...Opcion) http.Handler {
+	var o opciones
+	for _, aplicar := range opcionesRouter {
+		aplicar(&o)
+	}
 	h := &Handler{s: s}
 	mux := http.NewServeMux()
 
@@ -42,6 +54,10 @@ func NuevoRouter(s *service.Servicio) http.Handler {
 
 	// Consulta por lote: la usan Ventas (precio y datos de la variante) y el panel.
 	mux.HandleFunc("GET /v1/variantes", h.consultarVariantes)
+
+	if !o.sinCapacidadPublica {
+		mux.HandleFunc("GET /v1/productos", h.listarCatalogoPublico)
+	}
 
 	return mux
 }
