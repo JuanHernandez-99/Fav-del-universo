@@ -7,7 +7,7 @@ Juan Hernandez - 2325917
 
 Sistema de venta online y control de stock para **FAV**, una tienda de indumentaria femenina que hoy vende solo en el local y lleva el stock en un Excel. Es también el Trabajo Práctico Integrador de **Arquitectura de Software 2026**.
 
-> **Estado: rumbo a la presentación grupal.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). **Catálogo** funciona en parte (2 réplicas con MongoDB: productos, promociones, consulta por lote y catálogo público; faltan sus eventos, trazas y métricas). **Ventas** funciona (con Mercado Pago simulado y mails en Mailpit, [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). Usuarios y el frontend todavía no existen. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
+> **Estado: rumbo a la presentación grupal.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). **Catálogo** funciona en parte (2 réplicas con MongoDB: productos, promociones, consulta por lote y catálogo público; faltan sus eventos, trazas y métricas). **Ventas** funciona (con Mercado Pago simulado y mails en Mailpit, [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). **Usuarios** emite tokens, pero el gateway todavía no los valida. El frontend todavía no existe. Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: parte del diseño, todavía no implementado.
 
@@ -68,6 +68,7 @@ Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v
 | [ADR-013](docs/adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | Propuesta                  |
 
 | [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md) | Adicional · Simulador de pagos, mails y orden de la compra | Aceptada |
+| [ADR-015](docs/adr/ADR-015-claves-del-token-y-cuenta-de-administrador.md) | Adicional · Claves del token, administrador y contraseñas | Aceptada |
 
 Las decisiones marcadas como _Propuesta_ (D6, D7, D13) son diseño, sin implementar ni medir. Plantilla: [`ADR-000`](docs/adr/ADR-000-plantilla.md).
 
@@ -79,7 +80,7 @@ Con Docker, desde la raíz:
 docker compose up --build
 ```
 
-No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) y su MongoDB con los productos de ejemplo, Ventas y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger y Prometheus.
+No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) y su MongoDB con los productos de ejemplo, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger y Prometheus.
 
 | Qué | Dónde |
 |---|---|
@@ -90,7 +91,7 @@ No hace falta crear un `.env`: todas las variables tienen valores por defecto pa
 | Simulador de Mercado Pago | http://localhost:8096 |
 | RabbitMQ (`fav` / `cambiar`) | http://localhost:15672 |
 
-Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/README.md). Catálogo: [`services/catalogo/README.md`](services/catalogo/README.md). Ventas: [`services/ventas/README.md`](services/ventas/README.md). Perfil con el resto de la infraestructura (MySQL de Usuarios): `docker compose --profile completo up`.
+Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/README.md). Catálogo: [`services/catalogo/README.md`](services/catalogo/README.md). Ventas: [`services/ventas/README.md`](services/ventas/README.md). Usuarios: [`services/usuarios/README.md`](services/usuarios/README.md).
 
 ## Estructura del repositorio
 
@@ -118,5 +119,5 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 | ------------------------------ | ----------------------------------------------------------------------------------------------- | -------- |
 | 1 · Diseño y contrato con mock | README, SPEC, ARCHITECTURE, diagramas, límites de los servicios, contrato y ADR D1, D3, D5 y D8 | Entregada |
 | 2 · Dominio propio de punta a punta (23/10) | Servicios funcionando, capacidad compartida, logs y traza, más ADR | Entregada |
-| Presentación grupal (11 o 13/11) | Frontend, autenticación, tres servicios, capacidad en la nube, mensajería, búsqueda y caché | En curso. Listos: Inventario, Catálogo, Ventas y mensajería |
+| Presentación grupal (11 o 13/11) | Frontend, autenticación, tres servicios, capacidad en la nube, mensajería, búsqueda y caché | En curso. Listos: Inventario, Catálogo, Ventas, Usuarios y mensajería |
 | Defensa individual | Tests de contrato y carga, balanceo, caída controlada, tablero y alerta | Pendiente |

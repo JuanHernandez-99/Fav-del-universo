@@ -9,6 +9,8 @@
 
 > **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
 
+> **Actualización 04/11/2026:** [ADR-015](ADR-015-claves-del-token-y-cuenta-de-administrador.md) confirma la firma RS256 y el vencimiento de 1 hora, y define cómo se generan las claves y cómo nace la cuenta de administrador.
+
 ## Contexto
 
 FAV vende ropa en un local y empieza a vender online. El sistema tiene que unificar el stock de los dos canales, registrar todas las ventas y permitir compras online con reserva temporal de stock (SPEC §2). La consigna pide al menos tres microservicios y un API Gateway, con una base de datos por servicio.
@@ -147,7 +149,7 @@ En las dos, el consumidor externo depende de un solo servicio y la capacidad es 
 ## Pendientes
 
 - **Qué capacidad se publica (A o B).** Se elige según el grupo consumidor que asigne la cátedra. Cambia qué servicio la expone, no los límites (ADR-008).
-- **Firma y vencimiento del token, y dónde lo guarda el frontend:** se confirman al implementar el gateway y el frontend.
+- **Dónde guarda el token el frontend:** se confirma al implementar el frontend. La firma y el vencimiento están resueltos en ADR-015.
 
 ## Validación prevista (Entrega 2)
 

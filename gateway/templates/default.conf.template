@@ -15,6 +15,12 @@ upstream inventario {
 }
 
 # Catálogo: mismo criterio que Inventario.
+upstream usuarios {
+    zone usuarios 64k;
+    server usuarios:8080 resolve max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
+
 upstream catalogo {
     zone catalogo 64k;
     server catalogo:8080 resolve max_fails=2 fail_timeout=10s;
@@ -47,6 +53,8 @@ map $http_x_admin_key $admin_valido {
 
 # Límite por grupo: 60 pedidos por minuto, con ráfagas de hasta 20 (contrato, respuesta 429).
 limit_req_zone $http_x_api_key zone=por_grupo:10m rate=60r/m;
+# Límite por IP en registro e inicio de sesión: frena los intentos masivos de adivinar contraseñas (ADR-015).
+limit_req_zone $binary_remote_addr zone=por_ip_sesion:10m rate=30r/m;
 limit_req_status 429;
 
 # Log de acceso en JSON, con la réplica que atendió cada pedido (upstream_addr).
@@ -114,6 +122,19 @@ server {
         proxy_set_header X-User-Role "";
         rewrite ^/ventas/(.*)$ /$1 break;
         proxy_pass http://ventas;
+    }
+
+    # Registro e inicio de sesión. Son públicas: no pasan los encabezados de identidad.
+    location ~ ^/usuarios/v1/(registro|sesiones)$ {
+        limit_req zone=por_ip_sesion burst=10 nodelay;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        rewrite ^/usuarios/(.*)$ /$1 break;
+        proxy_pass http://usuarios;
     }
 
     # Panel de administración: ventas por estado, confirmar transferencias y ventas del local.

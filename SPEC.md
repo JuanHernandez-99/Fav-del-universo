@@ -1,8 +1,10 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.9** · 04/11/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.10** · 04/11/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
+>
+> **Cambios en 0.10** (ADR-015): se agrega RN-26, sobre las contraseñas, y RN-23 indica cómo se crea la cuenta de administrador.
 >
 > **Cambios en 0.9** (ADR-014): en CU-01 primero se reserva y después se guarda la venta. Mercado Pago se reemplaza por un simulador local, sin credenciales de prueba, y los mails se ven en Mailpit.
 >
@@ -113,8 +115,9 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | RN-20 | El comprador solo puede cancelar una compra pendiente de pago. Después del pago, cualquier cambio se gestiona por mail o teléfono. | Cliente |
 | RN-21 | El sistema no gestiona cambios, devoluciones, saldo a favor ni reclamos. La política de cambios y devoluciones del cliente y los datos de contacto se publican como página informativa. | Cliente + equipo. **[?]** datos de contacto |
 | RN-22 | En la venta online el precio lo calcula el servidor al comprar y el comprador no puede modificarlo. En la venta del local el sistema sugiere el monto con la promoción vigente para el medio de pago, y el administrador registra el monto efectivamente cobrado. | Equipo |
-| RN-23 | Hay un único rol de administración. En v1 se usa una sola cuenta de administrador. | Cliente |
+| RN-23 | Hay un único rol de administración. En v1 se usa una sola cuenta de administrador, que el sistema crea al arrancar con los datos de su configuración. No se obtiene por el registro público (ADR-015). | Cliente. **[propuesta]** cómo se crea |
 | RN-24 | El comprador sin cuenta no consulta el estado en el sitio: se entera por los mails de compra realizada y de pedido despachado, y para cualquier otra consulta se comunica con el local. No hay número de seguimiento en v1: el seguimiento del envío llega con la integración de envíos (RN-16). | Cliente |
+| RN-26 | La contraseña tiene como mínimo 8 caracteres, sin requisitos de mayúsculas, números ni símbolos (ADR-015). | **[propuesta]**, a confirmar con el cliente |
 | RN-25 | Si el stock físico de una variante queda en negativo, el sistema la marca como *stock a corregir*. El administrador la ve en un filtro del panel (sin mail) y la corrige con un ajuste de stock (HU-08). El stock físico negativo no afecta al stock online ni a las compras de la web. | Equipo |
 
 ## 7. Estados de la venta online
@@ -256,7 +259,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 
 **HU-18 · Registro e inicio de sesión.** Como comprador quiero registrarme e iniciar sesión, para ver mis compras.
 1. Cuando se registra con un email que ya existe, entonces se rechaza.
-2. Las contraseñas se guardan con hash y nunca se devuelven en ninguna respuesta.
+2. Las contraseñas se guardan con hash y nunca se devuelven en ninguna respuesta. Una contraseña de menos de 8 caracteres se rechaza (RN-26).
 3. Cuando inicia sesión con datos correctos, entonces recibe un token con vencimiento. Con datos incorrectos recibe un error genérico que no revela si el email existe.
 4. ~~Dado un invitado que compró con un email, cuando después se registra con ese email, entonces ve esas compras.~~ **Descartado** (ADR-001): sin verificación de email, cualquiera podría registrarse con un email ajeno y ver esos pedidos.
 
@@ -406,6 +409,7 @@ Fuera de la v1 **[propuesta]**: registrar las ventas que hace el gimnasio y calc
 | Cómo cobra con Mercado Pago en el local (fuera del sistema o desde el sistema) | RN-18 |
 | Datos de contacto (mail y teléfono) | RN-21, HU-24 |
 | Datos para transferir (alias o CBU y titular) | HU-12, HU-26 |
+| Mínimo de 8 caracteres en las contraseñas | RN-26 |
 | Avisarle que el filtro de poco stock no entra en v1 y que se reemplaza por la vista de stock por producto | HU-09 |
 | Cuántos productos piensa tener | Dimensionamiento (D13) |
 | Una versión del Excel de stock, para ver la estructura | Carga inicial |

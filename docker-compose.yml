@@ -2,9 +2,7 @@
 # Funciona sin .env (usa valores de prueba). Para cambiarlos: cp .env.example .env
 #
 # Inventario y Catálogo son servicios reales (dos réplicas cada uno, detrás del gateway), y Ventas
-# también. Mercado Pago y el gimnasio están simulados. Lo que todavía no se usa
-# queda en el perfil `completo`:
-#   docker compose --profile completo up
+# también, igual que Usuarios. Mercado Pago y el gimnasio están simulados.
 #
 # Puertos publicados:
 #   8080  gateway (capacidad publicada y panel)     16686  Jaeger (trazas)
@@ -12,6 +10,7 @@
 #   8095  mock del gimnasio (admin de WireMock)      3308   MySQL de Ventas (tests)
 #   8096  simulador de Mercado Pago                  8025   Mailpit (bandeja de mails)
 #   15672 RabbitMQ (administración)                  5672   RabbitMQ (tests)
+#   3309  MySQL de Usuarios (tests)
 
 x-otel: &otel
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
@@ -148,6 +147,49 @@ services:
     image: axllent/mailpit:v1.27
     ports: ["8025:8025"]
 
+  # ---------- Usuarios (real) ----------
+  # Genera las claves del token si no existen; después termina (ADR-015).
+  usuarios-init:
+    build: ./services/usuarios
+    command: ["generar-claves"]
+    healthcheck: { disable: true }
+    volumes:
+      - jwt-privada:/claves/privada
+      - jwt-publica:/claves/publica
+
+  usuarios:
+    build: ./services/usuarios
+    environment:
+      <<: *otel
+      USUARIOS_DB_HOST: mysql-usuarios:3306
+      USUARIOS_DB_NAME: ${USUARIOS_DB_NAME:-usuarios}
+      USUARIOS_DB_USER: ${USUARIOS_DB_USER:-usuarios}
+      USUARIOS_DB_PASSWORD: ${USUARIOS_DB_PASSWORD:-cambiar}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fav.example}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-cambiar-admin-local}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
+    volumes:
+      - jwt-privada:/claves/privada:ro # el gateway no monta este volumen: solo Usuarios firma
+    depends_on:
+      mysql-usuarios: { condition: service_healthy }
+      usuarios-init: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  mysql-usuarios:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${USUARIOS_DB_ROOT_PASSWORD:-cambiar}
+      MYSQL_DATABASE: ${USUARIOS_DB_NAME:-usuarios}
+      MYSQL_USER: ${USUARIOS_DB_USER:-usuarios}
+      MYSQL_PASSWORD: ${USUARIOS_DB_PASSWORD:-cambiar}
+    ports: ["3309:3306"]
+    volumes: [mysql-usuarios-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   # ---------- Gateway ----------
   gateway:
     image: nginx:1.28-alpine
@@ -158,7 +200,7 @@ services:
     volumes:
       - ./gateway/templates:/etc/nginx/templates:ro
     ports: ["8080:8080"]
-    depends_on: [inventario, catalogo, ventas]
+    depends_on: [inventario, catalogo, ventas, usuarios]
 
   # ---------- Dependencias simuladas ----------
   # Mercado Pago (ADR-014).
@@ -188,24 +230,10 @@ services:
       - ./observabilidad/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports: ["9090:9090"]
 
-  # ---------- Previsto (perfil `completo`) ----------
-  mysql-usuarios:
-    profiles: [completo]
-    image: mysql:8.4
-    environment:
-      MYSQL_ROOT_PASSWORD: ${USUARIOS_DB_ROOT_PASSWORD:-cambiar}
-      MYSQL_DATABASE: ${USUARIOS_DB_NAME:-usuarios}
-      MYSQL_USER: ${USUARIOS_DB_USER:-usuarios}
-      MYSQL_PASSWORD: ${USUARIOS_DB_PASSWORD:-cambiar}
-    volumes: [mysql-usuarios-data:/var/lib/mysql]
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
 volumes:
   mongo-catalogo-data:
   mysql-inventario-data:
   mysql-ventas-data:
   mysql-usuarios-data:
+  jwt-privada:
+  jwt-publica:
