@@ -4,7 +4,7 @@ package mysql
 // INVENTARIO_TEST_DSN; sin ella se saltean. Con Docker Compose:
 //
 //	docker compose up -d mysql-inventario
-//	INVENTARIO_TEST_DSN="inventario:cambiar@tcp(localhost:3307)/inventario?parseTime=true&loc=UTC&multiStatements=true" go test ./...
+//	INVENTARIO_TEST_DSN="root:cambiar@tcp(localhost:3307)/inventario_test?parseTime=true&loc=UTC&multiStatements=true" go test ./...
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/dominio"
@@ -27,16 +27,41 @@ func repoDePrueba(t *testing.T) (*Repositorio, *sql.DB) {
 	if dsn == "" {
 		t.Skip("INVENTARIO_TEST_DSN no definida: se saltea el test de integración")
 	}
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
+	db := baseDePrueba(t, dsn)
 	t.Cleanup(func() { db.Close() })
 	repo := NuevoRepositorio(db)
 	if err := repo.Migrar(context.Background(), false); err != nil {
 		t.Fatal(err)
 	}
 	return repo, db
+}
+
+// baseDePrueba abre una base propia de los tests y la crea si hace falta. No puede ser la del servicio:
+// sus procesos corren contra esa base y se llevarían las tareas y los eventos de prueba.
+func baseDePrueba(t *testing.T, dsn string) *sql.DB {
+	t.Helper()
+	cfg, err := mysqldriver.ParseDSN(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.DBName == "inventario" {
+		t.Fatal("el DSN de los tests apunta a la base del servicio: usar inventario_test")
+	}
+	nombre := cfg.DBName
+	cfg.DBName = ""
+	admin, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	if _, err := admin.Exec("CREATE DATABASE IF NOT EXISTS " + nombre); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return db
 }
 
 func varianteNueva(t *testing.T, db *sql.DB, online, fisico int) string {
@@ -252,5 +277,80 @@ func TestVencimientoGuardaEventoEnOutbox(t *testing.T) {
 	}
 	if eventos != 1 {
 		t.Errorf("esperaba un evento ReservaVencida, hubo %d", eventos)
+	}
+}
+
+// Una venta del local con la misma clave descuenta una sola vez, y el físico puede quedar negativo (RN-25).
+func TestDescontarFisicoEsIdempotenteYPuedeQuedarNegativo(t *testing.T) {
+	repo, db := repoDePrueba(t)
+	id := varianteNueva(t, db, 0, 1)
+	d, err := dominio.NuevoDescuentoFisico(uuid.NewString(), "venta-local", []dominio.Item{{VarianteID: id, Cantidad: 3}}, "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if _, err := repo.DescontarFisico(context.Background(), d); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if s := stockDe(t, repo, id); s.Fisico != -2 || !s.AConfirmar() {
+		t.Errorf("físico %d, a corregir %v", s.Fisico, s.AConfirmar())
+	}
+
+	otro, _ := dominio.NuevoDescuentoFisico(d.ClaveIdempotencia, "venta-local", []dominio.Item{{VarianteID: id, Cantidad: 1}}, "admin")
+	if _, err := repo.DescontarFisico(context.Background(), otro); !errors.Is(err, dominio.ErrClaveReutilizada) {
+		t.Errorf("misma clave con otro pedido: %v", err)
+	}
+}
+
+// La venta del local no se bloquea aunque la variante todavía no tenga fila de stock (RN-06).
+func TestDescontarFisicoCreaLaVarianteSiNoExiste(t *testing.T) {
+	repo, _ := repoDePrueba(t)
+	id := "test-" + uuid.NewString()
+	d, _ := dominio.NuevoDescuentoFisico(uuid.NewString(), "venta-local", []dominio.Item{{VarianteID: id, Cantidad: 2}}, "")
+	if _, err := repo.DescontarFisico(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	if s := stockDe(t, repo, id); s.Fisico != -2 {
+		t.Errorf("físico %d", s.Fisico)
+	}
+}
+
+// Si el broker falla, el evento sigue en el outbox; cuando vuelve, se publica una sola vez.
+func TestPublicarEventosConservaLoQueNoSePudoPublicar(t *testing.T) {
+	repo, db := repoDePrueba(t)
+	id := uuid.NewString()
+	if _, err := db.Exec(`INSERT INTO outbox (id, tipo, datos, ocurrido_en) VALUES (?, 'ReservaVencida', '{}', '2000-01-01')`, id); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	falla := func(_ context.Context, e dominio.Evento) error {
+		if e.ID == id {
+			return errors.New("broker caído")
+		}
+		return nil
+	}
+	if _, err := repo.PublicarEventos(ctx, 1, falla); err != nil {
+		t.Fatal(err)
+	}
+	var publicado sql.NullTime
+	if err := db.QueryRow(`SELECT publicado_en FROM outbox WHERE id = ?`, id).Scan(&publicado); err != nil || publicado.Valid {
+		t.Fatalf("no debía marcarse publicado: %v %v", publicado, err)
+	}
+
+	veces := 0
+	publicar := func(_ context.Context, e dominio.Evento) error {
+		if e.ID == id {
+			veces++
+		}
+		return nil
+	}
+	for range 2 {
+		if _, err := repo.PublicarEventos(ctx, 50, publicar); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if veces != 1 {
+		t.Errorf("publicado %d veces", veces)
 	}
 }

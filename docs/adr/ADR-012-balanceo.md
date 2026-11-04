@@ -46,7 +46,7 @@ Ya existe un API Gateway con nginx (autenticación por clave, límite por grupo,
 
 ### 3. Tráfico interno también balanceado
 
-El mock de Ventas llama a Inventario por el gateway (puerto interno 8081, sin publicar), no directo a una réplica. Así las reservas de la capacidad publicada también se reparten y se benefician de la detección de fallas.
+Ventas llama a Inventario por el gateway (puerto interno 8081, sin publicar), no directo a una réplica. Así las reservas de la capacidad publicada también se reparten y se benefician de la detección de fallas.
 
 ### 4. Réplicas sin estado compartido en memoria
 

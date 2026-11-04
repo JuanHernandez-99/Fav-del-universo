@@ -40,6 +40,7 @@ func NuevoRouter(s *aplicacion.Servicio) http.Handler {
 	mux.HandleFunc("GET /v1/stock", h.consultarStock)
 	mux.HandleFunc("POST /v1/ingresos", h.ingresar)
 	mux.HandleFunc("POST /v1/transferencias", h.transferir)
+	mux.HandleFunc("POST /v1/descuentos-fisicos", h.descontarFisico)
 
 	mux.HandleFunc("POST /v1/reposiciones", h.reponer)
 	mux.HandleFunc("GET /v1/consignacion", h.stockEnGimnasio)
@@ -192,6 +193,28 @@ func (h *Handler) transferir(w http.ResponseWriter, r *http.Request) {
 	}
 	st, err := h.s.Transferir(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Origen, p.Cantidad, usuario(r))
 	responderStock(w, r, st, err)
+}
+
+// descontarFisico lo usa Ventas al registrar una venta del local (HU-17).
+func (h *Handler) descontarFisico(w http.ResponseWriter, r *http.Request) {
+	var p pedidoReserva
+	if !leerJSON(w, r, &p) {
+		return
+	}
+	items := make([]dominio.Item, len(p.Items))
+	for i, it := range p.Items {
+		items[i] = dominio.Item{VarianteID: it.VarianteID, Cantidad: it.Cantidad}
+	}
+	stocks, err := h.s.DescontarFisico(r.Context(), r.Header.Get("Idempotency-Key"), p.Referencia, items, usuario(r))
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	respuesta := make([]stockJSON, len(stocks))
+	for i, s := range stocks {
+		respuesta[i] = stockAJSON(s)
+	}
+	escribirJSON(w, http.StatusOK, map[string]any{"items": respuesta})
 }
 
 func responderStock(w http.ResponseWriter, r *http.Request, st dominio.Stock, err error) {

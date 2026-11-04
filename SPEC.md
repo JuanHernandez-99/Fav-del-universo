@@ -1,8 +1,10 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.8** · 14/10/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.9** · 04/11/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
+>
+> **Cambios en 0.9** (ADR-014): en CU-01 primero se reserva y después se guarda la venta. Mercado Pago se reemplaza por un simulador local, sin credenciales de prueba, y los mails se ven en Mailpit.
 >
 > **Cambios en 0.8:** la cátedra asignó los grupos. La capacidad publicada pasa a ser **catálogo y pedidos** para el grupo de proveedores, y se suma la capacidad a consumir: la venta en consignación en un gimnasio (§11). Las opciones A y B quedan descartadas (ADR-008).
 >
@@ -54,7 +56,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 - **Mercadería nueva:** suele estar activa primero en el local y unos días después en la web.
 - **Pérdidas y fallas:** pueden ocurrir y obligan a corregir el stock a mano.
 - **Medios de pago hoy:** efectivo y transferencia. En el local, pagando en efectivo puede haber un porcentaje de descuento.
-- **Mercado Pago:** el cliente todavía no tiene cuenta de vendedor. Para el TP se usan credenciales de prueba.
+- **Mercado Pago:** el cliente todavía no tiene cuenta de vendedor. Para el TP se usa un simulador local (ADR-014).
 - **Usuarios:** por ahora el sistema lo administra una sola persona.
 
 ## 4. Actores
@@ -297,8 +299,8 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 1. El comprador, registrado o invitado, revisa el carrito y aprieta "Comprar". El frontend envía el contenido del carrito a Ventas.
 2. El invitado completa sus datos (como mínimo el email, RN-11). El registrado usa el email de su cuenta, que llega en el token. Elige Mercado Pago.
 3. Ventas obtiene de Catálogo el precio vigente de cada variante. **[propuesta]**
-4. Ventas crea la venta en *Pendiente de pago*, con una clave de idempotencia, y guarda el email del comprador.
-5. Ventas le pide a Inventario reservar las unidades por 20 minutos (llamada síncrona, con timeout).
+4. Ventas le pide a Inventario reservar las unidades por 20 minutos (llamada síncrona, con timeout y clave de idempotencia).
+5. Ventas crea la venta en *Pendiente de pago* y guarda el email del comprador (ADR-014).
 6. Ventas crea el pago en Mercado Pago y redirige al comprador.
 7. Mercado Pago avisa que el pago fue aprobado.
 8. Ventas registra el pago aprobado y le pide a Inventario confirmar la reserva (llamada síncrona, con reintentos; ADR-005).
@@ -306,9 +308,9 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 10. Ventas envía los mails.
 
 **Flujos alternativos**
-- **5a.** No hay stock suficiente: se rechaza y el comprador ve "sin stock".
-- **5b.** Inventario no responde: timeout, reintento acotado y error claro al comprador. No queda una reserva a medias.
-- **7a.** El pago es rechazado: se libera la reserva.
+- **4a.** No hay stock suficiente: se rechaza y el comprador ve "sin stock".
+- **4b.** Inventario no responde: timeout, reintento acotado y error claro al comprador. No se crea la venta y no queda una reserva a medias.
+- **7a.** El pago es rechazado: se libera la reserva. **[?]** Estado de la venta: **[propuesta]** *Cancelada* (ADR-014).
 - **7b.** No llega aviso en 20 minutos: la reserva vence, Inventario publica `ReservaVencida` y la venta pasa a *Vencida*.
 - **7c.** El pago llega con la reserva vencida: Inventario rechaza la confirmación y la venta queda *A verificar* (RN-14).
 - **8a.** Inventario no responde al confirmar: Ventas reintenta hasta que responda y la venta sigue *Pendiente de pago*. Si mientras tanto vence la reserva, sigue como 7c.

@@ -168,4 +168,4 @@ Contrastado contra el Inventario implementado (rama `feature-inventario`). Los d
 | Relación con el gimnasio                                   | **Agregada:** Inventario consume la capacidad del gimnasio (ADR-009). Es una relación saliente nueva a reflejar en el diagrama de relaciones.                 |
 | Lista de variantes con "stock a corregir"                  | **No implementada:** hoy solo se informa un indicador por variante (`stockACorregir`).                                                                       |
 
-**Pendiente de validar:** que Ventas llegue a Inventario solo por la entrada interna `:8081`, y que una compra se complete con Usuarios detenido (requieren Ventas real).
+**Validado el 04/11/2026:** Ventas llega a Inventario y a Catálogo por la entrada interna `:8081`, y una compra se completa sin Usuarios, que todavía no existe.

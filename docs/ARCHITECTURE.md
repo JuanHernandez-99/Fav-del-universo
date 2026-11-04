@@ -199,7 +199,7 @@ Si algo se cae, lo demás tiene que seguir funcionando y tiene que poder saberse
 
 El estado de una operación tiene que poder entenderse sin revisar cada componente a mano (**[ADR-011](adr/ADR-011-observabilidad.md), D11**).
 
-**Implementado en Inventario y el gateway (Entrega 2):** logs JSON con `servicio`, `instancia`, `correlation_id`, `trace_id` y `span_id`; log de acceso del gateway con la réplica que atendió; trazas OpenTelemetry a Jaeger (`:16686`) con una traza del flujo mock de Ventas → Inventario → MySQL; métricas Prometheus (`:9090`) con una serie por réplica. **Falta:** tablero (Grafana), alertas cargadas, persistencia del historial y el resto de los servicios. El objetivo completo es:
+**Implementado en Inventario, Ventas y el gateway:** logs JSON con `servicio`, `instancia`, `correlation_id`, `trace_id` y `span_id`; log de acceso del gateway con la réplica que atendió; trazas OpenTelemetry a Jaeger (`:16686`) con trazas del flujo Ventas → Inventario → MySQL; métricas Prometheus (`:9090`) con una serie por réplica. **Falta:** tablero (Grafana), alertas cargadas, persistencia del historial y el resto de los servicios. El objetivo completo es:
 
 
 - **Logs estructurados** en todos los servicios y en el gateway, con un identificador de correlación que viaja en cada llamada y en cada evento. Permite seguir una compra de punta a punta. El token nunca se escribe en los logs.
@@ -217,7 +217,7 @@ Se simula un **pico de demanda** como los que describe el cliente (cambio de tem
 
 - **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Catálogo con dos réplicas), MongoDB, tres MySQL y RabbitMQ. Redis, el motor de búsqueda y las herramientas de observabilidad se suman cuando se incorporen. Los secretos (incluida la clave privada del token) van en un archivo `.env` que no se sube al repositorio.
 - **Balanceo:** en la Entrega 2 el servicio replicado es **Inventario** (2 réplicas con `deploy.replicas`), detrás de un gateway nginx con round robin y verificación pasiva ([ADR-012](adr/ADR-012-balanceo.md), D12). Catálogo también tiene 2 réplicas, con el mismo mecanismo.
-- **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), mocks de Catálogo/Ventas y del gimnasio, Jaeger y Prometheus. El perfil `completo` suma MySQL de Ventas y Usuarios y RabbitMQ.
+- **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), Ventas y su MySQL, RabbitMQ, Mailpit, simulador de Mercado Pago, mocks de `GET /v1/productos` y del gimnasio, Jaeger y Prometheus. El perfil `completo` suma el MySQL de Usuarios.
 - **Nube:** para que el grupo de proveedores use la capacidad con una URL pública se despliegan el gateway, Catálogo, Ventas e Inventario con sus bases. **[?]** proveedor de nube.
 
 ## 13. Estructura del repositorio
@@ -336,20 +336,19 @@ services/inventario/            # hexagonal
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
 | Dónde se almacenan las fotos de los productos                                                 | D3                                        |
 | Firma y vencimiento del token, y dónde lo guarda el frontend                                  | Implementación del gateway y del frontend |
-| Proveedor de mail y de nube                                                                   | D5 / D13                                  |
-| Cómo recibe el entorno local los avisos de Mercado Pago                                       | D5                                        |
+| Proveedor de nube                                                                             | D13                                       |
 
-## 16. Limitaciones conocidas y deuda técnica (Entrega 2)
+## 16. Limitaciones conocidas y deuda técnica
 
 Lo que sabemos que no está o no funciona del todo. Se declara para la presentación.
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real en parte: productos y consulta por lote con precio vigente, sin gestión de promociones por API ni capacidad publicada (la sigue atendiendo el mock). Ventas es un mock; Usuarios y el frontend no están | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real en parte: productos y consulta por lote con precio vigente, sin gestión de promociones por API ni `GET /v1/productos` (lo sigue atendiendo el mock). **Ventas** es real. Usuarios y el frontend no están | — |
 | Gateway único | Punto único de falla; la validación del JWT no está (se usa `X-Admin-Key`) | ADR-012 |
 | Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |
-| Publicador a RabbitMQ | El outbox se escribe, pero nadie lo publica; sin consumo idempotente ni DLQ | ADR-005 |
-| Tiempos entre capas | Reintentos del mock de Ventas y del gateway se suman y pueden pasar los 5 s | ADR-010 |
+| Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |
+| Identidad en Ventas | Sin JWT, el gateway no informa quién compra: toda compra por el gateway es de invitado y "Mis compras" responde `401` | ADR-001 |
 | Observabilidad | Sin tablero ni alertas; Jaeger y Prometheus pierden datos al reiniciar; el gateway no crea spans | ADR-011 |
 | Búsqueda y caché | Solo diseño | ADR-006, ADR-007 |
 | Capacidad y costos | Guion de carga sin ejecutar; costos sin completar | ADR-013 |

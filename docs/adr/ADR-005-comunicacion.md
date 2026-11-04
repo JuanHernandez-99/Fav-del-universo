@@ -11,6 +11,8 @@
 
 > **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
 
+> **Actualización 04/11/2026:** [ADR-014](ADR-014-pagos-mails-y-orden-de-la-compra.md) resuelve los pendientes de Mercado Pago (simulador local) y de mail (Mailpit), y fija un tiempo total de 4,5 s por pedido en Ventas. Ver la validación al final.
+
 ## Contexto
 
 La consigna (requisito 2.5) pide comunicación síncrona y asíncrona:
@@ -169,4 +171,13 @@ Contrastado con el código de Inventario, el gateway y el mock de Ventas.
 | Outbox                                                 | **Parcial:** se escribe en la misma transacción, pero **no hay publicador** a RabbitMQ y el outbox **no tiene columna `version`**; el sobre del evento se completa al publicar. |
 | Consumo idempotente y DLQ                              | **No implementados** (Inventario aún no consume eventos).                                                                                                                    |
 
-**Problema detectado:** los reintentos del mock de Ventas y los del gateway se suman, y el tiempo total de Ventas puede superar los 5 s del gateway (ADR-010). Hay que alinear los tiempos al implementar Ventas.
+### Validación con Ventas real (04/11/2026)
+
+| Punto del ADR | Resultado |
+|---|---|
+| Confirmación síncrona | **Implementada:** tarea guardada con el pago y ejecutada por un proceso. Con la reserva vencida, la venta queda *A verificar*. |
+| Outbox | **Implementado:** un proceso de Inventario publica a RabbitMQ con confirmación del broker. Con RabbitMQ detenido se puede comprar y, al volver, el evento llega. Sigue sin columna `version`: el sobre la agrega al publicar. |
+| Consumo idempotente y DLQ | **Implementados** en Ventas. Un mensaje inválido terminó en `ventas.reserva-vencida.dlq`. La alerta sobre la DLQ sigue pendiente (ADR-011). |
+| Reintentos del punto 2 | Implementados, dentro de los 4,5 s por pedido (ADR-014). |
+
+**Problema detectado (resuelto por ADR-014):** los reintentos del mock de Ventas y los del gateway se suman, y el tiempo total de Ventas puede superar los 5 s del gateway (ADR-010). Hay que alinear los tiempos al implementar Ventas.

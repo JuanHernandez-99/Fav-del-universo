@@ -71,8 +71,7 @@ CREATE TABLE IF NOT EXISTS reposiciones (
   KEY reposiciones_pendientes (estado, proximo_intento)
 );
 
--- Eventos a publicar (transactional outbox, ADR-005). En esta entrega se guardan;
--- el publicador hacia RabbitMQ se suma en la entrega siguiente.
+-- Eventos a publicar (transactional outbox, ADR-005). Los envía el proceso publicador a RabbitMQ.
 CREATE TABLE IF NOT EXISTS outbox (
   id              CHAR(36)     NOT NULL PRIMARY KEY,
   tipo            VARCHAR(50)  NOT NULL,

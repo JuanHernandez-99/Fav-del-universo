@@ -122,6 +122,24 @@ func (s *Servicio) Transferir(ctx context.Context, clave, varianteID string, ori
 	return st, err
 }
 
+// DescontarFisico aplica una venta del local sobre el stock físico (HU-17).
+func (s *Servicio) DescontarFisico(ctx context.Context, clave, referencia string, items []dominio.Item, usuario string) ([]dominio.Stock, error) {
+	d, err := dominio.NuevoDescuentoFisico(clave, referencia, items, usuario)
+	if err != nil {
+		return nil, err
+	}
+	stocks, err := s.repo.DescontarFisico(ctx, d)
+	if err == nil {
+		slog.InfoContext(ctx, "descuento de stock físico", "referencia", referencia, "items", len(d.Items))
+	}
+	return stocks, err
+}
+
+// PublicarEventos envía al broker los eventos pendientes del outbox.
+func (s *Servicio) PublicarEventos(ctx context.Context, publicador puertos.PublicadorEventos, limite int) (int, error) {
+	return s.repo.PublicarEventos(ctx, limite, publicador.Publicar)
+}
+
 // Reponer descuenta el stock físico y deja la reposición pendiente. El envío al gimnasio
 // lo hace EnviarReposiciones, para que la caída del gimnasio no frene a FAV (ADR-010).
 func (s *Servicio) Reponer(ctx context.Context, clave, varianteID string, cantidad int, usuario string) (dominio.Reposicion, bool, error) {

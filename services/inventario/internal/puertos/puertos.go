@@ -23,6 +23,14 @@ type Repositorio interface {
 	ConsultarStock(ctx context.Context, varianteIDs []string) ([]dominio.Stock, error)
 	Ingresar(ctx context.Context, i dominio.Ingreso) (dominio.Stock, error)
 	Transferir(ctx context.Context, t dominio.Transferencia) (dominio.Stock, error)
+	// DescontarFisico aplica una venta del local, una sola vez por clave. Si la variante no tiene
+	// fila de stock la crea: la venta del local nunca se bloquea (RN-06).
+	DescontarFisico(ctx context.Context, d dominio.DescuentoFisico) ([]dominio.Stock, error)
+
+	// PublicarEventos toma eventos sin publicar, llama a publicar por cada uno y los marca en la misma
+	// transacción. Si el proceso se cae entre publicar y marcar, el evento se publica de nuevo:
+	// la entrega es al menos una vez y el consumidor es idempotente (ADR-005, punto 5).
+	PublicarEventos(ctx context.Context, limite int, publicar func(context.Context, dominio.Evento) error) (int, error)
 
 	// CrearReposicion descuenta el stock físico y guarda la reposición pendiente en la misma transacción.
 	CrearReposicion(ctx context.Context, r dominio.Reposicion) (guardada dominio.Reposicion, repetida bool, err error)
@@ -35,6 +43,11 @@ type Repositorio interface {
 	ReprogramarReposicion(ctx context.Context, id, motivo string, proximo time.Time) error
 
 	Ping(ctx context.Context) error
+}
+
+// PublicadorEventos envía un evento al broker. Devuelve nil solo si el broker ya lo guardó.
+type PublicadorEventos interface {
+	Publicar(ctx context.Context, e dominio.Evento) error
 }
 
 // Gimnasio es la capacidad consumida (ADR-009). El adaptador traduce su modelo al de FAV.

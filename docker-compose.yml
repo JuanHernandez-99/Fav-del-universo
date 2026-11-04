@@ -1,14 +1,17 @@
 # Arranque local con un solo comando:   docker compose up --build
 # Funciona sin .env (usa valores de prueba). Para cambiarlos: cp .env.example .env
 #
-# Inventario y Catálogo son servicios reales (dos réplicas cada uno, detrás del gateway). Ventas
-# y el gimnasio están simulados. Lo que todavía no se usa queda en el perfil `completo`:
+# Inventario y Catálogo son servicios reales (dos réplicas cada uno, detrás del gateway), y Ventas
+# también. Mercado Pago, el gimnasio y GET /v1/productos están simulados. Lo que todavía no se usa
+# queda en el perfil `completo`:
 #   docker compose --profile completo up
 #
 # Puertos publicados:
 #   8080  gateway (capacidad publicada y panel)     16686  Jaeger (trazas)
 #   9090  Prometheus (métricas)                      3307   MySQL de Inventario (tests)
-#   8095  mock del gimnasio (admin de WireMock)
+#   8095  mock del gimnasio (admin de WireMock)      3308   MySQL de Ventas (tests)
+#   8096  simulador de Mercado Pago                  8025   Mailpit (bandeja de mails)
+#   15672 RabbitMQ (administración)                  5672   RabbitMQ (tests)
 
 x-otel: &otel
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
@@ -27,6 +30,7 @@ services:
       INVENTARIO_DATOS_EJEMPLO: ${INVENTARIO_DATOS_EJEMPLO:-true}
       GIMNASIO_URL: http://gimnasio-mock:8080
       GIMNASIO_API_KEY: ${GIMNASIO_API_KEY:-clave-de-fav-en-el-gimnasio}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:-cambiar}@rabbitmq:5672/
     depends_on:
       mysql-inventario: { condition: service_healthy }
     restart: unless-stopped
@@ -89,6 +93,59 @@ services:
       timeout: 5s
       retries: 5
 
+  # ---------- Ventas (real) ----------
+  ventas:
+    build: ./services/ventas
+    environment:
+      <<: *otel
+      VENTAS_DB_HOST: mysql-ventas:3306
+      VENTAS_DB_NAME: ${VENTAS_DB_NAME:-ventas}
+      VENTAS_DB_USER: ${VENTAS_DB_USER:-ventas}
+      VENTAS_DB_PASSWORD: ${VENTAS_DB_PASSWORD:-cambiar}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:-cambiar}@rabbitmq:5672/
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-token-del-simulador}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-secreto-del-simulador}
+      MAIL_FROM: ${MAIL_FROM:-ventas@fav.example}
+      MAIL_ADMIN: ${MAIL_ADMIN:-admin@fav.example}
+      TRANSFERENCIA_ALIAS: ${TRANSFERENCIA_ALIAS:-FAV.EJEMPLO.ALIAS}
+      TRANSFERENCIA_TITULAR: ${TRANSFERENCIA_TITULAR:-FAV (ejemplo)}
+    depends_on:
+      mysql-ventas: { condition: service_healthy }
+    restart: unless-stopped
+
+  mysql-ventas:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${VENTAS_DB_ROOT_PASSWORD:-cambiar}
+      MYSQL_DATABASE: ${VENTAS_DB_NAME:-ventas}
+      MYSQL_USER: ${VENTAS_DB_USER:-ventas}
+      MYSQL_PASSWORD: ${VENTAS_DB_PASSWORD:-cambiar}
+    ports: ["3308:3306"]
+    volumes: [mysql-ventas-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Eventos entre servicios (ADR-005). Inventario y Ventas arrancan aunque esté caído.
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-fav}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-cambiar}
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Mails de Ventas (ADR-014): se ven en http://localhost:8025 y nada sale a internet.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["8025:8025"]
+
   # ---------- Gateway ----------
   gateway:
     image: nginx:1.28-alpine
@@ -99,15 +156,23 @@ services:
     volumes:
       - ./gateway/templates:/etc/nginx/templates:ro
     ports: ["8080:8080"]
-    depends_on: [inventario, catalogo, catalogo-ventas-mock]
+    depends_on: [inventario, catalogo, ventas, catalogo-ventas-mock]
 
   # ---------- Dependencias simuladas ----------
-  # Catálogo y Ventas: atiende la capacidad publicada y aparta el stock en Inventario.
+  # Atiende GET /v1/productos hasta que Catálogo exponga la capacidad publicada.
   catalogo-ventas-mock:
     build: ./mocks/catalogo-ventas
     environment:
       <<: *otel
       INVENTARIO_URL: http://gateway:8081 # pasa por el balanceo
+
+  # Mercado Pago (ADR-014).
+  mercadopago-simulador:
+    build: ./mocks/mercadopago-simulador
+    environment:
+      URL_PUBLICA: http://localhost:8096
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-secreto-del-simulador}
+    ports: ["8096:8080"]
 
   # Gimnasio: capacidad consumida, con el contrato supuesto (ADR-009).
   gimnasio-mock:
@@ -129,21 +194,6 @@ services:
     ports: ["9090:9090"]
 
   # ---------- Previsto (perfil `completo`) ----------
-  mysql-ventas:
-    profiles: [completo]
-    image: mysql:8.4
-    environment:
-      MYSQL_ROOT_PASSWORD: ${VENTAS_DB_ROOT_PASSWORD:-cambiar}
-      MYSQL_DATABASE: ${VENTAS_DB_NAME:-ventas}
-      MYSQL_USER: ${VENTAS_DB_USER:-ventas}
-      MYSQL_PASSWORD: ${VENTAS_DB_PASSWORD:-cambiar}
-    volumes: [mysql-ventas-data:/var/lib/mysql]
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   mysql-usuarios:
     profiles: [completo]
     image: mysql:8.4
@@ -155,19 +205,6 @@ services:
     volumes: [mysql-usuarios-data:/var/lib/mysql]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  rabbitmq:
-    profiles: [completo]
-    image: rabbitmq:3-management
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-fav}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-cambiar}
-    ports: ["15672:15672"]
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10

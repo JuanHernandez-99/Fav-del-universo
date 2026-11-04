@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // Errores de negocio. Son respuestas definitivas: quien llama no debe reintentarlas (ADR-005).
@@ -19,6 +20,15 @@ var (
 	ErrReposicionRechazada   = errors.New("el gimnasio rechazó la reposición")
 	ErrProveedorNoDisponible = errors.New("el gimnasio no está disponible")
 )
+
+// Evento es un cambio de Inventario guardado en el outbox, listo para publicarse (ADR-005, punto 5).
+type Evento struct {
+	ID            string
+	Tipo          string
+	Datos         []byte // JSON
+	CorrelationID string
+	OcurridoEn    time.Time
+}
 
 // ErrorValidacion indica qué campos del pedido no cumplen las reglas.
 type ErrorValidacion struct {

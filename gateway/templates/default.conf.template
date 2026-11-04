@@ -1,6 +1,6 @@
 # API Gateway (nginx). La imagen oficial reemplaza las ${VARIABLES} al arrancar.
-# Rutea la capacidad publicada al mock de Catálogo y Ventas, y las rutas de administración a las
-# réplicas de Inventario y de Catálogo, con balanceo y verificación de disponibilidad (ADR-012).
+# Rutea la capacidad publicada (pedidos a Ventas, productos al mock), la tienda a Ventas y las rutas de
+# administración a Inventario, Catálogo y Ventas, con balanceo y verificación de disponibilidad (ADR-012).
 
 # DNS interno de Docker. `resolve` en cada upstream vuelve a consultarlo cada 5 s,
 # así una réplica nueva o reiniciada (con otra IP) entra al balanceo sin reiniciar nginx.
@@ -18,6 +18,12 @@ upstream inventario {
 upstream catalogo {
     zone catalogo 64k;
     server catalogo:8080 resolve max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
+
+upstream ventas {
+    zone ventas 64k;
+    server ventas:8080 resolve max_fails=2 fail_timeout=10s;
     keepalive 16;
 }
 
@@ -78,12 +84,55 @@ server {
     location = /healthz { access_log off; return 200; }
 
     # Capacidad publicada: catálogo y pedidos (contrato catalogo-pedidos-v1).
-    location ~ ^/v1/(productos|pedidos)$ {
+    location = /v1/productos {
         if ($grupo_valido = 0) {
             return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
         }
         limit_req zone=por_grupo burst=20 nodelay;
         proxy_pass http://catalogo_ventas;
+    }
+
+    location = /v1/pedidos {
+        if ($grupo_valido = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        limit_req zone=por_grupo burst=20 nodelay;
+        # proxy_set_header en una location anula los heredados: se repiten los comunes.
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://ventas;
+    }
+
+    # Tienda: compra, cancelación, "mis compras" y aviso de Mercado Pago. Son públicas (se puede comprar
+    # sin cuenta), por eso se borra la identidad que mande el cliente. Cuando el gateway valide el JWT,
+    # estos encabezados saldrán del token (ADR-001).
+    location ~ ^/ventas/v1/(compras|compras/[^/]+/cancelar|mis-compras|mis-compras/[^/]+|pagos/aviso)$ {
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        rewrite ^/ventas/(.*)$ /$1 break;
+        proxy_pass http://ventas;
+    }
+
+    # Panel de administración: ventas por estado, confirmar transferencias y ventas del local.
+    location /ventas/v1/admin/ {
+        if ($admin_valido = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "admin";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "administrador";
+        proxy_pass http://ventas/v1/admin/;
     }
 
     # Panel de administración: stock, transferencias y consignación.

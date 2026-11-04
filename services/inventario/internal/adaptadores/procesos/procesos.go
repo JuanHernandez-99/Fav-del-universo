@@ -1,6 +1,6 @@
-// Package procesos es el adaptador de entrada de las tareas periódicas: vencer reservas y
-// enviar reposiciones al gimnasio. Corren en todas las réplicas; la base evita que dos réplicas
-// procesen lo mismo (bloqueo de la fila de la reserva y SKIP LOCKED en las reposiciones).
+// Package procesos es el adaptador de entrada de las tareas periódicas: vencer reservas, enviar
+// reposiciones al gimnasio y publicar eventos. Corren en todas las réplicas; la base evita que dos
+// réplicas procesen lo mismo (bloqueo de la fila de la reserva y SKIP LOCKED en lo demás).
 package procesos
 
 import (
@@ -15,6 +15,7 @@ import (
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/aplicacion"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/observabilidad"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/puertos"
 )
 
 const lote = 50
@@ -47,6 +48,20 @@ func EnviarReposiciones(ctx context.Context, s *aplicacion.Servicio, cada time.D
 			procesar(ctx, "enviar_reposicion", attribute.String("reposicion_id", r.ID), func(ctx context.Context) (bool, error) {
 				return s.EnviarReposicion(ctx, r)
 			})
+		}
+	})
+}
+
+// PublicarEventos envía el outbox a RabbitMQ. Si el broker está caído, los eventos esperan (ADR-005).
+func PublicarEventos(ctx context.Context, s *aplicacion.Servicio, publicador puertos.PublicadorEventos, cada time.Duration) {
+	cadaVuelta(ctx, cada, func() {
+		publicados, err := s.PublicarEventos(ctx, publicador, lote)
+		if err != nil {
+			slog.ErrorContext(ctx, "no se pudo leer el outbox", "error", err)
+			return
+		}
+		if publicados > 0 {
+			observabilidad.ProcesosEjecutados.WithLabelValues("publicar_evento").Add(float64(publicados))
 		}
 	})
 }

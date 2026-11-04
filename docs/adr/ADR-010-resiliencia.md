@@ -23,7 +23,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | Gimnasio (HTTP, de otro grupo)                      | Consultar su stock y enviar reposiciones              |
 | RabbitMQ                                            | Publicar `ReservaVencida` (_previsto_)                |
 | Gateway (nginx)                                     | Único camino de entrada y balanceo                    |
-| Quien llama: Ventas (hoy un mock) y el panel        | Origen de los pedidos                                 |
+| Quien llama: Ventas y el panel                      | Origen de los pedidos                                 |
 
 ## Criterios
 
@@ -43,7 +43,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | | Inventario, cada pedido HTTP | 4 s (menor que el del gateway) | Que Inventario corte antes de que el gateway ya haya desistido |
 | | Inventario → MySQL | 3 s para conectar, 5 s de lectura y escritura, y el contexto del pedido | Que una base lenta no retenga el pedido |
 | | Inventario → gimnasio | 2 s | Que un gimnasio lento no retenga recursos |
-| **Reintento con idempotencia** | Ventas (mock) → Inventario | 2 s por intento, hasta 2 reintentos (200 ms y 400 ms más aleatoriedad), solo ante timeout, conexión rechazada, 502, 503 o 504; nunca ante `4xx` | Superar fallas transitorias sin duplicar la reserva (misma `Idempotency-Key`) |
+| **Reintento con idempotencia** | Ventas → Inventario | 2 s por intento, hasta 2 reintentos (200 ms y 400 ms más aleatoriedad), solo ante timeout, conexión rechazada, 502, 503 o 504; nunca ante `4xx` | Superar fallas transitorias sin duplicar la reserva (misma `Idempotency-Key`) |
 | | Inventario → gimnasio | Persistido en la base, espera de 5 s duplicándose hasta 5 min | Que una reposición no se pierda si el gimnasio no responde |
 | **Circuit breaker** | Inventario → gimnasio | Se abre tras 5 fallas seguidas; 30 s abierto; una llamada de prueba | Fallar rápido en lugar de esperar el timeout en cada consulta |
 | **Bulkhead (aislamiento)** | Pool de conexiones de Inventario | 20 conexiones (`INVENTARIO_DB_MAX_CONEXIONES`) | Que un pico no agote las conexiones de la base |
@@ -82,7 +82,7 @@ Los errores usan el formato Problem Details con un `codigo` estable, y distingue
 | Alternativa                                                     | Por qué se descartó                                                                                                                                                      |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Reintentar en todas las capas** (gateway, Ventas, Inventario) | Multiplica los intentos (el apunte muestra 3 × 3 × 3 = 27). Se asigna un dueño del reintento: quien llama (Ventas) hacia Inventario, y Inventario hacia el gimnasio.      |
-| **Circuit breaker también en Ventas → Inventario**              | Inventario es una dependencia crítica sin alternativa: abrir el circuito solo cambiaría la espera por un error inmediato. Se evalúa cuando exista Ventas real.             |
+| **Circuit breaker también en Ventas → Inventario**              | Inventario es una dependencia crítica sin alternativa: abrir el circuito solo cambiaría la espera por un error inmediato. Sigue sin aplicarse con Ventas real: los reintentos quedan acotados por los 4,5 s de cada pedido (ADR-014).             |
 | **Bulkhead por semáforo en cada operación**                     | El volumen no lo justifica; el pool de conexiones y los trabajadores secuenciales ya acotan la concurrencia.                                                              |
 | **Health check activo con retiro de réplicas**                  | nginx de código abierto solo ofrece verificación pasiva. Además, si la base cae, las dos réplicas fallan igual: retirarlas no ayuda (ADR-012).                             |
 | **Respuesta de reserva "optimista" cuando la base no responde** | Mentiría: se prometería stock sin haberlo apartado.                                                                                                                       |
@@ -99,7 +99,7 @@ Los errores usan el formato Problem Details con un `codigo` estable, y distingue
 
 - **El gateway es una sola instancia.** Es un punto único de falla. El apunte lo marca como anti-patrón. Se acepta en esta entrega; para la presentación final se evalúa una segunda instancia (el límite de pedidos es por instancia: con dos, habría que coordinarlo o aceptar la aproximación).
 - **El presupuesto de tiempo no se propaga de punta a punta.** El mock de Ventas llama a Inventario con 2 s por intento y hasta 3 intentos: en el peor caso, con Inventario colgado (no caído), son unos 6,6 s. El gateway corta la llamada del consumidor a los 5 s, así que este recibiría el `504` genérico de nginx en lugar del `503 NO_DISPONIBLE` con Problem Details que promete el contrato. El mock cancela sus reintentos al detectar que la conexión se cerró, pero la respuesta ya se perdió. Si Inventario está caído (conexión rechazada), los tres intentos terminan en menos de un segundo y el consumidor sí recibe el `503` del contrato. Hay que alinear los tiempos (un deadline total menor al del gateway) cuando se implemente Ventas.
-- **Reintentos en dos lugares.** El gateway reintenta contra la otra réplica ante error de conexión, timeout o `502` (hasta 2 intentos), y el mock de Ventas reintenta además hasta 2 veces. Es seguro por la idempotencia, pero amplifica la carga durante una degradación. nginx no reenvía un `POST` que ya llegó a una réplica.
+- **Reintentos en dos lugares.** El gateway reintenta contra la otra réplica ante error de conexión, timeout o `502` (hasta 2 intentos), y Ventas reintenta además hasta 2 veces. Es seguro por la idempotencia, pero amplifica la carga durante una degradación. nginx no reenvía un `POST` que ya llegó a una réplica.
 - **La verificación de réplicas es pasiva.** Una réplica con la base caída sigue en el reparto porque su `503` no cuenta como falla para nginx. Se decidió así a propósito: ese `503` también lo usa Inventario para avisar que el gimnasio no está disponible, y contarlo sacaba del reparto a réplicas sanas.
 - **El circuito del gimnasio es por réplica.** Cada réplica abre el suyo con su propia muestra.
 - **Sin bulkhead para las consultas al gimnasio del panel**, que corren en el hilo del pedido (con timeout de 2 s).
@@ -109,7 +109,6 @@ Los errores usan el formato Problem Details con un `codigo` estable, y distingue
 ## Pendientes
 
 - **Caída controlada y `docs/POSTMORTEM.md`.** La consigna pide una caída provocada con su informe. Plan de ensayo: (1) detener una réplica de Inventario durante carga; (2) detener el gimnasio y enviar reposiciones; (3) detener la base. Para cada una: hipótesis, métricas observadas, comportamiento real, tiempo de recuperación.
-- Alinear tiempos y reintentos de Ventas con el gateway.
 - Alerta por circuito abierto y por reposiciones antiguas (ADR-011).
 - Mensajes fallidos (DLQ) cuando exista el consumidor de `ReservaVencida`.
 - Segunda instancia del gateway.

@@ -32,7 +32,7 @@ Los cuatro servicios tienen problemas de distinta naturaleza (ARCHITECTURE §4):
 | Servicio       | Estilo                                    | Estado           |
 | -------------- | ----------------------------------------- | ---------------- |
 | **Inventario** | Hexagonal (puertos y adaptadores)         | **Implementado** |
-| **Ventas**     | Hexagonal                                 | _Previsto_       |
+| **Ventas**     | Hexagonal                                 | Implementado     |
 | **Catálogo**   | Capas: Handler → Service → Repository     | **Implementado en parte** |
 | **Usuarios**   | Capas                                     | _Previsto_       |
 
@@ -117,7 +117,6 @@ La carrera la decide la base, no el núcleo: el puerto del repositorio expresa *
 - **Tests de la capa `aplicacion` con repositorio y gimnasio falsos.** Hoy el núcleo se cubre con tests de dominio y con los de integración contra MySQL. Los de integración usan el repositorio real y no reemplazan a los unitarios del servicio de aplicación.
 - **Sacar las etiquetas `json` del dominio** y mover el formato al adaptador HTTP.
 - **Aplicar el estilo hexagonal a Ventas y el de capas a Catálogo y Usuarios** cuando se implementen. La consigna pide dos estilos aplicados de manera reconocible para la presentación grupal.
-- **Publicador hacia RabbitMQ** como adaptador de salida de Inventario (un puerto nuevo). Existe una versión previa en el historial (commit `54749f9` de `development`); se adapta a esta estructura.
 
 ## Validación
 

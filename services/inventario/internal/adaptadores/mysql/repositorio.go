@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -310,6 +311,91 @@ func (r *Repositorio) Transferir(ctx context.Context, t dominio.Transferencia) (
 		}
 		return registrarMovimiento(ctx, tx, t.VarianteID, "TRANSFERENCIA", t.Destino(), t.Cantidad, t.ClaveIdempotencia, t.Usuario)
 	})
+}
+
+// DescontarFisico baja el físico sin condición: puede quedar negativo (RN-25). Con INSERT … ON DUPLICATE
+// una variante sin fila de stock también se registra, porque la venta del local no se bloquea (RN-06).
+func (r *Repositorio) DescontarFisico(ctx context.Context, d dominio.DescuentoFisico) ([]dominio.Stock, error) {
+	ids := make([]string, len(d.Items))
+	for i, it := range d.Items {
+		ids[i] = it.VarianteID
+	}
+	err := r.enTransaccion(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO operaciones (clave_idempotencia, tipo, huella, variante_id) VALUES (?, 'DESCUENTO_FISICO', ?, ?)`,
+			d.ClaveIdempotencia, d.Huella(), ids[0]); err != nil {
+			return err
+		}
+		for _, it := range d.Items {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO stock (variante_id, fisico) VALUES (?, ?)
+				 ON DUPLICATE KEY UPDATE fisico = fisico + VALUES(fisico), actualizado_en = NOW()`,
+				it.VarianteID, -it.Cantidad); err != nil {
+				return err
+			}
+			if err := registrarMovimiento(ctx, tx, it.VarianteID, "VENTA_LOCAL", dominio.CanalFisico, -it.Cantidad, d.Referencia, d.Usuario); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if esClaveDuplicada(err) {
+		var huellaGuardada string
+		if err := r.db.QueryRowContext(ctx, `SELECT huella FROM operaciones WHERE clave_idempotencia = ?`, d.ClaveIdempotencia).Scan(&huellaGuardada); err != nil {
+			return nil, err
+		}
+		if huellaGuardada != d.Huella() {
+			return nil, dominio.ErrClaveReutilizada
+		}
+	} else if err != nil {
+		return nil, err
+	}
+	return r.ConsultarStock(ctx, ids)
+}
+
+// ---------- Eventos (outbox) ----------
+
+// PublicarEventos usa SKIP LOCKED: dos réplicas no toman el mismo evento y una no frena a la otra.
+// Corta en la primera falla para conservar el orden; lo no publicado sigue en el outbox.
+func (r *Repositorio) PublicarEventos(ctx context.Context, limite int, publicar func(context.Context, dominio.Evento) error) (int, error) {
+	publicados := 0
+	err := r.enTransaccion(ctx, func(tx *sql.Tx) error {
+		filas, err := tx.QueryContext(ctx,
+			`SELECT id, tipo, datos, correlation_id, ocurrido_en FROM outbox
+			 WHERE publicado_en IS NULL ORDER BY ocurrido_en LIMIT ? FOR UPDATE SKIP LOCKED`, limite)
+		if err != nil {
+			return err
+		}
+		var eventos []dominio.Evento
+		for filas.Next() {
+			var e dominio.Evento
+			if err := filas.Scan(&e.ID, &e.Tipo, &e.Datos, &e.CorrelationID, &e.OcurridoEn); err != nil {
+				filas.Close()
+				return err
+			}
+			eventos = append(eventos, e)
+		}
+		filas.Close()
+		if err := filas.Err(); err != nil {
+			return err
+		}
+		for _, e := range eventos {
+			if err := publicar(ctx, e); err != nil {
+				// Lo ya publicado se marca igual: se confirma la transacción y se informa la falla por log.
+				slog.WarnContext(ctx, "no se pudo publicar el evento; queda en el outbox", "evento_id", e.ID, "error", err)
+				return nil
+			}
+			if _, err := tx.ExecContext(ctx, `UPDATE outbox SET publicado_en = UTC_TIMESTAMP() WHERE id = ?`, e.ID); err != nil {
+				return err
+			}
+			publicados++
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return publicados, nil
 }
 
 // operacionIdempotente registra la clave en la misma transacción que la operación.

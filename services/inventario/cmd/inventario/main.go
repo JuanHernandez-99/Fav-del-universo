@@ -25,6 +25,7 @@ import (
 	adaptadorhttp "github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/adaptadores/http"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/adaptadores/mysql"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/adaptadores/procesos"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/adaptadores/rabbitmq"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/aplicacion"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/observabilidad"
 )
@@ -83,6 +84,14 @@ func correr() error {
 
 	go procesos.VencerReservas(ctx, s, duracion("VENCIMIENTO_CADA_MS", 10_000))
 	go procesos.EnviarReposiciones(ctx, s, duracion("REPOSICIONES_CADA_MS", 5_000))
+
+	if url := os.Getenv("RABBITMQ_URL"); url != "" {
+		publicador := rabbitmq.NuevoPublicador(url)
+		defer publicador.Cerrar()
+		go procesos.PublicarEventos(ctx, s, publicador, duracion("PUBLICADOR_CADA_MS", 1_000))
+	} else {
+		slog.Warn("RABBITMQ_URL sin definir: los eventos quedan en el outbox")
+	}
 
 	servidor := &http.Server{
 		Addr:              ":" + variable("INVENTARIO_PUERTO", "8080"),

@@ -65,7 +65,7 @@ La **base de datos decide cada carrera**, con transacciones locales de MySQL. No
 | Dos réplicas intentan vencer o enviar lo mismo                                         | El bloqueo de la fila y `SKIP LOCKED` hacen que una procese y la otra salte.                                                                                                                |
 | La réplica se cae mientras envía una reposición al gimnasio                            | La reposición quedó apartada 30 s; pasado ese plazo otra réplica la toma. El gimnasio recibe la misma clave de idempotencia, así que no duplica la mercadería **si respeta la clave** (contrato supuesto, ADR-009). |
 | La base está caída                                                                     | Ninguna operación se aplica a medias: no hay transacción confirmada. Al volver, el servicio sigue sin intervención.                                                                       |
-| El evento `ReservaVencida` no se llega a publicar                                      | Está en el outbox, guardado en la misma transacción que el cambio de estado. Se publicará cuando exista el publicador (ver Pendientes); no se pierde.                                       |
+| El evento `ReservaVencida` no se llega a publicar                                      | Está en el outbox, guardado en la misma transacción que el cambio de estado. Un proceso lo publica a RabbitMQ cuando el broker está disponible; no se pierde.                                       |
 
 ### Aislamiento y restricciones de la base
 
@@ -77,6 +77,18 @@ CHECK (reservado >= 0 AND reservado <= online)
 ```
 
 El stock físico no tiene esa restricción a propósito (RN-06, RN-25).
+
+### Ventas (04/11/2026)
+
+La venta no usa `UPDATE … WHERE estado = …`, como se preveía: bloquea la fila con `SELECT … FOR UPDATE` y aplica la transición en el dominio, igual que la reserva. Ver [ADR-014](ADR-014-pagos-mails-y-orden-de-la-compra.md) para el orden de la compra.
+
+| Operación | Garantía | Mecanismo |
+|---|---|---|
+| **Crear la venta** | Una por clave | Restricción única de la clave. El id se deriva de la clave, así que un reintento reserva con la misma referencia. |
+| **Aviso de pago** | Se aplica una vez | Id del pago único, en la misma transacción que su efecto. |
+| **Evento `ReservaVencida`** | Se aplica una vez | Id del mensaje único, en la misma transacción que su efecto. |
+| **Tareas y mails** | No se pierden ni se ejecutan a la vez | Se guardan con el cambio de estado. Se toman con `FOR UPDATE SKIP LOCKED` y quedan apartados por un plazo. |
+| **Descontar el físico** (`POST /v1/descuentos-fisicos`, Inventario) | Una vez por clave; puede quedar negativo (RN-25) | `operaciones` más `INSERT … ON DUPLICATE KEY UPDATE`, en una transacción. |
 
 ## Alternativas consideradas
 
@@ -103,14 +115,11 @@ El stock físico no tiene esa restricción a propósito (RN-06, RN-25).
 - **El resultado de un reintento de ingreso o transferencia es el stock actual**, no la respuesta original. Para reservas sí se devuelve la reserva guardada, pero con su estado actual, que puede haber cambiado.
 - **Las claves de idempotencia no se limpian.** La tabla crece con el uso.
 - **Reponer descuenta el stock físico antes de que el gimnasio confirme.** Mientras la reposición está pendiente, esas unidades no están en ningún stock. Si el gimnasio la rechaza, vuelven.
-- **La entrega del evento `ReservaVencida` todavía no existe** (no hay publicador), por lo que Ventas no se entera del vencimiento. Mientras tanto, la reserva vence y libera su stock igual.
 
 ## Pendientes
 
-- **Publicador del outbox hacia RabbitMQ y consumidor idempotente en Ventas** (ADR-005, punto 5).
 - **Política de limpieza** de claves de idempotencia y del outbox ya publicado.
-- **Ventas:** transiciones condicionales de la venta (`UPDATE … WHERE estado = …`) y procesamiento idempotente del aviso de Mercado Pago. Se documentan cuando se implemente el servicio.
-- **Descuento del stock físico por venta del local** y ajustes de stock (HU-08, HU-17): todavía no existen en Inventario.
+- **Ajustes de stock** (HU-08): todavía no existen en Inventario.
 
 ## Validación
 
@@ -130,11 +139,11 @@ Se ejecutan con:
 
 ```bash
 docker compose up -d mysql-inventario
-INVENTARIO_TEST_DSN="inventario:cambiar@tcp(localhost:3307)/inventario?parseTime=true&loc=UTC&multiStatements=true" \
+INVENTARIO_TEST_DSN="root:cambiar@tcp(localhost:3307)/inventario_test?parseTime=true&loc=UTC&multiStatements=true" \
   go test -race ./services/inventario/...
 ```
 
-Las pruebas se corrieron contra MySQL 8.0 y el Compose usa MySQL 8.4; conviene repetirlas contra el contenedor del proyecto y dejar el resultado en el README del servicio.
+El 04/11/2026 se repitieron sin `-race` contra el contenedor del proyecto (MySQL 8.4), en una base propia de los tests, y pasaron junto con las nuevas de descuento físico y publicación de eventos. Los tests de Ventas (`services/ventas/internal/adaptadores/mysql`) cubren la concurrencia del aviso de pago, la clave repetida, el pago contra el vencimiento y las tareas tomadas por varias réplicas.
 
 **Lo que los tests todavía no cubren** (el comportamiento está implementado, pero sin prueba automática):
 
@@ -143,4 +152,4 @@ Las pruebas se corrieron contra MySQL 8.0 y el Compose usa MySQL 8.4; conviene r
 - Dos transferencias simultáneas sobre la misma variante.
 - La respuesta `409 CLAVE_IDEMPOTENCIA_REUTILIZADA` de punta a punta.
 
-**[propuesta]** Para la defensa: repetir las pruebas de concurrencia contra el servicio completo (varios pedidos simultáneos por el gateway sobre una variante con una sola unidad) y mostrar un solo `201` con el resto en `409 STOCK_INSUFICIENTE`.
+También el 04/11/2026, por el gateway: seis compras simultáneas por todas las unidades disponibles de una variante dieron un solo `201` y cinco `409 STOCK_INSUFICIENTE`, y el disponible quedó en 0.

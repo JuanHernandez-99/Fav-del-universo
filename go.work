@@ -6,5 +6,7 @@ go 1.26.0
 use (
 	./services/catalogo
 	./services/inventario
+	./services/ventas
 	./mocks/catalogo-ventas
+	./mocks/mercadopago-simulador
 )

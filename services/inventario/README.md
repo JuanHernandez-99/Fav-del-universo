@@ -2,7 +2,7 @@
 
 Cuántas unidades hay y dónde: stock por variante y canal (online y físico), reservas con vencimiento, transferencias, ingresos y consignación en el gimnasio.
 
-> Estado: **funcionando** (Entrega 2). Es el servicio real de esta entrega; Catálogo, Ventas y el gimnasio están simulados ([`mocks/`](../../mocks)).
+> Estado: **funcionando** (Entrega 2). El gimnasio sigue simulado ([`mocks/`](../../mocks)).
 
 | | |
 |---|---|
@@ -19,7 +19,7 @@ Desde la raíz del repositorio:
 docker compose up --build
 ```
 
-Levanta Inventario (2 réplicas), su MySQL con stock de ejemplo, el gateway, los mocks, Jaeger y Prometheus.
+Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, junto con el resto del sistema.
 
 ## Probarlo
 
@@ -43,7 +43,7 @@ curl localhost:8080/inventario/v1/reposiciones -H "$A" -H "Idempotency-Key: repo
 curl localhost:8080/inventario/v1/consignacion -H "$A"
 ```
 
-Flujo de punta a punta de la capacidad publicada (el mock de Ventas reserva en Inventario):
+Flujo de punta a punta de la capacidad publicada (Ventas reserva en Inventario):
 
 ```bash
 curl localhost:8080/v1/pedidos -H "X-API-Key: clave-grupo-proveedores" -H "Idempotency-Key: pedido-0001" \
@@ -62,6 +62,7 @@ curl localhost:8080/v1/pedidos -H "X-API-Key: clave-grupo-proveedores" -H "Idemp
 | `GET /v1/stock?variantes=a,b` | Panel | Stock online, físico, reservado y disponible por variante |
 | `POST /v1/ingresos` | Panel | Suma unidades a un canal; da de alta la variante si no existe |
 | `POST /v1/transferencias` | Panel | Mueve unidades entre canales en una transacción |
+| `POST /v1/descuentos-fisicos` | Ventas | Baja el físico por una venta del local; puede quedar negativo (RN-25). `Idempotency-Key` obligatoria. Cuerpo: `referencia`, `items` |
 | `POST /v1/reposiciones` | Panel | Envía prendas al gimnasio (`202`) |
 | `GET /v1/consignacion` | Panel | Stock de FAV en el gimnasio (`503 GIMNASIO_NO_DISPONIBLE` si no responde) |
 | `GET /healthz`, `/readyz`, `/metrics` | Gateway, Prometheus | Vida, disponibilidad (con la base) y métricas |
@@ -75,7 +76,7 @@ Los errores siguen RFC 9457 (`application/problem+json`) con un `codigo` estable
 - **Pago contra vencimiento:** confirmar y vencer bloquean la fila de la reserva (`FOR UPDATE`); gana una sola.
 - **Procesos en dos réplicas:** el vencimiento bloquea cada reserva; las reposiciones se toman con `FOR UPDATE SKIP LOCKED`.
 - **Gimnasio caído:** timeout de 2 s y circuit breaker (se abre tras 5 fallas seguidas y prueba de nuevo a los 30 s). Las reposiciones se reintentan con espera creciente (5 s a 5 min).
-- **Evento `ReservaVencida`:** se guarda en la tabla `outbox` en la misma transacción. El publicador hacia RabbitMQ queda para la entrega siguiente.
+- **Evento `ReservaVencida`:** se guarda en la tabla `outbox` en la misma transacción y un proceso lo publica en el exchange `inventario.eventos`. Con RabbitMQ caído, espera en el outbox. Si ningún consumidor declaró su cola, queda en `inventario.eventos.sin-destino`.
 
 ## Observabilidad
 
@@ -88,7 +89,7 @@ Los errores siguen RFC 9457 (`application/problem+json`) con un `codigo` estable
 ```bash
 go test ./services/inventario/...                       # dominio
 docker compose up -d mysql-inventario                   # integración y concurrencia contra MySQL
-INVENTARIO_TEST_DSN="inventario:cambiar@tcp(localhost:3307)/inventario?parseTime=true&loc=UTC&multiStatements=true" \
+INVENTARIO_TEST_DSN="root:cambiar@tcp(localhost:3307)/inventario_test?parseTime=true&loc=UTC&multiStatements=true" \
   go test ./services/inventario/...
 ```
 
@@ -99,7 +100,8 @@ INVENTARIO_TEST_DSN="inventario:cambiar@tcp(localhost:3307)/inventario?parseTime
 | `INVENTARIO_DB_HOST`, `_NAME`, `_USER`, `_PASSWORD` | `mysql-inventario:3306`, `inventario` | Conexión a MySQL |
 | `INVENTARIO_DATOS_EJEMPLO` | `false` (`true` en Compose) | Carga stock de las variantes del contrato |
 | `GIMNASIO_URL`, `GIMNASIO_API_KEY`, `GIMNASIO_PROVEEDOR_ID`, `GIMNASIO_TIMEOUT_MS` | mock, —, `fav`, `2000` | Capacidad consumida |
-| `VENCIMIENTO_CADA_MS`, `REPOSICIONES_CADA_MS` | `10000`, `5000` | Frecuencia de los procesos |
+| `VENCIMIENTO_CADA_MS`, `REPOSICIONES_CADA_MS`, `PUBLICADOR_CADA_MS` | `10000`, `5000`, `1000` | Frecuencia de los procesos |
+| `RABBITMQ_URL` | — | Sin valor, los eventos quedan en el outbox |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Sin valor, no exporta trazas |
 | `LOG_LEVEL` | `info` | `debug` para más detalle |
 
