@@ -47,6 +47,13 @@ Muestra las piezas desplegables dentro del sistema y cómo se comunican.
 
 Fuente editable: [`diagrams/contenedores.drawio`](diagrams/contenedores.drawio). Las líneas y los bordes punteados son componentes o relaciones previstos o pendientes de definir. Al pie del diagrama, una tabla relaciona cuatro historias con los contenedores que intervienen.
 
+**Diferencias con lo implementado (04/11/2026).** Los diagramas muestran el diseño del 14/10 y se actualizan una sola vez, cuando estén decididos el frontend y la búsqueda:
+
+- Gateway y observabilidad ya tienen tecnología: nginx, Jaeger y Prometheus. Inventario y Catálogo tienen dos réplicas.
+- Mercado Pago y el proveedor de mail se reemplazan en local por un simulador y Mailpit ([ADR-014](adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)).
+- Ventas llama a Catálogo e Inventario por la entrada interna del gateway, no directo. Ventas no publica eventos ni tiene outbox: solo consume `ReservaVencida`.
+- Estados: también llegan a *A verificar* una venta pendiente cuya reserva venció al confirmar y una cancelada que recibe un pago. Un pago rechazado la deja *Cancelada* **[propuesta]**.
+
 **Cómo se actualizan:** se edita el `.drawio` (en [draw.io](https://app.diagrams.net) o con la extensión de VS Code) y se vuelve a exportar el `.png` con el mismo nombre. El `.png` es lo que se ve en GitHub; el `.drawio` es la fuente.
 
 ## 4. Servicios, responsabilidades y datos
@@ -55,7 +62,7 @@ Fuente editable: [`diagrams/contenedores.drawio`](diagrams/contenedores.drawio).
 |---|---|---|
 | Catálogo | Productos, variantes, fotos, categorías, precios base, promociones y publicación. Calcula el precio vigente. Expone el catálogo al grupo de proveedores. | Productos con sus variantes, promociones |
 | Inventario | Stock por variante y canal, reservas con vencimiento, transferencias, ingresos, ajustes y movimientos. Consulta y repone el stock en consignación del gimnasio. | Stock, reservas, movimientos (incluidas las salidas a consignación), reposiciones pendientes, outbox, mensajes procesados. |
-| Ventas | Ventas online y del local, estados, pagos (Mercado Pago y transferencia) y envío de mails. Recibe los pedidos del grupo de proveedores. | Ventas (con el id y el email del comprador, o el grupo externo que compró), ítems, pagos, registro de mails, outbox, mensajes procesados. |
+| Ventas | Ventas online y del local, estados, pagos (Mercado Pago y transferencia) y envío de mails. Recibe los pedidos del grupo de proveedores. | Ventas (con el id y el email del comprador, o el grupo externo que compró), ítems, pagos, tareas pendientes hacia Inventario, registro de mails, mensajes procesados. |
 | Usuarios | Registro, inicio de sesión, emisión del token (id, email y rol) y roles. | Usuarios, hash de contraseña, rol |
 
 ### Estilo interno de cada servicio (preliminar, D2)

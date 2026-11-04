@@ -23,7 +23,7 @@ Carpetas: `api/` (OpenAPI), `db/` (scripts, datos de ejemplo y consultas de Mong
 |---|---|
 | **Base de datos** | MongoDB, un documento por producto con sus variantes ([ADR-003](../../docs/adr/ADR-003-persistencia.md)) |
 | **Estilo interno** | Capas: Handler → Service → Repository (D2) |
-| **Réplicas** | Dos, por ser el servicio más leído **[propuesta]** (D12) |
+| **Réplicas** | Dos, por ser el servicio más leído ([ADR-012](../../docs/adr/ADR-012-balanceo.md)) |
 
 ## Qué no hace
 

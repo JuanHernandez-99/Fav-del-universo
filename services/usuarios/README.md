@@ -2,7 +2,7 @@
 
 Registro, inicio de sesión, emisión del token y roles (comprador y administrador).
 
-> Estado: **previsto** (Entrega 2). Hoy solo está el diseño. **[propuesta]** marca lo no confirmado.
+> Estado: **previsto**. Hoy solo está el diseño. **[propuesta]** marca lo no confirmado.
 
 | | |
 |---|---|

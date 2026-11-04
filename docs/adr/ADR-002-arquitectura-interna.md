@@ -33,7 +33,7 @@ Los cuatro servicios tienen problemas de distinta naturaleza (ARCHITECTURE §4):
 | -------------- | ----------------------------------------- | ---------------- |
 | **Inventario** | Hexagonal (puertos y adaptadores)         | **Implementado** |
 | **Ventas**     | Hexagonal                                 | Implementado     |
-| **Catálogo**   | Capas: Handler → Service → Repository     | **Implementado en parte** |
+| **Catálogo**   | Capas: Handler → Service → Repository     | Implementado     |
 | **Usuarios**   | Capas                                     | _Previsto_       |
 
 Las razones de cada estilo están en ARCHITECTURE §4. Este ADR registra cómo quedó aplicado en Inventario, que es el único servicio real de esta entrega.
@@ -116,7 +116,7 @@ La carrera la decide la base, no el núcleo: el puerto del repositorio expresa *
 
 - **Tests de la capa `aplicacion` con repositorio y gimnasio falsos.** Hoy el núcleo se cubre con tests de dominio y con los de integración contra MySQL. Los de integración usan el repositorio real y no reemplazan a los unitarios del servicio de aplicación.
 - **Sacar las etiquetas `json` del dominio** y mover el formato al adaptador HTTP.
-- **Aplicar el estilo hexagonal a Ventas y el de capas a Catálogo y Usuarios** cuando se implementen. La consigna pide dos estilos aplicados de manera reconocible para la presentación grupal.
+- **Aplicar el estilo de capas a Usuarios** cuando se implemente. Hexagonal en Inventario y Ventas y capas en Catálogo ya cubren los dos estilos que pide la consigna.
 
 ## Validación
 

@@ -151,7 +151,8 @@ curl -X POST http://localhost:8090/v1/pedidos \
 
 | Entorno | URL | Estado |
 |---|---|---|
-| Mock local | `http://localhost:8090` | Disponible. Ver [`mocks/catalogo-pedidos-v1/`](../../mocks/catalogo-pedidos-v1). |
+| Mock local | `http://localhost:8090` | Disponible. Ver [`mocks/catalogo-pedidos-v1/`](../../mocks/catalogo-pedidos-v1). Responde ejemplos fijos. |
+| Local, con los servicios reales | `http://localhost:8080` | Disponible con `docker compose up --build`. Clave de prueba: `clave-grupo-proveedores`. |
 | Desplegado (nube) | **[?]** | Antes de la presentación grupal. |
 
 ## 7. Contacto

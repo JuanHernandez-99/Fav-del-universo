@@ -9,6 +9,8 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
+> **Actualización 04/11/2026:** Catálogo ya es real y también tiene dos réplicas. Ventas tiene una. Ver la validación al final.
+
 ## Contexto
 
 La consigna pide al menos un servicio con más de una réplica y un mecanismo que reparta los pedidos entre ellas. ARCHITECTURE proponía replicar Catálogo por ser el más leído, pero en la Entrega 2 Catálogo es un mock. **Inventario es el servicio real**, así que se replica Inventario. Además es el que recibe las operaciones concurrentes sobre el stock (reservas), lo que pone a prueba que las réplicas no se pisen.
@@ -51,7 +53,7 @@ Ventas llama a Inventario por el gateway (puerto interno 8081, sin publicar), no
 ### 4. Réplicas sin estado compartido en memoria
 
 - Todo el estado está en MySQL. No hace falta afinidad de sesión (sticky sessions).
-- Los procesos periódicos (vencer reservas, enviar reposiciones) corren en las dos réplicas. La base evita que procesen lo mismo: bloqueo de la fila de la reserva (`FOR UPDATE`) y `FOR UPDATE SKIP LOCKED` en las reposiciones.
+- Los procesos periódicos (vencer reservas, enviar reposiciones, publicar eventos) corren en las dos réplicas. La base evita que procesen lo mismo: bloqueo de la fila de la reserva (`FOR UPDATE`) y `FOR UPDATE SKIP LOCKED` en las reposiciones y el outbox.
 
 ## Alternativas consideradas
 
@@ -62,7 +64,7 @@ Ventas llama a Inventario por el gateway (puerto interno 8081, sin publicar), no
 | **HAProxy** | Tiene chequeos activos de salud en la versión libre, pero obliga a sumar un proxy delante o detrás del gateway. |
 | **Balanceo del lado del cliente** (Ventas elige la réplica) | Cada servicio que llama a Inventario tendría que implementarlo. |
 | **Least connections en vez de round robin** | Con pedidos cortos y parecidos, como los de Inventario, no hay diferencia práctica. Round robin es más fácil de verificar. |
-| **Replicar Catálogo** (como proponía ARCHITECTURE) | En esta entrega Catálogo es un mock: replicarlo no demuestra nada sobre un servicio real. Se puede replicar también cuando exista. |
+| **Replicar solo Catálogo** (como proponía ARCHITECTURE) | En la Entrega 2 Catálogo era un mock: replicarlo no demostraba nada sobre un servicio real. Hoy ya está replicado junto con Inventario. |
 
 ## Consecuencias
 
@@ -93,6 +95,19 @@ Ventas llama a Inventario por el gateway (puerto interno 8081, sin publicar), no
 - **Entrega 2:** deteniendo una réplica (`docker stop` sobre uno de los contenedores de `inventario`), los pedidos siguen respondiendo y la réplica caída deja de recibir tráfico. Al levantarla, vuelve a recibir.
 - **Entrega 2:** dos reservas concurrentes sobre la misma variante, atendidas por réplicas distintas, no apartan más stock del que hay.
 - **Pruebas de carga (ADR-013):** latencia y errores con una y con dos réplicas.
+
+## Validación (04/11/2026)
+
+| Comprobación | Resultado |
+|---|---|
+| 20 pedidos seguidos a Inventario | 10 a cada réplica, según el campo `upstream` del log del gateway |
+| 20 pedidos seguidos a `GET /v1/productos` (Catálogo) | 10 a cada réplica |
+| 20 pedidos con una réplica de Inventario detenida | Los 20 respondieron `200` |
+| Réplica levantada de nuevo | Vuelve a recibir pedidos, sin reiniciar nginx |
+| Prometheus | Una serie por réplica de Inventario (`instance`) |
+| Seis compras simultáneas por las últimas unidades, por el gateway | Un `201` y cinco `409` (ADR-004) |
+
+**Sin probar:** un `POST` cortado a mitad de camino al caer una réplica, y las pruebas de carga. En Catálogo no se ve el reparto en Prometheus porque no expone métricas; sí en el log del gateway.
 
 ---
 

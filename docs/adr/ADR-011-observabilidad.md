@@ -9,6 +9,8 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
+> **Actualización 04/11/2026:** Ventas ya es real y usa el mismo paquete de observabilidad. Catálogo sigue sin trazas ni métricas. Ver la validación al final.
+
 ## Contexto
 
 El SPEC pide dos cosas que no se resuelven mirando cada servicio por separado:
@@ -45,12 +47,12 @@ En la Entrega 2 corren Inventario (real, dos réplicas), el gateway (nginx) y lo
 
 ### 3. Trazas
 
-- Propagación con **W3C Trace Context** (`traceparent`). nginx reenvía el encabezado sin tocarlo, así la traza del mock de Ventas y la de Inventario quedan unidas aunque pasen por el gateway.
+- Propagación con **W3C Trace Context** (`traceparent`). nginx reenvía el encabezado sin tocarlo, así la traza de Ventas y la de Inventario quedan unidas aunque pasen por el gateway.
 - Spans: un span por pedido HTTP entrante, uno por llamada HTTP saliente (al gimnasio, a Inventario) y uno por consulta a MySQL.
 - Las consultas de los procesos periódicos solo se trazan si forman parte de una operación (vencer una reserva, enviar una reposición), para no llenar Jaeger de trazas sueltas.
 - Sin `OTEL_EXPORTER_OTLP_ENDPOINT` el servicio no exporta, pero igual propaga el contexto. Así los tests no necesitan Jaeger.
 
-### 4. Métricas de Inventario
+### 4. Métricas de Inventario y Ventas
 
 | Métrica | Tipo | Etiquetas | Responde |
 |---|---|---|---|
@@ -58,11 +60,12 @@ En la Entrega 2 corren Inventario (real, dos réplicas), el gateway (nginx) y lo
 | `http_duracion_segundos` | Histograma | `ruta`, `metodo` | Latencia (p50, p95, p99) |
 | `dependencia_llamadas_total` | Contador | `dependencia`, `resultado` | Fallas del gimnasio: `ok`, `error`, `rechazada`, `circuito_abierto` |
 | `circuit_breaker_estado` | Gauge | `dependencia` | 0 cerrado, 1 semiabierto, 2 abierto (ADR-010) |
-| `proceso_elementos_total` | Contador | `proceso` | Reservas vencidas y reposiciones enviadas |
+| `proceso_elementos_total` | Contador | `proceso` | Reservas vencidas, reposiciones y eventos enviados; en Ventas, tareas ejecutadas y mails enviados |
+| `mensajes_consumidos_total` | Contador | `resultado` | Solo Ventas: `ok`, `reintento` y `fallido` (los que van a la DLQ) |
 
 La etiqueta `ruta` es el **patrón** registrado (`/v1/reservas/{id}`), no la URL, para no crear una serie por cada id.
 
-Prometheus descubre las réplicas por el DNS de Docker (`dns_sd_configs` sobre `inventario`) y scrapea cada una por separado cada 5 s. La etiqueta `instance` muestra el reparto de carga del ADR-012.
+Prometheus descubre las réplicas por el DNS de Docker (`dns_sd_configs` sobre `inventario` y `ventas`) y scrapea cada una por separado cada 5 s. La etiqueta `instance` muestra el reparto de carga del ADR-012.
 
 ## Alternativas consideradas
 
@@ -79,7 +82,7 @@ Prometheus descubre las réplicas por el DNS de Docker (`dns_sd_configs` sobre `
 
 **Positivas**
 
-- Un pedido se sigue entre gateway, mock de Ventas, réplica de Inventario, MySQL y gimnasio con un solo `trace_id`.
+- Un pedido se sigue entre Ventas, una réplica de Inventario y MySQL con un solo `trace_id`, y también por `correlation_id` en los logs del gateway.
 - Los servicios no dependen de Jaeger ni de Prometheus para funcionar: si caen, se pierden señales pero no pedidos.
 - Se ve qué réplica atendió cada pedido y cómo se reparte la carga.
 - Cambiar de backend de trazas no requiere cambiar código.
@@ -100,7 +103,7 @@ Para la entrega de observabilidad:
 - **Retención:** volumen para Prometheus y `--storage.tsdb.retention.time` de al menos 15 días **[propuesta]** (RNF-03 pide dos semanas).
 - **Almacenamiento persistente de trazas** **[?]**, si hace falta revisarlas después de reiniciar.
 - **Métricas de caché** (RNF-05, ADR-007) y de RabbitMQ, cuando existan.
-- Instrumentar Catálogo, Ventas y Usuarios con el mismo paquete cuando dejen de ser mocks.
+- Instrumentar Catálogo y Usuarios con el mismo paquete. Mientras tanto, las llamadas a Catálogo aparecen en la traza solo del lado de Ventas.
 
 ## Validación prevista
 
@@ -108,6 +111,17 @@ Para la entrega de observabilidad:
 - **Entrega 2:** en Prometheus, `http_pedidos_total` muestra los pedidos separados por réplica (`instance`) y por código.
 - **Entrega 2:** con el mock del gimnasio fallando, `dependencia_llamadas_total{resultado="error"}` crece y `circuit_breaker_estado` pasa a 2.
 - **Entrega de observabilidad:** el tablero responde "cuántos 404 hubo la semana pasada" y la alerta se dispara provocando errores 5xx.
+
+## Validación con Ventas real (04/11/2026)
+
+| Comprobación | Resultado |
+|---|---|
+| Un `POST /v1/pedidos` con un `X-Correlation-Id` | El id aparece en los logs del gateway, de Ventas y de Inventario |
+| La traza de ese pedido en Jaeger | Una sola traza con Ventas e Inventario (24 spans). Catálogo no aparece: no está instrumentado |
+| Prometheus | Inventario (cada réplica por separado) y Ventas en estado `up`. Catálogo no expone métricas |
+| Id generado por el gateway | Llega a Inventario desde el panel. En Catálogo no se puede comprobar: no lo usa todavía |
+
+**Sin probar con el sistema levantado:** `circuit_breaker_estado = 2` con el gimnasio fallando.
 
 ---
 
