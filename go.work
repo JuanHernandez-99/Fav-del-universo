@@ -4,9 +4,8 @@
 go 1.26.0
 
 use (
+	./mocks/mercadopago-simulador
 	./services/catalogo
 	./services/inventario
 	./services/ventas
-	./mocks/catalogo-ventas
-	./mocks/mercadopago-simulador
 )

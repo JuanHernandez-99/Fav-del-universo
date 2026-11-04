@@ -260,9 +260,9 @@ Lo que todavía no existe en el repositorio es previsto y se agrega en entregas 
 ├── observabilidad/             # configuración de Prometheus
 ├── loadtest/                   # guion de carga (k6)
 ├── frontend/
-└── mocks/                      # contrato publicado, Catálogo/Ventas y gimnasio
+└── mocks/                      # contrato publicado, Mercado Pago y gimnasio
     ├── catalogo-pedidos-v1/
-    ├── catalogo-ventas/
+    ├── mercadopago-simulador/
     └── gimnasio-consignacion/
 ```
 
