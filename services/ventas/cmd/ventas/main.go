@@ -99,12 +99,17 @@ func correr() error {
 		slog.Warn("RABBITMQ_URL sin definir: las ventas no pasan a Vencida")
 	}
 
+	var opcionesRouter []adaptadorhttp.Opcion
+	if os.Getenv("CAPACIDAD_PUBLICA_ACTIVA") == "false" {
+		opcionesRouter = append(opcionesRouter, adaptadorhttp.SinCapacidadPublica())
+	}
+
 	servidor := &http.Server{
 		Addr: ":" + variable("VENTAS_PUERTO", "8080"),
 		Handler: conLimiteDeTiempo(adaptadorhttp.NuevoRouter(s, adaptadorhttp.DatosTransferencia{
 			Alias:   variable("TRANSFERENCIA_ALIAS", "FAV.EJEMPLO.ALIAS"),
 			Titular: variable("TRANSFERENCIA_TITULAR", "FAV (ejemplo)"),
-		}), 4500*time.Millisecond),
+		}, opcionesRouter...), 4500*time.Millisecond),
 		ReadHeaderTimeout: 5 * time.Second,
 		WriteTimeout:      10 * time.Second,
 	}

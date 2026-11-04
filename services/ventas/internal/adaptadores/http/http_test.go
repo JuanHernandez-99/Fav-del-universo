@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/dominio"
@@ -76,6 +77,26 @@ func TestRutasDeAdminExigenElRol(t *testing.T) {
 	h(httptest.NewRecorder(), r)
 	if !llamado {
 		t.Error("el administrador debe entrar")
+	}
+}
+
+// ADR-008: los pedidos externos se pueden apagar sin tocar la tienda.
+func TestPedidosExternosSePuedenApagar(t *testing.T) {
+	pedir := func(h http.Handler, metodo, ruta string) int {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(metodo, ruta, strings.NewReader("{")))
+		return w.Code
+	}
+	apagada := NuevoRouter(nil, DatosTransferencia{}, SinCapacidadPublica())
+	if c := pedir(apagada, http.MethodPost, "/v1/pedidos"); c != http.StatusNotFound {
+		t.Errorf("apagada: código %d", c)
+	}
+	if c := pedir(apagada, http.MethodPost, "/v1/compras"); c != http.StatusBadRequest {
+		t.Errorf("la compra online tiene que seguir: código %d", c)
+	}
+	// Prendida, la ruta existe: un cuerpo roto da 400, no 404.
+	if c := pedir(NuevoRouter(nil, DatosTransferencia{}), http.MethodPost, "/v1/pedidos"); c != http.StatusBadRequest {
+		t.Errorf("prendida: código %d", c)
 	}
 }
 

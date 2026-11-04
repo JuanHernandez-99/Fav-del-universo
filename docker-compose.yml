@@ -56,6 +56,7 @@ services:
     deploy: { replicas: 2 } # ADR-012
     environment:
       MONGO_HOST: mongo-catalogo:27017
+      CAPACIDAD_PUBLICA_ACTIVA: ${CAPACIDAD_PUBLICA_ACTIVA:-true}
       MONGO_DB: ${MONGO_DB:-catalogo}
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
@@ -99,6 +100,7 @@ services:
     environment:
       <<: *otel
       VENTAS_DB_HOST: mysql-ventas:3306
+      CAPACIDAD_PUBLICA_ACTIVA: ${CAPACIDAD_PUBLICA_ACTIVA:-true}
       VENTAS_DB_NAME: ${VENTAS_DB_NAME:-ventas}
       VENTAS_DB_USER: ${VENTAS_DB_USER:-ventas}
       VENTAS_DB_PASSWORD: ${VENTAS_DB_PASSWORD:-cambiar}

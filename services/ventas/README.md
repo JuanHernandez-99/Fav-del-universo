@@ -126,6 +126,7 @@ Los tests de integración usan la base `ventas_test`, no la del servicio.
 | `VENTAS_DB_HOST`, `_NAME`, `_USER`, `_PASSWORD` | `mysql-ventas:3306`, `ventas` | Conexión a MySQL |
 | `CATALOGO_URL`, `INVENTARIO_URL` | `http://gateway:8081/catalogo`, `http://gateway:8081` | Pasan por el balanceo |
 | `RABBITMQ_URL` | — | Sin valor, las ventas no pasan a *Vencida* |
+| `CAPACIDAD_PUBLICA_ACTIVA` | activa | Con `false`, apaga `POST /v1/pedidos` ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)) |
 | `MERCADOPAGO_URL`, `_ACCESS_TOKEN`, `_WEBHOOK_SECRET`, `_URL_AVISO`, `_TIMEOUT_MS` | simulador, —, —, gateway, `5000` | Proveedor de pagos |
 | `SMTP_DIRECCION`, `SMTP_TIMEOUT_MS`, `MAIL_FROM`, `MAIL_ADMIN` | `mailpit:1025`, `10000`, `ventas@fav.example`, `admin@fav.example` | Mails |
 | `TRANSFERENCIA_ALIAS`, `TRANSFERENCIA_TITULAR` | ficticios | **[?]** Los define el cliente |
