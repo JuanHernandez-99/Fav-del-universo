@@ -77,6 +77,7 @@ Ventas llama a Inventario por el gateway (puerto interno 8081, sin publicar), no
 
 **Negativas aceptadas**
 
+- **Recuperación después de caer todas las réplicas.** Medido el 05/11/2026: el servicio tarda hasta unos 10 s en volver a responder por el gateway después de arrancar, y mientras tanto el gateway responde `503` con `Retry-After`. Además, en unas 2 de cada 10 corridas de `gateway/pruebas/tienda.mjs` hubo un `503` poco después del primer `200`. En los logs aparecen `could not be resolved` y `no live upstreams`: la causa probable es que nginx vuelve a consultar el DNS cada 5 s, sin confirmar. No se reprodujo en 6 caídas medidas con pedidos cada 100 ms. Quien reintenta, como indica el contrato, no lo nota.
 - **Detección solo pasiva:** nginx libre no tiene chequeos activos. Una réplica caída se descubre cuando falla un pedido real; ese pedido se reintenta en la otra si el error fue de conexión, pero un POST que se cortó a mitad de camino devuelve error.
 - **El gateway es un solo contenedor:** si nginx cae, no entra ningún pedido. Se acepta para el entorno local **[?]** y se revisa en el despliegue (ADR-013).
 - **Las dos réplicas comparten MySQL:** replicar Inventario no escala la base, que sigue siendo un punto único.

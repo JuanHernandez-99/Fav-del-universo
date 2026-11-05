@@ -50,6 +50,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | | Envío de reposiciones | Un trabajador secuencial por réplica, lotes de 50 | Que el gimnasio no reciba ráfagas de llamadas simultáneas |
 | **Degradación honesta (fallback)** | Panel → consignación | `503 GIMNASIO_NO_DISPONIBLE` con `Retry-After: 30`; el resto del panel sigue | No inventar el stock del gimnasio |
 | | Inventario ante pedidos que no llegan a tiempo | `503 NO_DISPONIBLE` con `Retry-After: 1` | El cliente sabe que puede reintentar |
+| | Gateway sin réplicas de un servicio | `503 NO_DISPONIBLE` con `Retry-After: 1`, en JSON, en lugar del `502` o `504` en HTML de nginx. La página de la tienda responde `503` en HTML | El consumidor recibe lo que promete el contrato (`gateway/pruebas/errores.mjs`) |
 | **Balanceo con verificación pasiva** | Gateway → 2 réplicas de Inventario | Una réplica que falla 2 veces en 10 s sale del reparto 10 s | Que la caída de una réplica no se note (ADR-012) |
 | **Límite de pedidos (admisión)** | Gateway, capacidad publicada | 60 pedidos por minuto por grupo, ráfagas de 20; el exceso recibe `429` | Que un pico del consumidor externo no sature a FAV |
 | **Idempotencia** | Reservas, ingresos, transferencias y reposiciones | Clave única persistida (ADR-004) | Que cualquier reintento sea seguro |

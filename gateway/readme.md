@@ -10,6 +10,7 @@ Punto de entrada único del sistema: valida el token, rutea a los servicios y co
 - Recibe el aviso de pago de Mercado Pago y lo reenvía a Ventas.
 - Deja pasar sin token la lectura de la tienda: `/catalogo/v1/tienda/productos` y `/inventario/v1/disponibilidad`. El resto de `/catalogo/` e `/inventario/` sigue siendo solo de administrador.
 - Sirve la tienda en `/`, en el mismo origen que la API ([ADR-017](../docs/adr/ADR-017-frontend.md)).
+- Si no queda ninguna réplica responde `503 NO_DISPONIBLE`, y si se supera un límite, `429 LIMITE_EXCEDIDO`, ambos en JSON y con `Retry-After`, como pide el contrato. Los errores de los servicios pasan tal cual.
 - **No tiene lógica de negocio ni compone respuestas** de varios servicios.
 - Balancea entre las dos réplicas de Inventario y las dos de Catálogo.
 
@@ -30,6 +31,14 @@ Fabrica tokens falsos (sin firma, firmados con otra clave, con el rol cambiado, 
 node gateway/pruebas/tienda.mjs
 ```
 
-Comprueba productos, filtros, paginación, promociones, unidades disponibles, que el resto siga protegido (también con `../`) y las caídas de Inventario y de Catálogo. Detiene y vuelve a levantar esos dos servicios, y deja datos de prueba en la base. Último resultado, el 05/11/2026: 44 de 44 en tres corridas seguidas; una corrida anterior falló en un chequeo, sin causa confirmada.
+Comprueba productos, filtros, paginación, promociones, unidades disponibles, que el resto siga protegido (también con `../`) y las caídas de Inventario y de Catálogo. Detiene y vuelve a levantar esos dos servicios, y deja datos de prueba en la base. Espera unos segundos después de reiniciar Inventario, por lo que explica [ADR-012](../docs/adr/ADR-012-balanceo.md).
+
+## Probar sus errores
+
+```bash
+node gateway/pruebas/errores.mjs
+```
+
+Detiene y vuelve a levantar cada servicio. Último resultado, el 05/11/2026: 35 de 35. Decisión en [ADR-010](../docs/adr/ADR-010-resiliencia.md).
 
 [Arquitectura §6](../docs/ARCHITECTURE.md)

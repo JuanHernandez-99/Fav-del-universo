@@ -107,6 +107,7 @@ console.log(`      (código ${sinInv.status}, tipo ${sinInv.headers.get('content
 check('Inventario caído: los productos se siguen viendo', (await http('GET', TIENDA)).status === 200);
 dc('start inventario');
 check('Inventario vuelve', await esperar(async () => (await http('GET', `${GW}/inventario/v1/disponibilidad?variantes=${varM}`)).status === 200));
+await new Promise((f) => setTimeout(f, 12000)); // tras reiniciar todas las réplicas, ver "Negativas" en ADR-012
 dc('stop catalogo');
 const sinCat = await http('GET', TIENDA);
 check('Catálogo caído: error en el listado', sinCat.status >= 500, sinCat.status);
