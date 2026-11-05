@@ -343,7 +343,6 @@ services/inventario/            # hexagonal
 | Contrato del gimnasio y cómo identifica los productos de FAV | D9 |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
 | Dónde se almacenan las fotos de los productos                                                 | D3                                        |
-| Dónde guarda el token el frontend                                                             | Implementación del frontend               |
 | Proveedor de nube                                                                             | D13                                       |
 
 ## 16. Limitaciones conocidas y deuda técnica

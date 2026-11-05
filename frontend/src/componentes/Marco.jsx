@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useCarrito } from '../carrito/contexto.jsx';
+import { useSesion } from '../sesion/contexto.jsx';
 import { CATEGORIAS } from '../dominio.js';
 
 function Buscador() {
@@ -25,6 +26,24 @@ function Buscador() {
   );
 }
 
+// Fuera de esas páginas, ingresar vuelve a donde estaba el comprador.
+function enlaceIngresar(pathname, search) {
+  if (pathname === '/' && !search) return '/ingresar';
+  if (pathname === '/ingresar' || pathname === '/registrarme') return `/ingresar${search}`;
+  return `/ingresar?volver=${encodeURIComponent(pathname + search)}`;
+}
+
+function Cuenta({ pathname, search }) {
+  const { sesion, cerrar } = useSesion();
+  if (!sesion) return <Link to={enlaceIngresar(pathname, search)} className="enlace-cuenta">Ingresar</Link>;
+  return (
+    <div className="cuenta">
+      <span className="cuenta-email" title={sesion.email}>{sesion.email}</span>
+      <button type="button" className="boton-texto" onClick={cerrar}>Salir</button>
+    </div>
+  );
+}
+
 export default function Marco() {
   const { unidades } = useCarrito();
   const { pathname, search } = useLocation();
@@ -45,7 +64,8 @@ export default function Marco() {
             <span className="marca-universo">del universo</span>
           </Link>
           <Buscador />
-          <nav aria-label="Principal">
+          <nav className="navegacion" aria-label="Principal">
+            <Cuenta pathname={pathname} search={search} />
             <NavLink to="/carrito" className="enlace-carrito" aria-label={`Carrito, ${unidades} ${unidades === 1 ? 'prenda' : 'prendas'}`}>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l1.200 12H4.800L6 8Z" /><path d="M9 10V6.500a3 3 0 0 1 6 0V10" /></svg>
               <span>Carrito</span>

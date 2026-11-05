@@ -219,6 +219,38 @@ button:disabled { cursor: not-allowed; }
 .carrito-resumen-nota { margin-bottom: .9rem; font-size: .84rem; color: var(--tinta-suave); }
 .carrito-seguir { display: block; margin-top: .9rem; font-size: .88rem; font-weight: 600; text-align: center; text-underline-offset: 3px; }
 
+/* ---------- Cuenta ---------- */
+.navegacion { display: flex; align-items: center; gap: clamp(.8rem, 2vw, 1.5rem); }
+.enlace-cuenta { font-weight: 600; font-size: .93rem; text-decoration: none; }
+.enlace-cuenta:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cuenta { display: flex; align-items: center; gap: .7rem; font-size: .88rem; }
+.cuenta-email { max-width: 13rem; overflow: hidden; color: var(--tinta-suave); text-overflow: ellipsis; white-space: nowrap; }
+
+.acceso { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: calc(100vh - 4.6rem); }
+.acceso-lateral { position: relative; display: flex; align-items: flex-end; overflow: hidden; padding: clamp(2rem, 5vw, 4rem); background: radial-gradient(90% 130% at 82% 18%, #4a3468 0%, var(--noche) 58%); color: var(--papel); }
+.acceso-lateral p { position: relative; max-width: 11ch; font: 400 clamp(2.4rem, 4.6vw, 4.1rem)/1.02 var(--serif); letter-spacing: -.015em; }
+.acceso-lateral em { font-weight: 300; color: var(--astro); }
+.acceso-astro { position: absolute; right: -4rem; top: 7%; width: min(82%, 480px); fill: none; stroke: var(--astro); stroke-width: 1.2; opacity: .85; }
+.acceso-astro circle:first-child { fill: color-mix(in srgb, var(--astro) 14%, transparent); }
+.acceso-astro circle:last-child { fill: var(--astro); stroke: none; }
+.acceso-formulario { display: flex; flex-direction: column; justify-content: center; width: min(100%, 27rem); margin: auto; padding: 2.5rem var(--margen); }
+.acceso-formulario h1 { font-size: clamp(2.2rem, 4vw, 3.2rem); font-weight: 400; }
+.acceso-bajada { margin: .7rem 0 1.6rem; color: var(--tinta-suave); }
+.acceso-error { margin-bottom: 1.1rem; padding: .7rem .9rem; background: #fbe6e1; border-left: 3px solid var(--coral); border-radius: 3px; font-size: .9rem; color: var(--coral-oscuro); }
+.acceso-campo { display: block; margin-bottom: 1.1rem; }
+.acceso-campo > span { display: block; margin-bottom: .3rem; font-size: .84rem; font-weight: 600; }
+.acceso-campo input { width: 100%; height: 2.95rem; padding: 0 .85rem; background: #fff; border: 1px solid var(--linea); border-radius: 8px; }
+.acceso-campo input:hover { border-color: var(--tinta-suave); }
+.acceso-campo input[aria-invalid='true'] { border-color: var(--coral); }
+.acceso-campo small { display: block; margin-top: .3rem; font-size: .8rem; color: var(--coral-oscuro); }
+.acceso-campo small.acceso-ayuda { color: var(--tinta-suave); }
+.acceso-contrasena { position: relative; }
+.acceso-contrasena input { padding-right: 5rem; }
+.acceso-contrasena button { position: absolute; right: .85rem; top: 50%; transform: translateY(-50%); }
+.acceso-formulario .boton { margin-top: .4rem; }
+.acceso-cambiar { margin-top: 1.2rem; font-size: .9rem; text-align: center; color: var(--tinta-suave); }
+.acceso-cambiar a { font-weight: 600; color: var(--tinta); text-underline-offset: 3px; }
+
 /* ---------- Pie ---------- */
 .pie { background: var(--noche); color: #d9d0e4; font-size: .9rem; }
 .pie-interior { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2rem; max-width: var(--ancho); margin: auto; padding: 3rem var(--margen); }
@@ -233,6 +265,10 @@ button:disabled { cursor: not-allowed; }
 /* ---------- Pantallas chicas ---------- */
 @media (max-width: 900px) {
   .ficha { grid-template-columns: 1fr; }
+  .acceso { grid-template-columns: 1fr; min-height: 0; }
+  .acceso-lateral { display: none; }
+  .acceso-formulario { padding-block: 3rem 4rem; }
+  .cuenta-email { display: none; }
   .ficha-datos, .carrito-resumen { position: static; }
   .carrito-columnas { grid-template-columns: 1fr; }
   .portada-astro { opacity: .35; }
@@ -240,6 +276,7 @@ button:disabled { cursor: not-allowed; }
 @media (max-width: 640px) {
   .encabezado-interior { flex-wrap: wrap; justify-content: space-between; gap: .6rem 1rem; }
   .buscador { order: 3; flex-basis: 100%; max-width: none; }
+  .enlace-carrito > span:not(.contador) { display: none; }
   .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .categorias { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .filtros-plegar { display: block; }

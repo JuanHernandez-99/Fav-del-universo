@@ -34,6 +34,17 @@ export function obtenerProducto(id, opciones) {
   return pedir(`/catalogo/v1/tienda/productos/${encodeURIComponent(id)}`, opciones);
 }
 
+function enviarCredenciales(ruta, email, contrasena) {
+  return pedir(ruta, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, contrasena }),
+  });
+}
+
+export const registrarUsuario = (email, contrasena) => enviarCredenciales('/usuarios/v1/registro', email, contrasena);
+export const iniciarSesion = (email, contrasena) => enviarCredenciales('/usuarios/v1/sesiones', email, contrasena);
+
 const MAXIMO_POR_CONSULTA = 200; // límite de la ruta de Inventario
 
 // Devuelve { varianteId: unidades disponibles online } con lo que responde Inventario (HU-01.5).
