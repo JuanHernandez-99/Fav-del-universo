@@ -30,6 +30,7 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 | **Clave de idempotencia** | La genera el navegador y se guarda en `sessionStorage` junto con el contenido del pedido. El mismo pedido reintentado usa la misma clave (HU-11.8); si cambió, una nueva |
 | **Volver de Mercado Pago** | El pago se abre en otra pestaña y la tienda sigue abierta. Con cuenta, la tienda consulta el estado cada 3 s mientras está pendiente. Sin cuenta no hay de dónde consultarlo (RN-24): se informa por mail |
 | **Datos al cerrar la sesión** | "Salir" borra el token, las compras guardadas en la pestaña y la clave de idempotencia. No se muestra una compra de otra cuenta en una computadora compartida. El carrito se conserva, porque no es de la cuenta sino del navegador (HU-10.4) |
+| **Panel** | En la misma aplicación, en `/panel`, solo para el rol administrador. Esconderlo es comodidad: cada pedido lo autoriza el gateway con el rol del token (ADR-016) |
 | **Composición** | Productos y unidades disponibles se piden por separado y el frontend junta las respuestas (ADR-006) |
 | **Stock visible** | El comprador ve las unidades online disponibles, sin físico ni reservadas (HU-01.5). La ficha y el carrito no dejan pedir más. Es un dato del momento: la reserva la decide Inventario al comprar (`409 STOCK_INSUFICIENTE`) |
 

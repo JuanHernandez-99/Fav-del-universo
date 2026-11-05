@@ -2,7 +2,7 @@
 
 Tienda para el comprador y panel para el administrador. React con Vite ([ADR-017](../docs/adr/ADR-017-frontend.md)).
 
-> Estado: **en curso**. Están el catálogo, la búsqueda, los filtros, la ficha, el carrito, el registro, el inicio de sesión la compra con los dos medios de pago y "Mis compras". Faltan la política de cambios y el panel.
+> Estado: **en curso**. Están el catálogo, la búsqueda, los filtros, la ficha, el carrito, el registro, el inicio de sesión la compra con los dos medios de pago, "Mis compras" y en el panel, las ventas: confirmar transferencias y avanzar pedidos. Faltan la política de cambios y el resto del panel.
 
 - **El carrito vive en el navegador** y se envía completo a Ventas al comprar ([ADR-001](../docs/adr/ADR-001-limites-de-los-servicios.md)).
 - **Habla solo con el gateway**, en el mismo origen. Todas las llamadas están en `src/api.js`.

@@ -318,6 +318,41 @@ button:disabled { cursor: not-allowed; }
 .mis-compras .aviso { margin: 0 0 1rem; }
 .resultado-mis-compras { display: block; width: fit-content; margin-top: 1rem; font-size: .9rem; font-weight: 600; text-underline-offset: 3px; }
 
+/* ---------- Panel ---------- */
+.panel { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: clamp(1.5rem, 4vw, 3.5rem); max-width: var(--ancho); min-height: 70vh; margin: auto; padding: clamp(1.6rem, 3vw, 2.8rem) var(--margen) 4rem; }
+.panel-menu { position: sticky; top: 5.6rem; align-self: start; display: flex; flex-direction: column; gap: .2rem; }
+.panel-titulo { margin-bottom: .5rem; font-size: .72rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--tinta-suave); }
+.panel-menu a { padding: .55rem .8rem; border-radius: 8px; font-weight: 600; font-size: .93rem; text-decoration: none; }
+.panel-menu a:hover { background: var(--papel-oscuro); }
+.panel-menu a[aria-current='page'], .panel-menu a.active { background: var(--noche); color: var(--papel); }
+.panel-contenido > h1, .panel-venta h1 { margin-bottom: 1.2rem; font-size: clamp(2.1rem, 4vw, 3rem); font-weight: 400; }
+.panel-filtros { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.3rem; }
+.panel-filtros button { padding: .38rem .9rem; background: none; border: 1px solid var(--linea); border-radius: 999px; font-size: .85rem; font-weight: 500; }
+.panel-filtros button:hover { border-color: var(--tinta); }
+.panel-filtros button[aria-pressed='true'] { background: var(--noche); border-color: var(--noche); color: var(--papel); }
+.panel-tabla { background: #fff; border: 1px solid var(--linea); border-radius: 10px; overflow: hidden; }
+.panel-fila { display: grid; grid-template-columns: 8.5rem minmax(0, 1.6fr) minmax(0, 1.2fr) 7rem 10rem; gap: 1rem; align-items: center; padding: .85rem 1.1rem; font-size: .9rem; text-decoration: none; }
+.panel-fila + .panel-fila { border-top: 1px solid var(--linea); }
+a.panel-fila:hover { background: var(--papel); }
+.panel-fila-titulos { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-suave); background: var(--papel); }
+.panel-comprador { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-total { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.panel-fila .resultado-estado { margin: 0; }
+.resultado-estado.neutro { background: var(--papel-oscuro); color: var(--tinta); }
+.panel-vacio { padding: 2.5rem 0; color: var(--tinta-suave); }
+.panel-venta { max-width: 760px; }
+.panel-volver { display: inline-block; margin-bottom: 1rem; font-size: .88rem; font-weight: 600; text-decoration: none; color: var(--tinta-suave); }
+.panel-volver:hover { color: var(--tinta); }
+.panel-venta-cabecera { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; margin-bottom: 1.3rem; }
+.panel-venta-cabecera h1 { margin: 0; font-variant-numeric: tabular-nums; }
+.panel-venta-datos { max-width: none; margin-bottom: 1.8rem; }
+.panel-venta h2 { margin-bottom: .5rem; font-size: 1.4rem; }
+.panel-venta-prendas { margin-bottom: 1.6rem; }
+.panel-venta .aviso { margin-bottom: 1.2rem; }
+.panel-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem 1.2rem; margin-bottom: 1.6rem; }
+.panel-acciones .resultado-confirmar { flex-basis: 100%; margin: 0; }
+.panel-mensaje { flex-basis: 100%; font-size: .9rem; font-weight: 600; color: var(--verde); }
+
 /* ---------- Pie ---------- */
 .pie { background: var(--noche); color: #d9d0e4; font-size: .9rem; }
 .pie-interior { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2rem; max-width: var(--ancho); margin: auto; padding: 3rem var(--margen); }
@@ -338,6 +373,14 @@ button:disabled { cursor: not-allowed; }
   .cuenta-email { display: none; }
   .ficha-datos, .carrito-resumen { position: static; }
   .carrito-columnas, .resultado { grid-template-columns: 1fr; }
+  .panel { grid-template-columns: 1fr; }
+  .panel-menu { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .panel-titulo { margin: 0 .5rem 0 0; }
+  .panel-fila { grid-template-columns: 1fr auto; gap: .25rem .8rem; }
+  .panel-fila-titulos { display: none; }
+  .panel-fila > :nth-child(5) { grid-column: 1; grid-row: 1; }
+  .panel-fila > :nth-child(4) { grid-column: 2; grid-row: 1; }
+  .panel-fila > :nth-child(1), .panel-fila > :nth-child(2), .panel-fila > :nth-child(3) { grid-column: 1 / -1; color: var(--tinta-suave); font-size: .84rem; }
   .portada-astro { opacity: .35; }
 }
 @media (max-width: 640px) {

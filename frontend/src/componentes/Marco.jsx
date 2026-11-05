@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useCarrito } from '../carrito/contexto.jsx';
 import { useSesion } from '../sesion/contexto.jsx';
+import { ROL_ADMINISTRADOR } from '../paginas/panel/Panel.jsx';
 import { CATEGORIAS } from '../dominio.js';
 
 function Buscador() {
@@ -38,7 +39,9 @@ function Cuenta({ pathname, search }) {
   if (!sesion) return <Link to={enlaceIngresar(pathname, search)} className="enlace-cuenta">Ingresar</Link>;
   return (
     <div className="cuenta">
-      <NavLink to="/mis-compras" className="enlace-cuenta">Mis compras</NavLink>
+      {sesion.rol === ROL_ADMINISTRADOR
+        ? <NavLink to="/panel" className="enlace-cuenta">Panel</NavLink>
+        : <NavLink to="/mis-compras" className="enlace-cuenta">Mis compras</NavLink>}
       <span className="cuenta-email" title={sesion.email}>{sesion.email}</span>
       <button type="button" className="boton-texto" onClick={cerrar}>Salir</button>
     </div>

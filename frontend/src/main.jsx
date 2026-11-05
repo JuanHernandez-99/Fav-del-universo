@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/manrope';
 import './estilos.css';
@@ -14,6 +14,9 @@ import Acceso from './paginas/Acceso.jsx';
 import Comprar from './paginas/Comprar.jsx';
 import CompraResultado from './paginas/CompraResultado.jsx';
 import MisCompras from './paginas/MisCompras.jsx';
+import Panel from './paginas/panel/Panel.jsx';
+import PanelVentas from './paginas/panel/PanelVentas.jsx';
+import PanelVenta from './paginas/panel/PanelVenta.jsx';
 import NoEncontrada from './paginas/NoEncontrada.jsx';
 
 createRoot(document.getElementById('raiz')).render(
@@ -29,6 +32,11 @@ createRoot(document.getElementById('raiz')).render(
               <Route path="comprar" element={<Comprar />} />
               <Route path="compra/:id" element={<CompraResultado />} />
               <Route path="mis-compras" element={<MisCompras />} />
+              <Route path="panel" element={<Panel />}>
+                <Route index element={<Navigate to="ventas" replace />} />
+                <Route path="ventas" element={<PanelVentas />} />
+                <Route path="ventas/:id" element={<PanelVenta />} />
+              </Route>
               <Route path="ingresar" element={<Acceso key="ingresar" modo="ingresar" />} />
               <Route path="registrarme" element={<Acceso key="registrar" modo="registrar" />} />
               <Route path="*" element={<NoEncontrada />} />
