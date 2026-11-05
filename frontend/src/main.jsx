@@ -17,6 +17,7 @@ import MisCompras from './paginas/MisCompras.jsx';
 import Panel from './paginas/panel/Panel.jsx';
 import PanelVentas from './paginas/panel/PanelVentas.jsx';
 import PanelVenta from './paginas/panel/PanelVenta.jsx';
+import PanelVentaLocal from './paginas/panel/PanelVentaLocal.jsx';
 import NoEncontrada from './paginas/NoEncontrada.jsx';
 
 createRoot(document.getElementById('raiz')).render(
@@ -36,6 +37,7 @@ createRoot(document.getElementById('raiz')).render(
                 <Route index element={<Navigate to="ventas" replace />} />
                 <Route path="ventas" element={<PanelVentas />} />
                 <Route path="ventas/:id" element={<PanelVenta />} />
+                <Route path="venta-local" element={<PanelVentaLocal />} />
               </Route>
               <Route path="ingresar" element={<Acceso key="ingresar" modo="ingresar" />} />
               <Route path="registrarme" element={<Acceso key="registrar" modo="registrar" />} />

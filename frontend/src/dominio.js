@@ -18,8 +18,10 @@ export const ORDENES = [
 // Ordena los talles de una prenda como se leen en una etiqueta, no alfabéticamente.
 export const ordenarTalles = (talles) => [...new Set(talles)].sort((a, b) => TALLES.indexOf(a) - TALLES.indexOf(b));
 
-const pesos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 2 });
-export const formatearPrecio = (monto) => pesos.format(monto);
+// Sin centavos si el monto es entero ($ 15.000); con los dos si los tiene ($ 9.500,50, no $ 9.500,5).
+const pesosEnteros = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+const pesosConCentavos = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const formatearPrecio = (monto) => (Number.isInteger(monto) ? pesosEnteros : pesosConCentavos).format(monto);
 
 const COLORES = {
   blanco: '#f4efe6', blanca: '#f4efe6', crema: '#efe3cc', beige: '#dcc8a8', negro: '#2b2730', negra: '#2b2730',

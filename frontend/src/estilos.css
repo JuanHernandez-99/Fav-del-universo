@@ -353,6 +353,34 @@ a.panel-fila:hover { background: var(--papel); }
 .panel-acciones .resultado-confirmar { flex-basis: 100%; margin: 0; }
 .panel-mensaje { flex-basis: 100%; font-size: .9rem; font-weight: 600; color: var(--verde); }
 
+/* ---------- Venta del local ---------- */
+.local { max-width: 780px; }
+.local > h1 { margin-bottom: .5rem; font-size: clamp(2.1rem, 4vw, 3rem); font-weight: 400; }
+.local-bajada { margin-bottom: 1.5rem; color: var(--tinta-suave); }
+.local h2 { margin: 1.8rem 0 .8rem; font-size: 1.4rem; }
+.local-registrada { margin-bottom: 1rem; padding: .8rem 1rem; background: #dcecdf; border-radius: 8px; }
+.local-registrada a { color: inherit; }
+.local-buscador { padding: 1.2rem; background: #fff; border: 1px solid var(--linea); border-radius: 10px; }
+.local-buscador .acceso-campo { margin: 0; }
+.local-resultados { margin-top: 1rem; }
+.local-resultados > li { padding: .8rem 0; border-top: 1px solid var(--linea); }
+.local-producto { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .6rem; margin-bottom: .55rem; }
+.local-producto small { color: var(--tinta-suave); }
+.local-producto .resultado-estado { margin: 0; padding: .1rem .55rem; font-size: .72rem; }
+.local-variantes { display: flex; flex-wrap: wrap; gap: .4rem; }
+.local-variantes button { padding: .35rem .75rem; background: var(--papel); border: 1px solid var(--linea); border-radius: 999px; font-size: .84rem; }
+.local-variantes button:hover { border-color: var(--tinta); }
+.local-lineas { border-top: 1px solid var(--linea); }
+.local-lineas li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .6rem 1rem; padding: .9rem 0; border-bottom: 1px solid var(--linea); }
+.local-lineas li > div:first-child { flex: 1 1 20rem; }
+.local-lineas small { color: var(--tinta-suave); }
+.local-lineas .carrito-acciones { margin: 0; }
+.local-fisico { margin-top: .3rem; font-size: .84rem; color: var(--tinta-suave); }
+.local-lineas .carrito-aviso { margin-top: .35rem; }
+.local-medios { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); margin-bottom: 1.2rem; }
+.local-monto { max-width: 22rem; }
+.local-formulario .acceso-error { max-width: 50ch; }
+
 /* ---------- Pie ---------- */
 .pie { background: var(--noche); color: #d9d0e4; font-size: .9rem; }
 .pie-interior { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2rem; max-width: var(--ancho); margin: auto; padding: 3rem var(--margen); }

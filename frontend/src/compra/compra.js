@@ -9,15 +9,15 @@ function generarClave() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-const huella = ({ email, medioPago, items }) => JSON.stringify({
-  email,
-  medioPago,
-  items: items.map((i) => [i.varianteId, i.cantidad]).sort(),
-});
+// Todo el contenido del pedido, con las prendas en un orden fijo: el orden en que se eligieron no lo cambia.
+const huella = ({ items, ...resto }) => JSON.stringify([
+  Object.entries(resto).sort(([a], [b]) => a.localeCompare(b)),
+  items.map((i) => [i.varianteId, i.cantidad]).sort(),
+]);
 
-// Devuelve la clave de idempotencia de este pedido. Reintentar el mismo pedido, por ejemplo tras un error de red,
-// usa la misma clave y no crea otra venta (HU-11.8). Si el pedido cambió, usa una nueva: Ventas rechaza
-// la misma clave con otro contenido.
+// Devuelve la clave de idempotencia de este pedido: una compra o una venta del local. Reintentar el mismo pedido,
+// por ejemplo tras un error de red, usa la misma clave y no crea otra venta (HU-11.8). Si cambió algo, usa una
+// nueva: Ventas rechaza la misma clave con otro contenido.
 export function claveDelPedido(pedido, almacen = sessionStorage, generar = generarClave) {
   const actual = huella(pedido);
   try {

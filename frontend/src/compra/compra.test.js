@@ -31,6 +31,7 @@ describe('clave de idempotencia (HU-11.8)', () => {
     ['otro medio de pago', { ...pedido, medioPago: 'MERCADO_PAGO' }],
     ['otro email', { ...pedido, email: 'otra@example.com' }],
     ['otra cantidad', { ...pedido, items: [{ varianteId: 'var-remera-blanca-m', cantidad: 3 }] }],
+    ['otro monto cobrado, en el local', { ...pedido, monto: 12000 }],
   ])('con %s usa otra clave: Ventas rechaza la misma con otro contenido', (_, cambiado) => {
     const almacen = almacenFalso(), generar = contador();
     const clave = claveDelPedido(pedido, almacen, generar);

@@ -22,7 +22,8 @@ export default function Panel() {
     <div className="panel">
       <nav className="panel-menu" aria-label="Panel">
         <p className="panel-titulo">Panel</p>
-        <NavLink to="/panel/ventas">Ventas</NavLink>
+        <NavLink to="/panel/ventas" end>Ventas</NavLink>
+        <NavLink to="/panel/venta-local">Venta del local</NavLink>
       </nav>
       <div className="panel-contenido"><Outlet /></div>
     </div>

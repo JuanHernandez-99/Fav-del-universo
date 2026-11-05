@@ -84,6 +84,23 @@ export const confirmarTransferencia = (id, token) =>
 export const avanzarVenta = (id, token) =>
   pedir(`/ventas/v1/admin/ventas/${encodeURIComponent(id)}/avanzar`, { method: 'POST', headers: conToken(token) });
 
+export const buscarProductosAdmin = (token, q, opciones) =>
+  pedir(`/catalogo/v1/admin/productos?${new URLSearchParams({ q, tamano: 8 })}`, { ...opciones, headers: conToken(token) });
+
+export const consultarStockAdmin = (token, ids, opciones) =>
+  pedir(`/inventario/v1/stock?variantes=${ids.map(encodeURIComponent).join(',')}`, { ...opciones, headers: conToken(token) });
+
+export const sugerirMontoLocal = (token, medioPago, variantes, opciones) =>
+  pedir(`/ventas/v1/admin/ventas-local/sugerencia?${new URLSearchParams({ medioPago, variantes })}`, { ...opciones, headers: conToken(token) });
+
+export function registrarVentaLocal(token, pedido, clave) {
+  return pedir('/ventas/v1/admin/ventas-local', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': clave, ...conToken(token) },
+    body: JSON.stringify(pedido),
+  });
+}
+
 const MAXIMO_POR_CONSULTA = 200; // límite de la ruta de Inventario
 
 // Devuelve { varianteId: unidades disponibles online } con lo que responde Inventario (HU-01.5).

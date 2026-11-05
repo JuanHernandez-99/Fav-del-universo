@@ -27,7 +27,7 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 | **Rutas de API inexistentes** | El gateway responde `404` en JSON bajo `/v1/`, `/ventas/` y `/usuarios/`. Si no, recibirían la página de la tienda con un `200` |
 | **Tipografías** | Incluidas en el paquete (`@fontsource`). La tienda no depende de un servicio externo |
 | **Sesión** | El token se guarda en `sessionStorage`. Se borra al cerrar la pestaña y no se comparte entre pestañas. Sin refresh token (ADR-001): al vencer, hay que volver a ingresar. El frontend lo lee solo para mostrar el email y saber cuándo vence; lo valida el gateway (ADR-016) |
-| **Clave de idempotencia** | La genera el navegador y se guarda en `sessionStorage` junto con el contenido del pedido. El mismo pedido reintentado usa la misma clave (HU-11.8); si cambió, una nueva |
+| **Clave de idempotencia** | La genera el navegador y se guarda en `sessionStorage` junto con el contenido del pedido (compra o venta del local). El mismo pedido reintentado usa la misma clave (HU-11.8); si cambió, una nueva |
 | **Volver de Mercado Pago** | El pago se abre en otra pestaña y la tienda sigue abierta. Con cuenta, la tienda consulta el estado cada 3 s mientras está pendiente. Sin cuenta no hay de dónde consultarlo (RN-24): se informa por mail |
 | **Datos al cerrar la sesión** | "Salir" borra el token, las compras guardadas en la pestaña y la clave de idempotencia. No se muestra una compra de otra cuenta en una computadora compartida. El carrito se conserva, porque no es de la cuenta sino del navegador (HU-10.4) |
 | **Panel** | En la misma aplicación, en `/panel`, solo para el rol administrador. Esconderlo es comodidad: cada pedido lo autoriza el gateway con el rol del token (ADR-016) |
