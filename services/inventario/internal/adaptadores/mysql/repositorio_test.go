@@ -334,6 +334,37 @@ func TestAjusteYReservaConcurrentes(t *testing.T) {
 	}
 }
 
+// HU-09.2: solo las variantes con físico negativo, primero las más negativas.
+func TestStockACorregir(t *testing.T) {
+	repo, db := repoDePrueba(t)
+	ctx := context.Background()
+	muyNegativa, negativa := varianteNueva(t, db, 0, -1000), varianteNueva(t, db, 3, -999)
+	enCero, positiva := varianteNueva(t, db, 0, 0), varianteNueva(t, db, 0, 5)
+	stocks, err := repo.StockACorregir(ctx, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	posicion := map[string]int{}
+	for i, s := range stocks {
+		if s.Fisico >= 0 {
+			t.Errorf("incluye una variante sin físico negativo: %+v", s)
+		}
+		posicion[s.VarianteID] = i
+	}
+	if _, ok := posicion[enCero]; ok {
+		t.Error("incluye una variante en 0")
+	}
+	if _, ok := posicion[positiva]; ok {
+		t.Error("incluye una variante positiva")
+	}
+	if posicion[muyNegativa] != 0 || posicion[negativa] != 1 {
+		t.Errorf("orden: %v", posicion)
+	}
+	if s, _ := repo.StockACorregir(ctx, 1); len(s) != 1 {
+		t.Errorf("límite: %d", len(s))
+	}
+}
+
 func TestTransferenciaNoMueveLoReservado(t *testing.T) {
 	repo, db := repoDePrueba(t)
 	ctx := context.Background()

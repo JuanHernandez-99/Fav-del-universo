@@ -21,6 +21,8 @@ type Repositorio interface {
 	ReservasVencidas(ctx context.Context, ahora time.Time, limite int) ([]string, error)
 
 	ConsultarStock(ctx context.Context, varianteIDs []string) ([]dominio.Stock, error)
+	// StockACorregir lista hasta limite variantes con físico negativo, primero las más negativas (RN-25).
+	StockACorregir(ctx context.Context, limite int) ([]dominio.Stock, error)
 	Ingresar(ctx context.Context, i dominio.Ingreso) (dominio.Stock, error)
 	Transferir(ctx context.Context, t dominio.Transferencia) (dominio.Stock, error)
 	// Ajustar suma o resta unidades con un motivo. Al restar, rechaza si el online quedaría por debajo de lo

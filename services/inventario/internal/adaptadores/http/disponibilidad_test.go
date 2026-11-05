@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -23,6 +24,36 @@ type repoStock struct {
 
 func (r repoStock) ConsultarStock(context.Context, []string) ([]dominio.Stock, error) {
 	return r.stocks, r.err
+}
+
+func (r repoStock) StockACorregir(_ context.Context, limite int) ([]dominio.Stock, error) {
+	return r.stocks[:min(limite, len(r.stocks))], r.err
+}
+
+func TestStockACorregirInformaSiHayMas(t *testing.T) {
+	var muchas []dominio.Stock
+	for i := range aplicacion.MaximoACorregir + 1 {
+		muchas = append(muchas, dominio.Stock{VarianteID: fmt.Sprintf("var-%d", i), Fisico: -1})
+	}
+	for _, c := range []struct {
+		stocks []dominio.Stock
+		items  int
+		hayMas bool
+	}{{muchas[:2], 2, false}, {muchas, aplicacion.MaximoACorregir, true}} {
+		w := pedirDisponibilidad(repoStock{stocks: c.stocks}, "/v1/stock/a-corregir")
+		var cuerpo struct {
+			Items []struct {
+				StockACorregir bool `json:"stockACorregir"`
+			}
+			HayMas bool
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &cuerpo); err != nil || w.Code != 200 {
+			t.Fatalf("código %d: %v", w.Code, err)
+		}
+		if len(cuerpo.Items) != c.items || cuerpo.HayMas != c.hayMas || !cuerpo.Items[0].StockACorregir {
+			t.Errorf("con %d negativas: %d items, hayMas %v", len(c.stocks), len(cuerpo.Items), cuerpo.HayMas)
+		}
+	}
 }
 
 func pedirDisponibilidad(repo repoStock, ruta string) *httptest.ResponseRecorder {

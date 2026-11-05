@@ -98,6 +98,22 @@ func (s *Servicio) ConsultarStock(ctx context.Context, varianteIDs []string) ([]
 	return s.repo.ConsultarStock(ctx, varianteIDs)
 }
 
+// MaximoACorregir acota la lista de stock a corregir. Con 10 a 20 prendas por semana (SPEC §3) no se espera
+// llegar: si se llega, la respuesta lo indica.
+const MaximoACorregir = 500
+
+// StockACorregir devuelve las variantes con físico negativo (HU-09.2) y si hay más que las devueltas.
+func (s *Servicio) StockACorregir(ctx context.Context) ([]dominio.Stock, bool, error) {
+	stocks, err := s.repo.StockACorregir(ctx, MaximoACorregir+1)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(stocks) > MaximoACorregir {
+		return stocks[:MaximoACorregir], true, nil
+	}
+	return stocks, false, nil
+}
+
 // ConsultarDisponibilidad responde por cada id pedido, en el mismo orden. Una variante sin fila de stock
 // no tiene unidades: se responde 0.
 func (s *Servicio) ConsultarDisponibilidad(ctx context.Context, varianteIDs []string) ([]dominio.Disponibilidad, error) {

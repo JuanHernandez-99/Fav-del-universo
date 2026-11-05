@@ -261,6 +261,22 @@ func (r *Repositorio) ConsultarStock(ctx context.Context, ids []string) ([]domin
 	if err != nil {
 		return nil, err
 	}
+	return leerStocks(filas)
+}
+
+// StockACorregir lista las variantes con físico negativo, primero las más negativas (RN-25, HU-09.2).
+// Sin índice sobre fisico: con el volumen de FAV la tabla tiene cientos de filas y se recorre entera.
+func (r *Repositorio) StockACorregir(ctx context.Context, limite int) ([]dominio.Stock, error) {
+	filas, err := r.db.QueryContext(ctx,
+		`SELECT variante_id, online, fisico, reservado, actualizado_en FROM stock
+		 WHERE fisico < 0 ORDER BY fisico, variante_id LIMIT ?`, limite)
+	if err != nil {
+		return nil, err
+	}
+	return leerStocks(filas)
+}
+
+func leerStocks(filas *sql.Rows) ([]dominio.Stock, error) {
 	defer filas.Close()
 	var stocks []dominio.Stock
 	for filas.Next() {

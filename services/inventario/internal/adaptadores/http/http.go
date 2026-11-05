@@ -38,6 +38,7 @@ func NuevoRouter(s *aplicacion.Servicio) http.Handler {
 	mux.HandleFunc("POST /v1/reservas/{id}/liberar", h.liberar)
 
 	mux.HandleFunc("GET /v1/stock", h.consultarStock)
+	mux.HandleFunc("GET /v1/stock/a-corregir", h.stockACorregir)
 	mux.HandleFunc("GET /v1/disponibilidad", h.consultarDisponibilidad)
 	mux.HandleFunc("POST /v1/ingresos", h.ingresar)
 	mux.HandleFunc("POST /v1/transferencias", h.transferir)
@@ -164,6 +165,21 @@ func (h *Handler) consultarStock(w http.ResponseWriter, r *http.Request) {
 		items[i] = stockAJSON(s)
 	}
 	escribirJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// stockACorregir es el filtro del panel (HU-09.2). Solo ids y cantidades: producto, talle y color los
+// agrega el panel con Catálogo (ADR-001).
+func (h *Handler) stockACorregir(w http.ResponseWriter, r *http.Request) {
+	stocks, hayMas, err := h.s.StockACorregir(r.Context())
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	items := make([]stockJSON, len(stocks))
+	for i, s := range stocks {
+		items[i] = stockAJSON(s)
+	}
+	escribirJSON(w, http.StatusOK, map[string]any{"items": items, "hayMas": hayMas})
 }
 
 // consultarDisponibilidad es la ruta pública de la tienda: las unidades online disponibles, nada más (HU-01.5).
