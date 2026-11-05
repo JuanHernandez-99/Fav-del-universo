@@ -59,6 +59,9 @@ func NuevoRouter(s *service.Servicio, opcionesRouter ...Opcion) http.Handler {
 	mux.HandleFunc("POST /v1/promociones", h.crearPromocion)
 	mux.HandleFunc("PUT /v1/promociones/{id}", h.actualizarPromocion)
 
+	mux.HandleFunc("GET /v1/tienda/productos", h.listarTienda)
+	mux.HandleFunc("GET /v1/tienda/productos/{id}", h.obtenerDeTienda)
+
 	if !o.sinCapacidadPublica {
 		mux.HandleFunc("GET /v1/productos", h.listarCatalogoPublico)
 	}

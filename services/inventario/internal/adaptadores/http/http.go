@@ -38,6 +38,7 @@ func NuevoRouter(s *aplicacion.Servicio) http.Handler {
 	mux.HandleFunc("POST /v1/reservas/{id}/liberar", h.liberar)
 
 	mux.HandleFunc("GET /v1/stock", h.consultarStock)
+	mux.HandleFunc("GET /v1/disponibilidad", h.consultarDisponibilidad)
 	mux.HandleFunc("POST /v1/ingresos", h.ingresar)
 	mux.HandleFunc("POST /v1/transferencias", h.transferir)
 	mux.HandleFunc("POST /v1/descuentos-fisicos", h.descontarFisico)
@@ -148,14 +149,8 @@ func stockAJSON(s dominio.Stock) stockJSON {
 
 // consultarStock recibe los ids separados por coma: el panel los pide por lote (ADR-001, decisión 3).
 func (h *Handler) consultarStock(w http.ResponseWriter, r *http.Request) {
-	var ids []string
-	for _, id := range strings.Split(r.URL.Query().Get("variantes"), ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			ids = append(ids, id)
-		}
-	}
-	if len(ids) == 0 || len(ids) > 200 {
-		escribirError(w, r, &dominio.ErrorValidacion{Campos: []dominio.CampoInvalido{{Campo: "variantes", Mensaje: "indicar entre 1 y 200 ids separados por coma"}}})
+	ids, ok := idsDeVariantes(w, r)
+	if !ok {
 		return
 	}
 	stocks, err := h.s.ConsultarStock(r.Context(), ids)
@@ -168,6 +163,45 @@ func (h *Handler) consultarStock(w http.ResponseWriter, r *http.Request) {
 		items[i] = stockAJSON(s)
 	}
 	escribirJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// consultarDisponibilidad es la ruta pública de la tienda: solo dice si hay, sin cantidades (HU-01.3).
+func (h *Handler) consultarDisponibilidad(w http.ResponseWriter, r *http.Request) {
+	ids, ok := idsDeVariantes(w, r)
+	if !ok {
+		return
+	}
+	disponibilidad, err := h.s.ConsultarDisponibilidad(r.Context(), ids)
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	type disponibilidadJSON struct {
+		VarianteID string `json:"varianteId"`
+		HayStock   bool   `json:"hayStock"`
+	}
+	items := make([]disponibilidadJSON, len(disponibilidad))
+	for i, d := range disponibilidad {
+		items[i] = disponibilidadJSON{d.VarianteID, d.HayStock}
+	}
+	escribirJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// idsDeVariantes lee los ids separados por coma, sin repetidos.
+func idsDeVariantes(w http.ResponseWriter, r *http.Request) ([]string, bool) {
+	var ids []string
+	vistos := map[string]bool{}
+	for _, id := range strings.Split(r.URL.Query().Get("variantes"), ",") {
+		if id = strings.TrimSpace(id); id != "" && !vistos[id] {
+			vistos[id] = true
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 || len(ids) > 200 {
+		escribirError(w, r, &dominio.ErrorValidacion{Campos: []dominio.CampoInvalido{{Campo: "variantes", Mensaje: "indicar entre 1 y 200 ids separados por coma"}}})
+		return nil, false
+	}
+	return ids, true
 }
 
 type pedidoMovimiento struct {

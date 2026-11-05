@@ -130,6 +130,29 @@ server {
         return 403 '{"type":"https://fav.example/errores/no-autorizado","title":"No autorizado","status":403,"codigo":"NO_AUTORIZADO"}';
     }
 
+    # Tienda: productos publicados y si hay stock (HU-01). Públicas: no pasan los encabezados de identidad.
+    # Estas rutas exactas ganan sobre /catalogo/ y /inventario/, que siguen siendo solo de administrador.
+    location ~ ^/catalogo/v1/tienda/productos(/[^/]+)?$ {
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        rewrite ^/catalogo/(.*)$ /$1 break;
+        proxy_pass http://catalogo;
+    }
+
+    location = /inventario/v1/disponibilidad {
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://inventario/v1/disponibilidad;
+    }
+
     # Tienda: se puede comprar sin cuenta, así que el token es opcional. Si viene, tiene que ser válido.
     # "Mis compras" sin token la rechaza Ventas (HU-14.2).
     location ~ ^/ventas/v1/(compras|compras/[^/]+/cancelar|mis-compras|mis-compras/[^/]+)$ {

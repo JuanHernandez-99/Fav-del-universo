@@ -30,6 +30,12 @@ type Stock struct {
 
 func (s Stock) DisponibleOnline() int { return s.Online - s.Reservado }
 
+// Disponibilidad es lo que ve el comprador de una variante: si hay stock online, sin la cantidad (HU-01.3).
+type Disponibilidad struct {
+	VarianteID string
+	HayStock   bool
+}
+
 // AConfirmar marca la variante como "stock a corregir" (RN-25).
 func (s Stock) AConfirmar() bool { return s.Fisico < 0 }
 

@@ -10,12 +10,13 @@ Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, c
 |---|---|
 | **API** | CRUD de productos bajo `/v1/admin/productos`, publicar, agregar variante (operación atómica) y listado con filtros, orden y paginación. Sondas `/healthz` y `/readyz` |
 | **Promociones** | `GET`, `POST /v1/promociones` y `PUT /v1/promociones/{id}`. Por el gateway, en `/catalogo/`. Se cancela editando la vigencia |
+| **Tienda** | `GET /v1/tienda/productos` y `GET /v1/tienda/productos/{id}`: solo publicados, con fotos, precio con y sin promoción, filtros y paginación. Por el gateway, en `/catalogo/v1/tienda/`, sin token. No depende de `CAPACIDAD_PUBLICA_ACTIVA` |
 | **Consulta por lote** | `GET /v1/variantes?variantes=a,b,c` (hasta 200 ids), para Ventas. Detalle en `api/openapi.yaml` |
 | **Código** | Go, en capas `handler` → `service` → `repository` (único que habla con MongoDB). Sin estado en memoria |
 | **Base** | MongoDB con tres colecciones (`productos`, `categorias`, `promociones`), índices y validación de esquema |
 | **Documentación** | Especificación en `api/openapi.yaml` y decisiones en `DISENO.md` |
 
-Se levanta con el `docker-compose.yml` de la raíz: dos réplicas detrás del gateway, más `catalogo-init`, que prepara la base (`DISENO.md`, sección 8). Desde afuera se entra por el gateway, en `/catalogo/`, con el token de administrador. Ventas usa la entrada interna `http://gateway:8081/catalogo/`. Tests: `go test ./...`.
+Se levanta con el `docker-compose.yml` de la raíz: dos réplicas detrás del gateway, más `catalogo-init`, que prepara la base (`DISENO.md`, sección 8). Desde afuera se entra por el gateway, en `/catalogo/`, con el token de administrador; la tienda no lo necesita. Ventas usa la entrada interna `http://gateway:8081/catalogo/`. Tests: `go test ./...`.
 
 Carpetas: `api/` (OpenAPI), `db/` (scripts, datos de ejemplo y consultas de MongoDB) y `pruebas/` (concurrencia y esquema).
 

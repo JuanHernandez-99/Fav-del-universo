@@ -92,12 +92,11 @@ Objetivo inicial: que un cambio sea encontrable en **unos 10 segundos** (valor a
 - **Una pieza más que operar** (memoria, versiones, mapeo).
 - **Frescura eventual:** hay una ventana en la que el índice no refleja la edición.
 - **Hay que escribir el indexador** y mantener su idempotencia.
-- **Los resultados no muestran disponibilidad exacta.** Se resuelve con un dato aproximado (un indicador "hay stock") **[propuesta]** que Inventario publicaría como evento; hoy no existe ese evento.
+- **Los resultados no traen la disponibilidad.** La tienda la pide aparte a Inventario, por lote y solo "hay / no hay" (`GET /v1/disponibilidad`, hasta 200 ids): un pedido por página, no uno por resultado. No se puede filtrar "solo con stock" y, sin Inventario, se ven los productos sin saber si hay.
 
 ## Pendientes
 
-- **Todo:** el indexador, el índice, el mapeo, la consulta y los eventos de Catálogo no existen todavía.
-- **Evento de disponibilidad** de Inventario **[propuesta]**.
+- **Todo:** el indexador, el índice, el mapeo, la consulta y los eventos de Catálogo no existen todavía. Hoy la tienda busca con el índice de texto de Mongo, el plan B de este ADR (`GET /v1/tienda/productos`).
 - **Decidir motor definitivo** después de armar una prueba con datos reales.
 - **Medir la frescura** y fijar el objetivo.
 

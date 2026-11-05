@@ -288,6 +288,7 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | `POST /v1/admin/productos/{id}/variantes` | Agregar una variante (operación atómica de 5.9) |
 | `GET /v1/variantes?variantes=a,b,c` | **Consulta por lote** (Ventas y panel): de 1 a 200 ids separados por coma, y la respuesta va en `{"items": [...]}`, igual que `GET /v1/stock?variantes=…` de Inventario. Por variante devuelve `productoId`, `nombre`, `categoria`, `talle`, `color`, `publicado` y precio vigente (`medioPago` opcional, por defecto `TRANSFERENCIA`). No filtra por `publicado` |
 | `POST /v1/promociones`, `PUT /v1/promociones/{id}`, `GET /v1/promociones` | Gestionar promociones. El servidor genera el id (`promo-` + nombre normalizado). No hay `DELETE`: se cancela editando la vigencia (5.3) |
+| `GET /v1/tienda/productos`, `GET /v1/tienda/productos/{id}` | Lectura pública del comprador (HU-01, HU-02), en `handler/tienda.go`. Solo publicados, con los filtros del listado salvo `publicado`, que da `400`. El no publicado da `404`. Trae todas las fotos, `precio` (vigente para transferencia, D4), `precioBase` y `promocion`. Sin stock (D1) |
 | `GET /healthz`, `GET /readyz` | Sondas. La segunda verifica la conexión a MongoDB |
 
 - El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote (etapa FAV).

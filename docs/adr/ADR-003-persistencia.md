@@ -46,7 +46,7 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 | Componente        | Qué guarda                                                  | Se decide en |
 | ----------------- | ----------------------------------------------------------- | ------------ |
 | Redis (caché)     | Lecturas del catálogo                                       | ADR-007 (D7) |
-| Motor de búsqueda | Índice de productos publicados con su disponibilidad online | ADR-006 (D6) |
+| Motor de búsqueda | Índice de productos publicados | ADR-006 (D6) |
 
 **Cómo se cumplen las garantías:**
 

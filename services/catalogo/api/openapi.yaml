@@ -229,6 +229,31 @@ paths:
       responses:
         "200":
           description: Catálogo publicado. Ver el esquema `Catalogo` del contrato.
+  /v1/tienda/productos:
+    get:
+      tags: [Productos]
+      summary: Listado del comprador
+      description: |
+        Público. Solo publicados, con los mismos filtros, orden y paginación que el listado de administración, salvo `publicado`,
+        que da `400`. Filtra y ordena por precio base. Por el gateway: `/catalogo/v1/tienda/productos`, sin token.
+      responses:
+        "200":
+          description: Página con `items` (`ProductoTienda`), `pagina`, `tamano`, `total` y `paginas`.
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+  /v1/tienda/productos/{id}:
+    get:
+      tags: [Productos]
+      summary: Ficha del comprador
+      description: Pública. Un producto no publicado responde igual que uno inexistente.
+      parameters:
+        - $ref: "#/components/parameters/ProductoId"
+      responses:
+        "200":
+          description: El producto.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductoTienda" }
+        "404": { $ref: "#/components/responses/NoEncontrado" }
   /v1/promociones:
     get:
       tags: [Promociones]
@@ -403,6 +428,30 @@ components:
             codigo: CONFLICTO_DE_VERSION
 
   schemas:
+    ProductoTienda:
+      type: object
+      required: [productoId, nombre, categoria, precio, precioBase, fotos, variantes]
+      properties:
+        productoId: { type: string }
+        nombre: { type: string }
+        descripcion: { type: string }
+        categoria: { type: string }
+        precio: { type: number, description: "Vigente para transferencia (D4), en pesos." }
+        precioBase: { type: number, description: "Sin promoción, en pesos." }
+        promocion:
+          type: object
+          description: Solo si se aplicó una.
+          properties:
+            promocionId: { type: string }
+            nombre: { type: string }
+            porcentaje: { type: integer }
+        fotos:
+          type: array
+          items: { $ref: "#/components/schemas/Foto" }
+        variantes:
+          type: array
+          description: Sin stock. Si hay lo responde Inventario, en `GET /v1/disponibilidad`.
+          items: { $ref: "#/components/schemas/Variante" }
     PromocionNueva:
       type: object
       required: [nombre, tipo, porcentaje, vigencia, alcance]

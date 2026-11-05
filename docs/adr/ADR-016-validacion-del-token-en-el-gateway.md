@@ -31,6 +31,7 @@ La consigna pide un punto de entrada único con autenticación. ADR-001 decidió
 | Panel: `/inventario/`, `/catalogo/`, `/ventas/v1/admin/` | `401` | `401` | `403` | Pasa |
 | Tienda: `/ventas/v1/compras…`, `/ventas/v1/mis-compras…` | Pasa como invitado; "Mis compras" da `401` | `401` | Pasa | Pasa |
 | Capacidad publicada: `/v1/productos`, `/v1/pedidos` | Usa `X-API-Key` (ADR-008) | — | — | — |
+| Lectura de la tienda: `/catalogo/v1/tienda/productos…`, `/inventario/v1/disponibilidad` | Pasa | Pasa, sin leerlo | Pasa | Pasa |
 | `/ventas/v1/pagos/aviso` | Lo valida Ventas con la firma | — | — | — |
 | `/usuarios/v1/registro`, `/usuarios/v1/sesiones` | Públicas | — | — | — |
 
