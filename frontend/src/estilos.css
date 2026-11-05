@@ -418,6 +418,28 @@ a.panel-fila:hover { background: var(--papel); }
 .producto-nueva-variante input { flex: 1 1 12rem; width: auto; }
 .producto-editor ul.acceso-error { padding-left: 1.6rem; list-style: disc; }
 
+/* ---------- Promociones ---------- */
+.promo-grupo h2 { display: flex; align-items: center; gap: .6rem; margin: 1.8rem 0 .8rem; font-size: 1.4rem; }
+.promo-grupo h2 .resultado-estado { margin: 0; }
+.promo-grupo ul { display: grid; gap: .8rem; }
+.promo-tarjeta { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 1.1rem; padding: 1.1rem 1.2rem; background: #fff; border: 1px solid var(--linea); border-radius: 10px; }
+.promo-porcentaje { display: grid; place-items: center; height: 5.5rem; background: var(--noche); border-radius: 10px; font: 500 1.7rem var(--serif); color: var(--astro); }
+.promo-datos h3 { margin-bottom: .25rem; font-size: 1.2rem; }
+.promo-datos p { font-size: .9rem; color: var(--tinta-suave); }
+.promo-vigencia { margin-top: .2rem; font-variant-numeric: tabular-nums; }
+.promo-acciones { display: flex; gap: 1.2rem; margin-top: .7rem; font-size: .9rem; font-weight: 600; }
+.promo-acciones a { text-underline-offset: 3px; }
+.promo-datos .resultado-confirmar { margin-top: .8rem; }
+.promo-titulo { margin-bottom: 1.2rem; font-size: clamp(2.1rem, 4vw, 3rem); font-weight: 400; }
+.producto-formulario .selector { margin-top: 1.4rem; }
+.producto-formulario input[type='number'], .producto-formulario input[type='datetime-local'] { width: 100%; height: 2.95rem; padding: 0 .85rem; background: #fff; border: 1px solid var(--linea); border-radius: 8px; }
+.promo-productos input { width: 100%; height: 2.95rem; margin-top: .8rem; padding: 0 .85rem; background: #fff; border: 1px solid var(--linea); border-radius: 8px; }
+.promo-resultados { margin-top: .4rem; background: #fff; border: 1px solid var(--linea); border-radius: 8px; }
+.promo-resultados button { width: 100%; padding: .6rem .85rem; background: none; border: 0; text-align: left; font-size: .9rem; }
+.promo-resultados li + li { border-top: 1px solid var(--linea); }
+.promo-resultados button:hover:not(:disabled) { background: var(--papel); }
+.promo-resultados button:disabled { color: var(--tinta-suave); }
+
 /* ---------- Pie ---------- */
 .pie { background: var(--noche); color: #d9d0e4; font-size: .9rem; }
 .pie-interior { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2rem; max-width: var(--ancho); margin: auto; padding: 3rem var(--margen); }
@@ -440,6 +462,8 @@ a.panel-fila:hover { background: var(--papel); }
   .carrito-columnas, .resultado { grid-template-columns: 1fr; }
   .panel { grid-template-columns: 1fr; }
   .producto-fila, .producto-foto { grid-template-columns: 1fr; }
+  .promo-tarjeta { grid-template-columns: 1fr; }
+  .promo-porcentaje { height: auto; padding: .5rem; justify-self: start; }
   .producto-foto select { margin-top: 0; }
   .panel-menu { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }
   .panel-titulo { margin: 0 .5rem 0 0; }
@@ -472,3 +496,7 @@ a.panel-fila:hover { background: var(--papel); }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+details.promo-grupo summary { list-style: none; cursor: pointer; }
+details.promo-grupo summary::-webkit-details-marker { display: none; }
+details.promo-grupo summary h2::after { content: '▸'; font-size: .9rem; color: var(--tinta-suave); }
+details.promo-grupo[open] summary h2::after { content: '▾'; }

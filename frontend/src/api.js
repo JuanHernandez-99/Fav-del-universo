@@ -101,6 +101,11 @@ export const publicarProducto = (token, id) => pedir(`${rutaProducto(id)}/public
 export const despublicarProducto = (token, id) => pedir(rutaProducto(id), { method: 'DELETE', headers: conToken(token) });
 export const agregarVarianteAdmin = (token, id, variante) => enviarJSON('POST', `${rutaProducto(id)}/variantes`, token, variante);
 
+export const listarPromociones = (token) => pedir('/catalogo/v1/promociones', { headers: conToken(token) });
+export const crearPromocion = (token, promocion) => enviarJSON('POST', '/catalogo/v1/promociones', token, promocion);
+export const actualizarPromocion = (token, id, promocion) =>
+  enviarJSON('PUT', `/catalogo/v1/promociones/${encodeURIComponent(id)}`, token, promocion);
+
 export const buscarProductosAdmin = (token, q, opciones) =>
   pedir(`/catalogo/v1/admin/productos?${new URLSearchParams({ q, tamano: 8 })}`, { ...opciones, headers: conToken(token) });
 

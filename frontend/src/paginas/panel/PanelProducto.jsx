@@ -103,7 +103,11 @@ export default function PanelProducto() {
 
   useEffect(() => { if (!esNuevo) cargar(); }, [esNuevo, cargar]);
 
-  const cambiar = (campo) => (e) => setDatos((d) => ({ ...d, [campo]: e.target.value }));
+  // Al tocar un campo se borra su error: ya no corresponde a lo que está escrito.
+  const cambiar = (campo) => (e) => {
+    setDatos((d) => ({ ...d, [campo]: e.target.value }));
+    setErrores((actuales) => { const resto = { ...actuales }; delete resto[campo === 'precio' ? 'precioBase.monto' : campo]; return resto; });
+  };
   const coloresDelProducto = esNuevo ? colores : [...new Set(producto?.variantes.map((v) => v.color) ?? [])];
 
   const guardar = async (e) => {
