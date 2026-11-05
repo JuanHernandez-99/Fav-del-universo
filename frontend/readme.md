@@ -2,7 +2,7 @@
 
 Tienda para el comprador y panel para el administrador. React con Vite ([ADR-017](../docs/adr/ADR-017-frontend.md)).
 
-> Estado: **en curso**. Están el catálogo, la búsqueda, los filtros, la ficha, el carrito, el registro y el inicio de sesión. Faltan la compra, "Mis compras", la política de cambios y el panel.
+> Estado: **en curso**. Están el catálogo, la búsqueda, los filtros, la ficha, el carrito, el registro, el inicio de sesión y la compra con los dos medios de pago. Faltan "Mis compras", la política de cambios y el panel.
 
 - **El carrito vive en el navegador** y se envía completo a Ventas al comprar ([ADR-001](../docs/adr/ADR-001-limites-de-los-servicios.md)).
 - **Habla solo con el gateway**, en el mismo origen. Todas las llamadas están en `src/api.js`.
@@ -22,7 +22,7 @@ Para desarrollar, con recarga automática y el gateway levantado:
 cd frontend
 npm install
 npm run dev     # http://localhost:5173
-npm test        # lógica del carrito y de la sesión
+npm test        # lógica del carrito, de la sesión y de la compra
 ```
 
 ## Carpetas
@@ -33,6 +33,7 @@ npm test        # lógica del carrito y de la sesión
 | `src/dominio.js` | Categorías, talles y formato de precios |
 | `src/carrito/` | Lógica del carrito, con sus tests, y su estado en React |
 | `src/sesion/` | Token en `sessionStorage`, con sus tests, y su estado en React |
+| `src/compra/` | Clave de idempotencia, venta guardada en la pestaña y textos de estados y errores, con sus tests |
 | `src/componentes/`, `src/paginas/` | Pantallas |
 | `src/estilos.css` | Colores, tipografías y diseño |
 | `pruebas/datos-demo.mjs` | Carga datos de ejemplo. No se usa en producción |

@@ -11,6 +11,8 @@ import Tienda from './paginas/Tienda.jsx';
 import Producto from './paginas/Producto.jsx';
 import Carrito from './paginas/Carrito.jsx';
 import Acceso from './paginas/Acceso.jsx';
+import Comprar from './paginas/Comprar.jsx';
+import CompraResultado from './paginas/CompraResultado.jsx';
 import NoEncontrada from './paginas/NoEncontrada.jsx';
 
 createRoot(document.getElementById('raiz')).render(
@@ -23,6 +25,8 @@ createRoot(document.getElementById('raiz')).render(
               <Route index element={<Tienda />} />
               <Route path="producto/:id" element={<Producto />} />
               <Route path="carrito" element={<Carrito />} />
+              <Route path="comprar" element={<Comprar />} />
+              <Route path="compra/:id" element={<CompraResultado />} />
               <Route path="ingresar" element={<Acceso key="ingresar" modo="ingresar" />} />
               <Route path="registrarme" element={<Acceso key="registrar" modo="registrar" />} />
               <Route path="*" element={<NoEncontrada />} />

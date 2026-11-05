@@ -18,9 +18,10 @@ export function ProveedorCarrito({ children }) {
   const agregar = useCallback((item, cantidad) => setItems((a) => carrito.agregar(a, item, cantidad)), []);
   const cambiarCantidad = useCallback((id, cantidad) => setItems((a) => carrito.cambiarCantidad(a, id, cantidad)), []);
   const quitar = useCallback((id) => setItems((a) => carrito.quitar(a, id)), []);
+  const vaciar = useCallback(() => setItems([]), []);
 
-  const valor = useMemo(() => ({ items, agregar, cambiarCantidad, quitar, unidades: carrito.contarUnidades(items) }),
-    [items, agregar, cambiarCantidad, quitar]);
+  const valor = useMemo(() => ({ items, agregar, cambiarCantidad, quitar, vaciar, unidades: carrito.contarUnidades(items) }),
+    [items, agregar, cambiarCantidad, quitar, vaciar]);
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }

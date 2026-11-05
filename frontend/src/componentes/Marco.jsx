@@ -49,9 +49,9 @@ export default function Marco() {
   const { pathname, search } = useLocation();
 
   // Una página nueva arranca desde arriba; cambiar un filtro de la tienda, no.
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [pathname]);
   useEffect(() => {
-    if (pathname === '/' && new URLSearchParams(search).has('pagina')) window.scrollTo(0, 0);
+    if (pathname === '/' && new URLSearchParams(search).has('pagina')) window.scrollTo({ top: 0, behavior: 'instant' });
   }, [pathname, search]);
 
   return (

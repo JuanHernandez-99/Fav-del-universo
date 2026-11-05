@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { consultarDisponibilidad, ErrorApi, obtenerProducto } from '../api.js';
 import { useCarrito } from '../carrito/contexto.jsx';
-import { calcularSubtotal, revisar, sePuedeComprar } from '../carrito/carrito.js';
+import { calcularSubtotal, sePuedeComprar } from '../carrito/carrito.js';
+import { useRevision } from '../carrito/useRevision.js';
 import { formatearPrecio } from '../dominio.js';
 import FotoPrenda from '../componentes/FotoPrenda.jsx';
 
@@ -14,51 +13,9 @@ const AVISOS = {
 
 const textoDisponible = (n) => (n === 1 ? 'Queda 1 unidad.' : `Quedan ${n} unidades.`);
 
-// Consulta lo actual de cada producto: null si no está publicado, undefined si Catálogo no respondió.
-async function leerProductos(ids, signal) {
-  const pares = await Promise.all(ids.map(async (id) => {
-    try {
-      return [id, await obtenerProducto(id, { signal })];
-    } catch (e) {
-      return [id, e instanceof ErrorApi && e.estado === 404 ? null : undefined];
-    }
-  }));
-  return Object.fromEntries(pares);
-}
-
 export default function Carrito() {
   const { items, cambiarCantidad, quitar } = useCarrito();
-  const [productos, setProductos] = useState({});
-  const [disponibilidad, setDisponibilidad] = useState(undefined);
-  const [revisando, setRevisando] = useState(true);
-
-  // Se vuelve a revisar solo si cambian las prendas, no al tocar una cantidad.
-  const claveVariantes = items.map((i) => i.varianteId).sort().join(',');
-  const claveProductos = [...new Set(items.map((i) => i.productoId))].sort().join(',');
-
-  useEffect(() => {
-    if (!claveVariantes) { setRevisando(false); return undefined; }
-    const control = new AbortController();
-    setRevisando(true);
-    (async () => {
-      const [leidos, disp] = await Promise.all([
-        leerProductos(claveProductos.split(','), control.signal),
-        consultarDisponibilidad(claveVariantes.split(','), { signal: control.signal }).catch(() => null),
-      ]);
-      if (control.signal.aborted) return;
-      setProductos(leidos);
-      setDisponibilidad(disp);
-      setRevisando(false);
-    })();
-    return () => control.abort();
-  }, [claveVariantes, claveProductos]);
-
-  const revisados = useMemo(() => {
-    if (revisando) return items;
-    const lineas = revisar(items, productos, disponibilidad ?? null);
-    // Sin respuesta de Catálogo no se puede saber si sigue publicada ni cuánto sale.
-    return lineas.map((l) => (productos[l.productoId] === undefined && !l.problema ? { ...l, problema: 'SIN_DATOS' } : l));
-  }, [items, productos, disponibilidad, revisando]);
+  const { revisados, revisando } = useRevision(items);
 
   if (items.length === 0) {
     return (
@@ -118,9 +75,9 @@ export default function Carrito() {
             El total se calcula al comprar, según el medio de pago. El carrito no aparta las prendas: se reservan cuando comprás.
           </p>
           {hayCambioDePrecio && <p className="carrito-resumen-nota">Actualizamos los precios que cambiaron.</p>}
-          <button type="button" className="boton boton-ancho" disabled>
-            {revisando ? 'Revisando el stock…' : listo ? 'Comprar: próximamente' : 'Revisá tu carrito'}
-          </button>
+          {listo
+            ? <Link to="/comprar" className="boton boton-ancho">Comprar</Link>
+            : <button type="button" className="boton boton-ancho" disabled>{revisando ? 'Revisando el stock…' : 'Revisá tu carrito'}</button>}
           <Link className="carrito-seguir" to="/">Seguir comprando</Link>
         </aside>
       </div>

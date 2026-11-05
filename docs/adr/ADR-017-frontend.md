@@ -27,6 +27,8 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 | **Rutas de API inexistentes** | El gateway responde `404` en JSON bajo `/v1/`, `/ventas/` y `/usuarios/`. Si no, recibirían la página de la tienda con un `200` |
 | **Tipografías** | Incluidas en el paquete (`@fontsource`). La tienda no depende de un servicio externo |
 | **Sesión** | El token se guarda en `sessionStorage`. Se borra al cerrar la pestaña y no se comparte entre pestañas. Sin refresh token (ADR-001): al vencer, hay que volver a ingresar. El frontend lo lee solo para mostrar el email y saber cuándo vence; lo valida el gateway (ADR-016) |
+| **Clave de idempotencia** | La genera el navegador y se guarda en `sessionStorage` junto con el contenido del pedido. El mismo pedido reintentado usa la misma clave (HU-11.8); si cambió, una nueva |
+| **Volver de Mercado Pago** | El pago se abre en otra pestaña y la tienda sigue abierta. Con cuenta, la tienda consulta el estado cada 3 s mientras está pendiente. Sin cuenta no hay de dónde consultarlo (RN-24): se informa por mail |
 | **Composición** | Productos y unidades disponibles se piden por separado y el frontend junta las respuestas (ADR-006) |
 | **Stock visible** | El comprador ve las unidades online disponibles, sin físico ni reservadas (HU-01.5). La ficha y el carrito no dejan pedir más. Es un dato del momento: la reserva la decide Inventario al comprar (`409 STOCK_INSUFICIENTE`) |
 
@@ -52,6 +54,8 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 - **El stock online queda a la vista de cualquiera,** también de la competencia, porque la ruta es pública. Se decidió así para que el comprador sepa cuánto hay y HU-10.2 avise antes de comprar. A confirmar con el cliente.
 - **Una falla de XSS podría leer el token,** porque `sessionStorage` es accesible desde JavaScript. React escapa lo que muestra y el token vence en 1 hora, pero el riesgo existe.
 - **Abrir la tienda en otra pestaña pide ingresar de nuevo.**
+- **El invitado no ve el resultado del pago en la pantalla,** solo en el mail (RN-24). Los datos para pagar se ven en la pestaña donde compró.
+- **El total final recién se ve después de reservar,** porque una promoción puede depender del medio de pago y no hay una ruta pública que lo calcule antes. Si no le conviene, el comprador puede cancelar.
 - **Las opciones del filtro de color** salen de los primeros 100 productos, porque el color es texto libre y no hay una ruta de colores.
 - **Los talles y las categorías** están repetidos en el frontend (RN-02, RN-17), porque no hay una ruta pública que los liste.
 
