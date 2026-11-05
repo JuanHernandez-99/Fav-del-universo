@@ -4,6 +4,7 @@ import { useCarrito } from '../carrito/contexto.jsx';
 import { useSesion } from '../sesion/contexto.jsx';
 import { ROL_ADMINISTRADOR } from '../paginas/panel/Panel.jsx';
 import { CATEGORIAS } from '../dominio.js';
+import MenuCategorias from './MenuCategorias.jsx';
 
 function Buscador() {
   const [parametros] = useSearchParams();
@@ -67,6 +68,7 @@ export default function Marco() {
             <span className="marca-fav">FAV</span>
             <span className="marca-universo">del universo</span>
           </Link>
+          <MenuCategorias />
           <Buscador />
           <nav className="navegacion" aria-label="Principal">
             <Cuenta pathname={pathname} search={search} />

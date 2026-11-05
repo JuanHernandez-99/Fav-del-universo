@@ -47,6 +47,19 @@ button:disabled { cursor: not-allowed; }
 .marca { display: flex; align-items: baseline; gap: .4rem; text-decoration: none; white-space: nowrap; }
 .marca-fav { font: 600 1.7rem/1 var(--serif); letter-spacing: .02em; }
 .marca-universo { font: italic 400 .98rem/1 var(--serif); color: var(--tinta-suave); }
+.menu-categorias { position: relative; }
+.menu-categorias-boton { display: flex; align-items: center; gap: .35rem; padding: .45rem .8rem; background: none; border: 1px solid transparent; border-radius: 999px; font-size: .93rem; font-weight: 600; }
+.menu-categorias-boton:hover, .menu-categorias-boton[aria-expanded='true'] { border-color: var(--linea); background: var(--papel-oscuro); }
+.menu-categorias-boton svg { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
+.menu-categorias-flecha { width: .75rem; height: .75rem; stroke-width: 1.6; transition: transform .15s; }
+.menu-categorias-boton[aria-expanded='true'] .menu-categorias-flecha { transform: rotate(180deg); }
+.menu-categorias-icono { display: none; width: 1.35rem; height: 1.35rem; stroke-width: 1.8; }
+.menu-categorias-lista { position: absolute; top: calc(100% + .5rem); left: 0; z-index: 30; width: 22rem; padding: .9rem; background: #fff; border: 1px solid var(--linea); border-radius: 12px; box-shadow: 0 16px 40px rgb(38 31 46 / .14); }
+.menu-categorias-lista ul { display: grid; grid-template-columns: 1fr 1fr; gap: .1rem .4rem; }
+.menu-categorias-lista a { display: block; padding: .5rem .7rem; border-radius: 8px; font-size: .93rem; text-decoration: none; }
+.menu-categorias-lista a:hover { background: var(--papel); }
+.menu-categorias-lista a[aria-current='page'] { background: var(--noche); color: var(--papel); }
+.menu-categorias-todo { margin-bottom: .4rem; padding-bottom: .6rem !important; border-bottom: 1px solid var(--linea); border-radius: 8px 8px 0 0 !important; font-weight: 600; }
 .buscador { position: relative; flex: 1; max-width: 480px; margin-inline: auto; }
 .buscador svg { position: absolute; left: .95rem; top: 50%; width: 1.05rem; transform: translateY(-50%); fill: none; stroke: var(--tinta-suave); stroke-width: 2; stroke-linecap: round; }
 .buscador input { width: 100%; padding: .62rem 1rem .62rem 2.6rem; background: var(--papel-oscuro); border: 1px solid transparent; border-radius: 999px; transition: border-color .15s, background .15s; }
@@ -94,11 +107,6 @@ button:disabled { cursor: not-allowed; }
 
 /* ---------- Tienda ---------- */
 .tienda { max-width: var(--ancho); margin: auto; padding: 1.6rem var(--margen) 4rem; scroll-margin-top: 4.5rem; }
-.categorias { display: flex; flex-wrap: wrap; gap: .45rem; padding-bottom: 1rem; }
-.categorias::-webkit-scrollbar { display: none; }
-.categorias a { flex: none; padding: .42rem 1rem; border: 1px solid var(--linea); border-radius: 999px; font-size: .88rem; font-weight: 500; text-decoration: none; transition: background .15s, border-color .15s, color .15s; }
-.categorias a:hover { border-color: var(--tinta); }
-.categorias a[aria-current] { background: var(--noche); border-color: var(--noche); color: var(--papel); }
 .filtros { padding: 1rem 0 1.3rem; border-block: 1px solid var(--linea); }
 .filtros-campos { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem 1rem; }
 .filtros-plegar { display: none; width: 100%; padding: .6rem 1rem; background: #fff; border: 1px solid var(--linea); border-radius: 8px; font-size: .9rem; font-weight: 600; }
@@ -499,9 +507,14 @@ a.panel-fila:hover { background: var(--papel); }
 @media (max-width: 640px) {
   .encabezado-interior { flex-wrap: wrap; justify-content: space-between; gap: .6rem 1rem; }
   .buscador { order: 3; flex-basis: 100%; max-width: none; }
+  .menu-categorias { position: static; margin-right: auto; }
+  .menu-categorias-boton { padding: .35rem; }
+  .menu-categorias-icono { display: block; }
+  .menu-categorias-flecha { display: none; }
+  .menu-categorias-texto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .menu-categorias-lista { left: var(--margen); right: var(--margen); width: auto; }
   .enlace-carrito > span:not(.contador) { display: none; }
   .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .categorias { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   .filtros-plegar { display: block; }
   .filtros-campos { display: none; margin-top: .9rem; }
   .filtros-campos.abiertos { display: flex; }

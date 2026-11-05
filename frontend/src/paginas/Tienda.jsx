@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { consultarDisponibilidad, ErrorApi, listarProductos } from '../api.js';
-import { CATEGORIAS, nombreCategoria } from '../dominio.js';
+import { nombreCategoria } from '../dominio.js';
 import Filtros from '../componentes/Filtros.jsx';
 import TarjetaProducto from '../componentes/TarjetaProducto.jsx';
 
@@ -119,13 +119,6 @@ export default function Tienda() {
     <>
       <Cabecera filtros={filtros} />
       <div className="tienda" id="catalogo">
-        <nav className="categorias" aria-label="Categorías">
-          <Link to="/" aria-current={!filtros.categoria ? 'true' : undefined}>Todo</Link>
-          {CATEGORIAS.map(([id, nombre]) => (
-            <Link key={id} to={`/?categoria=${id}`} aria-current={filtros.categoria === id ? 'true' : undefined}>{nombre}</Link>
-          ))}
-        </nav>
-
         <Filtros filtros={filtros} colores={colores} alCambiar={cambiar} alLimpiar={limpiar} hayFiltros={hayFiltros} />
 
         {disponibilidad === null && (
