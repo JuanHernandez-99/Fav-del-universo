@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -82,6 +83,14 @@ var pagina = template.Must(template.New("checkout").Parse(`<!doctype html>
 <form method="post" action="/checkout/{{.ID}}/rechazar"><button>Rechazar el pago</button></form>
 </body></html>`))
 
+// resultado es lo que ve quien aprieta un botón del checkout: el comprador vuelve a la tienda por su cuenta.
+var resultado = template.Must(template.New("resultado").Parse(`<!doctype html>
+<html lang="es"><meta charset="utf-8"><title>Simulador de Mercado Pago</title>
+<body style="font-family:sans-serif;max-width:32rem;margin:2rem auto">
+<h1>Pago {{if eq .Status "approved"}}aprobado{{else}}rechazado{{end}}</h1>
+<p>Podés cerrar esta pestaña y volver a la tienda.</p>
+</body></html>`))
+
 func (s *simulador) mostrarCheckout(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	p, ok := s.preferencias[r.PathValue("id")]
@@ -117,6 +126,12 @@ func (s *simulador) resolver(estado string) http.HandlerFunc {
 			resultados[i] = s.avisar(r.Context(), p.NotificationURL, nuevo.ID, i)
 		}
 		slog.Info("pago resuelto", "pago", nuevo.ID, "estado", estado, "venta", p.ExternalReference, "respuestas_al_aviso", resultados)
+		// Desde el navegador, una página. Desde un script (fetch, curl), el detalle en JSON.
+		if strings.Contains(r.Header.Get("Accept"), "text/html") {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_ = resultado.Execute(w, nuevo)
+			return
+		}
 		escribirJSON(w, http.StatusOK, map[string]any{"pago": nuevo, "respuestasAlAviso": resultados})
 	}
 }
