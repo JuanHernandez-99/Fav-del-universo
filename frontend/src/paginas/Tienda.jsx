@@ -21,8 +21,7 @@ function Cabecera({ filtros }) {
       <div className="portada-interior">
         <p className="portada-volanta">Colección online</p>
         <h1>Ropa con <em>órbita</em> propia.</h1>
-        <p className="portada-texto">Elegí tu talle y tu color, y sumalo al carrito. Podés comprar con o sin cuenta.</p>
-        <a className="boton boton-claro" href="#catalogo">Ver el catálogo</a>
+        <p className="portada-texto">Tu talle, tu color, tu estilo.<br />Comprá online, con cuenta o sin ella.</p>
       </div>
       <svg className="portada-astro" viewBox="0 0 400 400" aria-hidden="true">
         <circle cx="200" cy="200" r="104" />
