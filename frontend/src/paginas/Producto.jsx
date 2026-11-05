@@ -8,7 +8,7 @@ import Precio from '../componentes/Precio.jsx';
 
 export default function Producto() {
   const { id } = useParams();
-  const { agregar } = useCarrito();
+  const { agregar, items } = useCarrito();
   const [producto, setProducto] = useState(null);
   const [error, setError] = useState(null);
   const [disponibilidad, setDisponibilidad] = useState(undefined); // undefined: consultando. null: no respondió.
@@ -34,7 +34,7 @@ export default function Producto() {
         } catch { /* Inventario caído: se avisa, sin afirmar que no hay */ }
         if (control.signal.aborted) return;
         setDisponibilidad(d);
-        const conStock = d && p.variantes.find((v) => d[v.varianteId]);
+        const conStock = d && p.variantes.find((v) => d[v.varianteId] > 0);
         setColor(conStock?.color ?? p.variantes[0].color);
         setTalle('');
       })
@@ -72,12 +72,15 @@ export default function Producto() {
   const talles = ordenarTalles(variantesDelColor.map((v) => v.talle));
   const varianteDe = (t) => variantesDelColor.find((v) => v.talle === t);
   const variante = varianteDe(talle);
-  const hay = (v) => disponibilidad?.[v.varianteId] === true;
+  const hay = (v) => disponibilidad?.[v.varianteId] > 0;
   const consultando = disponibilidad === undefined;
   const sinDatos = disponibilidad === null;
   const colorAgotado = (c) => disponibilidad && producto.variantes.filter((v) => v.color === c).every((v) => !hay(v));
   const foto = fotos[Math.min(fotoElegida, Math.max(fotos.length - 1, 0))];
-  const puedeAgregar = variante && hay(variante);
+  const disponible = variante ? disponibilidad?.[variante.varianteId] ?? 0 : 0;
+  const enCarrito = variante ? items.find((i) => i.varianteId === variante.varianteId)?.cantidad ?? 0 : 0;
+  const restantes = Math.max(disponible - enCarrito, 0); // lo que todavía se puede sumar (HU-10.2)
+  const puedeAgregar = variante && cantidad <= restantes && restantes > 0;
 
   const agregarAlCarrito = () => {
     agregar({
@@ -87,6 +90,7 @@ export default function Producto() {
     setAgregado(true);
     setCantidad(1);
   };
+  const elegirTalle = (t) => { setTalle(t); setCantidad(1); };
 
   return (
     <article className="ficha">
@@ -123,7 +127,7 @@ export default function Producto() {
               <button key={c} type="button" className={`muestra-boton${colorAgotado(c) ? ' agotado' : ''}${esColorClaro(c) ? ' claro' : ''}`}
                 style={{ '--muestra': colorDeMuestra(c) }} aria-pressed={c === colorActual}
                 aria-label={`${c}${colorAgotado(c) ? ', sin stock' : ''}`} title={c}
-                onClick={() => { setColor(c); setTalle(''); }} />
+                onClick={() => { setColor(c); setTalle(''); setCantidad(1); }} />
             ))}
           </div>
         </fieldset>
@@ -135,13 +139,19 @@ export default function Producto() {
               const sinStock = disponibilidad && !hay(varianteDe(t));
               return (
                 <button key={t} type="button" className={sinStock ? 'agotado' : ''} disabled={sinStock || consultando || sinDatos}
-                  aria-pressed={t === talle} aria-label={`Talle ${t === 'U' ? 'único' : t}${sinStock ? ', sin stock' : ''}`} onClick={() => setTalle(t)}>
+                  aria-pressed={t === talle} aria-label={`Talle ${t === 'U' ? 'único' : t}${sinStock ? ', sin stock' : ''}`} onClick={() => elegirTalle(t)}>
                   {t === 'U' ? 'Único' : t}
                 </button>
               );
             })}
           </div>
           {disponibilidad && variantesDelColor.every((v) => !hay(v)) && <p className="selector-nota">Este color no tiene stock online.</p>}
+          {variante && hay(variante) && (
+            <p className={`selector-stock${disponible === 1 ? ' ultima' : ''}`} role="status">
+              {disponible === 1 ? 'Última unidad disponible' : `${disponible} unidades disponibles`}
+              {enCarrito > 0 && ` · ${enCarrito} en tu carrito`}
+            </p>
+          )}
         </fieldset>
 
         {sinDatos && (
@@ -155,10 +165,10 @@ export default function Producto() {
           <div className="cantidad">
             <button type="button" aria-label="Quitar una unidad" disabled={cantidad <= 1} onClick={() => setCantidad((n) => n - 1)}>−</button>
             <output aria-label="Cantidad">{cantidad}</output>
-            <button type="button" aria-label="Sumar una unidad" onClick={() => setCantidad((n) => n + 1)}>+</button>
+            <button type="button" aria-label="Sumar una unidad" disabled={!variante || cantidad >= restantes} onClick={() => setCantidad((n) => n + 1)}>+</button>
           </div>
           <button type="button" className="boton boton-ancho" disabled={!puedeAgregar} onClick={agregarAlCarrito}>
-            {consultando ? 'Consultando stock…' : sinDatos ? 'Stock no disponible' : variante ? 'Agregar al carrito' : 'Elegí un talle'}
+            {consultando ? 'Consultando stock…' : sinDatos ? 'Stock no disponible' : !variante ? 'Elegí un talle' : restantes === 0 ? 'Ya están todas en tu carrito' : 'Agregar al carrito'}
           </button>
         </div>
         <p className="ficha-mensaje" role="status">
@@ -166,7 +176,7 @@ export default function Producto() {
         </p>
 
         <ul className="ficha-notas">
-          <li>Agregar al carrito no aparta la prenda: se reserva cuando comprás.</li>
+          <li>Agregar al carrito no aparta la prenda: se reserva cuando comprás, así que las unidades pueden cambiar.</li>
           <li>El total final se confirma al comprar, según el medio de pago.</li>
           <li>La entrega se acuerda con el vendedor.</li>
         </ul>

@@ -31,9 +31,9 @@ func pedirDisponibilidad(repo repoStock, ruta string) *httptest.ResponseRecorder
 	return w
 }
 
-// Las reservadas no cuentan y la respuesta no deja ver ninguna cantidad (HU-01.3). Respeta el orden pedido,
-// sin repetidos, y una variante sin fila de stock figura sin stock.
-func TestDisponibilidadSoloDiceSiHay(t *testing.T) {
+// Las reservadas no cuentan y el físico no se informa (HU-01.5). Respeta el orden pedido, sin repetidos,
+// y una variante sin fila de stock figura con 0.
+func TestDisponibilidadInformaLasUnidadesOnline(t *testing.T) {
 	repo := repoStock{stocks: []dominio.Stock{
 		{VarianteID: "var-jean-celeste-38", Online: 0, Fisico: 40},
 		{VarianteID: "var-remera-blanca-m", Online: 3, Fisico: 40, Reservado: 1},
@@ -43,8 +43,8 @@ func TestDisponibilidadSoloDiceSiHay(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("código %d: %s", w.Code, w.Body)
 	}
-	esperado := `{"items":[{"varianteId":"var-remera-negra-l","hayStock":false},{"varianteId":"var-remera-blanca-m","hayStock":true},` +
-		`{"varianteId":"var-jean-celeste-38","hayStock":false},{"varianteId":"var-sin-fila","hayStock":false}]}`
+	esperado := `{"items":[{"varianteId":"var-remera-negra-l","disponible":0},{"varianteId":"var-remera-blanca-m","disponible":2},` +
+		`{"varianteId":"var-jean-celeste-38","disponible":0},{"varianteId":"var-sin-fila","disponible":0}]}`
 	if obtenido := strings.TrimSpace(w.Body.String()); obtenido != esperado {
 		t.Errorf("respuesta:\n%s", obtenido)
 	}
@@ -62,7 +62,7 @@ func TestDisponibilidadValidaLosIds(t *testing.T) {
 	}
 }
 
-// Si no se puede leer el stock no se responde "no hay": sería un dato falso.
+// Si no se puede leer el stock no se responde 0: sería un dato falso.
 func TestDisponibilidadInformaLaFalla(t *testing.T) {
 	if w := pedirDisponibilidad(repoStock{err: errors.New("mysql caído")}, "/v1/disponibilidad?variantes=var-a"); w.Code != 500 {
 		t.Errorf("código %d: %s", w.Code, w.Body)

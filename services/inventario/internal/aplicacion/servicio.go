@@ -99,19 +99,19 @@ func (s *Servicio) ConsultarStock(ctx context.Context, varianteIDs []string) ([]
 }
 
 // ConsultarDisponibilidad responde por cada id pedido, en el mismo orden. Una variante sin fila de stock
-// no tiene unidades: se responde que no hay.
+// no tiene unidades: se responde 0.
 func (s *Servicio) ConsultarDisponibilidad(ctx context.Context, varianteIDs []string) ([]dominio.Disponibilidad, error) {
 	stocks, err := s.repo.ConsultarStock(ctx, varianteIDs)
 	if err != nil {
 		return nil, err
 	}
-	disponibles := make(map[string]bool, len(stocks))
+	disponibles := make(map[string]int, len(stocks))
 	for _, st := range stocks {
-		disponibles[st.VarianteID] = st.DisponibleOnline() > 0
+		disponibles[st.VarianteID] = max(st.DisponibleOnline(), 0)
 	}
 	resultado := make([]dominio.Disponibilidad, len(varianteIDs))
 	for i, id := range varianteIDs {
-		resultado[i] = dominio.Disponibilidad{VarianteID: id, HayStock: disponibles[id]}
+		resultado[i] = dominio.Disponibilidad{VarianteID: id, Disponible: disponibles[id]}
 	}
 	return resultado, nil
 }

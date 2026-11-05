@@ -165,7 +165,7 @@ func (h *Handler) consultarStock(w http.ResponseWriter, r *http.Request) {
 	escribirJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-// consultarDisponibilidad es la ruta pública de la tienda: solo dice si hay, sin cantidades (HU-01.3).
+// consultarDisponibilidad es la ruta pública de la tienda: las unidades online disponibles, nada más (HU-01.5).
 func (h *Handler) consultarDisponibilidad(w http.ResponseWriter, r *http.Request) {
 	ids, ok := idsDeVariantes(w, r)
 	if !ok {
@@ -178,11 +178,11 @@ func (h *Handler) consultarDisponibilidad(w http.ResponseWriter, r *http.Request
 	}
 	type disponibilidadJSON struct {
 		VarianteID string `json:"varianteId"`
-		HayStock   bool   `json:"hayStock"`
+		Disponible int    `json:"disponible"`
 	}
 	items := make([]disponibilidadJSON, len(disponibilidad))
 	for i, d := range disponibilidad {
-		items[i] = disponibilidadJSON{d.VarianteID, d.HayStock}
+		items[i] = disponibilidadJSON{d.VarianteID, d.Disponible}
 	}
 	escribirJSON(w, http.StatusOK, map[string]any{"items": items})
 }

@@ -1,8 +1,10 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.10** · 04/11/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.11** · 05/11/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
+>
+> **Cambios en 0.11** (ADR-017): se agrega HU-01.5: el comprador ve las unidades online disponibles.
 >
 > **Cambios en 0.10** (ADR-015): se agrega RN-26, sobre las contraseñas, y RN-23 indica cómo se crea la cuenta de administrador.
 >
@@ -142,6 +144,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 2. Dado un producto no publicado, cuando el comprador navega o busca, entonces no aparece.
 3. Dada una variante sin stock online disponible, entonces se muestra como "sin stock" y no se puede agregar al carrito.
 4. Dado un producto con una promoción vigente, entonces se muestra el precio original y el precio con promoción. **[?]** cómo se muestra una promoción condicionada al medio de pago.
+5. Cuando elige talle y color, entonces ve cuántas unidades online hay disponibles. **[propuesta]**
 
 **HU-02 · Buscar, filtrar y ordenar.** Como comprador quiero buscar y filtrar productos, para encontrar rápido lo que busco. *(RN-02, RN-17)*
 1. Cuando el comprador busca por texto, entonces obtiene los productos publicados cuyo nombre o descripción coinciden.

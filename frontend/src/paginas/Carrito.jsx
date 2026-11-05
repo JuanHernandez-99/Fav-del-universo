@@ -12,6 +12,8 @@ const AVISOS = {
   SIN_DATOS: 'Ahora no podemos consultar si hay stock.',
 };
 
+const textoDisponible = (n) => (n === 1 ? 'Queda 1 unidad.' : `Quedan ${n} unidades.`);
+
 // Consulta lo actual de cada producto: null si no está publicado, undefined si Catálogo no respondió.
 async function leerProductos(ids, signal) {
   const pares = await Promise.all(ids.map(async (id) => {
@@ -86,13 +88,18 @@ export default function Carrito() {
               <div className="carrito-datos">
                 <h2><Link to={`/producto/${item.productoId}`}>{item.nombre}</Link></h2>
                 <p className="carrito-variante">{item.color} · Talle {item.talle === 'U' ? 'único' : item.talle}</p>
-                {item.problema && <p className="carrito-aviso" role="alert">{AVISOS[item.problema]}</p>}
+                {item.problema === 'NO_ALCANZA' ? (
+                  <p className="carrito-aviso" role="alert">
+                    {textoDisponible(item.disponible)}{' '}
+                    <button type="button" className="boton-texto" onClick={() => cambiarCantidad(item.varianteId, item.disponible)}>Dejar {item.disponible}</button>
+                  </p>
+                ) : item.problema && <p className="carrito-aviso" role="alert">{AVISOS[item.problema]}</p>}
                 {item.precioCambio && !item.problema && <p className="carrito-nota">El precio cambió desde que la agregaste.</p>}
                 <div className="carrito-acciones">
                   <div className="cantidad cantidad-chica">
                     <button type="button" aria-label={`Quitar una unidad de ${item.nombre}`} disabled={item.cantidad <= 1} onClick={() => cambiarCantidad(item.varianteId, item.cantidad - 1)}>−</button>
                     <output aria-label="Cantidad">{item.cantidad}</output>
-                    <button type="button" aria-label={`Sumar una unidad de ${item.nombre}`} onClick={() => cambiarCantidad(item.varianteId, item.cantidad + 1)}>+</button>
+                    <button type="button" aria-label={`Sumar una unidad de ${item.nombre}`} disabled={item.disponible != null && item.cantidad >= item.disponible} onClick={() => cambiarCantidad(item.varianteId, item.cantidad + 1)}>+</button>
                   </div>
                   <button type="button" className="boton-texto" onClick={() => quitar(item.varianteId)}>Quitar</button>
                 </div>
@@ -108,7 +115,7 @@ export default function Carrito() {
             <div><dt>Subtotal</dt><dd>{formatearPrecio(subtotal)}</dd></div>
           </dl>
           <p className="carrito-resumen-nota">
-            El total se calcula al comprar, según el medio de pago. Si no alcanzan las unidades que pediste, te avisamos en ese momento.
+            El total se calcula al comprar, según el medio de pago. El carrito no aparta las prendas: se reservan cuando comprás.
           </p>
           {hayCambioDePrecio && <p className="carrito-resumen-nota">Actualizamos los precios que cambiaron.</p>}
           <button type="button" className="boton boton-ancho" disabled>

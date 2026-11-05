@@ -26,8 +26,8 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 | **Por dónde se entra** | Por el gateway: `/` va al frontend y las rutas de la API van a los servicios. Mismo origen, sin CORS |
 | **Rutas de API inexistentes** | El gateway responde `404` en JSON bajo `/v1/`, `/ventas/` y `/usuarios/`. Si no, recibirían la página de la tienda con un `200` |
 | **Tipografías** | Incluidas en el paquete (`@fontsource`). La tienda no depende de un servicio externo |
-| **Composición** | Productos e "hay / no hay" se piden por separado y el frontend junta las respuestas (ADR-006) |
-| **Cantidad pedida** | El comprador no ve cuántas unidades hay. Si pide más de las disponibles, se entera al comprar (`409 STOCK_INSUFICIENTE`) |
+| **Composición** | Productos y unidades disponibles se piden por separado y el frontend junta las respuestas (ADR-006) |
+| **Stock visible** | El comprador ve las unidades online disponibles, sin físico ni reservadas (HU-01.5). La ficha y el carrito no dejan pedir más. Es un dato del momento: la reserva la decide Inventario al comprar (`409 STOCK_INSUFICIENTE`) |
 
 ## Alternativas consideradas
 
@@ -46,7 +46,7 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 
 **Negativas aceptadas**
 
-- **HU-10.2 se cumple recién al comprar:** el carrito no puede avisar antes que no alcanzan las unidades, porque la tienda no conoce cantidades. A confirmar con el cliente.
+- **El stock online queda a la vista de cualquiera,** también de la competencia, porque la ruta es pública. Se decidió así para que el comprador sepa cuánto hay y HU-10.2 avise antes de comprar. A confirmar con el cliente.
 - **Las opciones del filtro de color** salen de los primeros 100 productos, porque el color es texto libre y no hay una ruta de colores.
 - **Los talles y las categorías** están repetidos en el frontend (RN-02, RN-17), porque no hay una ruta pública que los liste.
 

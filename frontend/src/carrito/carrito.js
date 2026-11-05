@@ -54,8 +54,10 @@ export function revisar(items, productos, disponibilidad) {
       return { ...conPrecio, problema: 'NO_PUBLICADO' };
     }
     if (disponibilidad === null) return { ...conPrecio, problema: 'SIN_DATOS' };
-    if (disponibilidad[item.varianteId] !== true) return { ...conPrecio, problema: 'SIN_STOCK' };
-    return conPrecio;
+    const disponible = disponibilidad[item.varianteId] ?? 0;
+    if (disponible === 0) return { ...conPrecio, disponible, problema: 'SIN_STOCK' };
+    if (item.cantidad > disponible) return { ...conPrecio, disponible, problema: 'NO_ALCANZA' }; // HU-10.2
+    return { ...conPrecio, disponible };
   });
 }
 

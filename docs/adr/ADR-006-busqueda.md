@@ -92,7 +92,7 @@ Objetivo inicial: que un cambio sea encontrable en **unos 10 segundos** (valor a
 - **Una pieza más que operar** (memoria, versiones, mapeo).
 - **Frescura eventual:** hay una ventana en la que el índice no refleja la edición.
 - **Hay que escribir el indexador** y mantener su idempotencia.
-- **Los resultados no traen la disponibilidad.** La tienda la pide aparte a Inventario, por lote y solo "hay / no hay" (`GET /v1/disponibilidad`, hasta 200 ids): un pedido por página, no uno por resultado. No se puede filtrar "solo con stock" y, sin Inventario, se ven los productos sin saber si hay.
+- **Los resultados no traen la disponibilidad.** La tienda la pide aparte a Inventario, por lote (`GET /v1/disponibilidad`, hasta 200 ids): un pedido por página, no uno por resultado. No se puede filtrar "solo con stock" y, sin Inventario, se ven los productos sin saber si hay.
 
 ## Pendientes
 

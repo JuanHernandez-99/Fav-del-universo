@@ -178,6 +178,8 @@ button:disabled { cursor: not-allowed; }
 .selector-talles button:disabled:not(.agotado) { color: var(--tinta-suave); }
 .selector-talles .agotado { background: transparent; color: var(--tinta-suave); text-decoration: line-through; opacity: .62; }
 .selector-nota { margin-top: .6rem; font-size: .85rem; color: var(--coral-oscuro); }
+.selector-stock { margin-top: .6rem; font-size: .85rem; font-weight: 600; color: var(--verde); }
+.selector-stock.ultima { color: var(--coral-oscuro); }
 .ficha-comprar { display: flex; gap: .7rem; margin-top: 1.7rem; }
 .cantidad { display: flex; align-items: center; flex: none; background: #fff; border: 1px solid var(--linea); border-radius: 999px; }
 .cantidad button { width: 2.8rem; height: 2.9rem; background: none; border: 0; border-radius: 50%; font-size: 1.1rem; }

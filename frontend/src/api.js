@@ -36,7 +36,7 @@ export function obtenerProducto(id, opciones) {
 
 const MAXIMO_POR_CONSULTA = 200; // límite de la ruta de Inventario
 
-// Devuelve { varianteId: true/false } con lo que responde Inventario, sin cantidades (HU-01.3).
+// Devuelve { varianteId: unidades disponibles online } con lo que responde Inventario (HU-01.5).
 export async function consultarDisponibilidad(ids, opciones) {
   const unicos = [...new Set(ids)];
   const tandas = [];
@@ -49,7 +49,7 @@ export async function consultarDisponibilidad(ids, opciones) {
   }));
   const disponibilidad = {};
   for (const { items } of respuestas) {
-    for (const { varianteId, hayStock } of items) disponibilidad[varianteId] = hayStock;
+    for (const { varianteId, disponible } of items) disponibilidad[varianteId] = disponible;
   }
   return disponibilidad;
 }

@@ -57,14 +57,21 @@ describe('revisar antes de comprar (HU-10.3)', () => {
   const items = [{ ...remeraM, cantidad: 1 }];
 
   it('con stock y publicado se puede comprar', () => {
-    const revisados = revisar(items, { 'prod-remera': remeraPublicada }, { [remeraM.varianteId]: true });
+    const revisados = revisar(items, { 'prod-remera': remeraPublicada }, { [remeraM.varianteId]: 1 });
     expect(revisados[0].problema).toBeUndefined();
     expect(sePuedeComprar(revisados)).toBe(true);
   });
 
   it('sin stock se avisa y no se puede comprar', () => {
-    const revisados = revisar(items, { 'prod-remera': remeraPublicada }, { [remeraM.varianteId]: false });
+    const revisados = revisar(items, { 'prod-remera': remeraPublicada }, { [remeraM.varianteId]: 0 });
     expect(revisados[0].problema).toBe('SIN_STOCK');
+    expect(sePuedeComprar(revisados)).toBe(false);
+  });
+
+  it('si pide más de lo disponible se avisa y no se puede comprar (HU-10.2)', () => {
+    const revisados = revisar([{ ...remeraM, cantidad: 3 }], { 'prod-remera': remeraPublicada }, { [remeraM.varianteId]: 2 });
+    expect(revisados[0].problema).toBe('NO_ALCANZA');
+    expect(revisados[0].disponible).toBe(2);
     expect(sePuedeComprar(revisados)).toBe(false);
   });
 
@@ -73,7 +80,7 @@ describe('revisar antes de comprar (HU-10.3)', () => {
   });
 
   it('despublicado: se avisa aunque haya stock', () => {
-    const revisados = revisar(items, { 'prod-remera': null }, { [remeraM.varianteId]: true });
+    const revisados = revisar(items, { 'prod-remera': null }, { [remeraM.varianteId]: 1 });
     expect(revisados[0].problema).toBe('NO_PUBLICADO');
   });
 
@@ -84,7 +91,7 @@ describe('revisar antes de comprar (HU-10.3)', () => {
   });
 
   it('muestra el precio actual y marca que cambió (RN-22)', () => {
-    const revisados = revisar(items, { 'prod-remera': { ...remeraPublicada, precio: 12000 } }, { [remeraM.varianteId]: true });
+    const revisados = revisar(items, { 'prod-remera': { ...remeraPublicada, precio: 12000 } }, { [remeraM.varianteId]: 1 });
     expect(revisados[0].precio).toBe(12000);
     expect(revisados[0].precioCambio).toBe(true);
   });

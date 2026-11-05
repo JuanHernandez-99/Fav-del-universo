@@ -3,11 +3,11 @@ import { coloresDe, colorDeMuestra, nombreCategoria, ordenarTalles } from '../do
 import FotoPrenda from './FotoPrenda.jsx';
 import Precio from './Precio.jsx';
 
-// disponibilidad: { varianteId: boolean }, o null si Inventario no respondió (no se afirma que no hay).
+// disponibilidad: { varianteId: unidades }, o null si Inventario no respondió (no se afirma que no hay).
 export default function TarjetaProducto({ producto, disponibilidad, prioridad }) {
   const colores = coloresDe(producto);
   const talles = ordenarTalles(producto.variantes.map((v) => v.talle)).map((t) => (t === 'U' ? 'Talle único' : t));
-  const sinStock = disponibilidad != null && producto.variantes.every((v) => disponibilidad[v.varianteId] === false);
+  const sinStock = disponibilidad != null && producto.variantes.every((v) => disponibilidad[v.varianteId] === 0);
 
   return (
     <article className={`tarjeta${sinStock ? ' tarjeta-sin-stock' : ''}`}>

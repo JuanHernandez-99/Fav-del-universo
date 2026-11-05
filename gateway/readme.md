@@ -30,6 +30,6 @@ Fabrica tokens falsos (sin firma, firmados con otra clave, con el rol cambiado, 
 node gateway/pruebas/tienda.mjs
 ```
 
-Comprueba productos, filtros, paginación, promociones, hay / no hay, que el resto siga protegido (también con `../`) y las caídas de Inventario y de Catálogo. Detiene y vuelve a levantar esos dos servicios, y deja datos de prueba en la base. Último resultado, el 05/11/2026: 44 de 44 en tres corridas seguidas; una corrida anterior falló en un chequeo, sin causa confirmada.
+Comprueba productos, filtros, paginación, promociones, unidades disponibles, que el resto siga protegido (también con `../`) y las caídas de Inventario y de Catálogo. Detiene y vuelve a levantar esos dos servicios, y deja datos de prueba en la base. Último resultado, el 05/11/2026: 44 de 44 en tres corridas seguidas; una corrida anterior falló en un chequeo, sin causa confirmada.
 
 [Arquitectura §6](../docs/ARCHITECTURE.md)
