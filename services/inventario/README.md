@@ -23,10 +23,13 @@ Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, junto con el r
 
 ## Probarlo
 
-Por el gateway (`http://localhost:8080`). Las rutas del panel van con el prefijo `/inventario` y la clave provisoria del administrador:
+Por el gateway (`http://localhost:8080`). Las rutas del panel van con el prefijo `/inventario` y el token del administrador:
 
 ```bash
-A="X-Admin-Key: clave-admin-local"
+# Token de administrador (valores por defecto de Docker Compose). Vence en 1 hora.
+TOKEN=$(curl -s localhost:8080/usuarios/v1/sesiones -H "Content-Type: application/json" \
+  -d '{"email":"admin@fav.example","contrasena":"cambiar-admin-local"}' | sed 's/.*"token":"\([^"]*\)".*/\1/')
+A="Authorization: Bearer $TOKEN"
 
 # Stock de varias variantes
 curl "localhost:8080/inventario/v1/stock?variantes=var-remera-basica-blanca-m,var-jean-mom-celeste-38" -H "$A"

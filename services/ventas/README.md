@@ -13,7 +13,7 @@ Ventas online y del local, sus estados, los pagos (Mercado Pago y transferencia)
 
 ## Qué no hace
 
-No modifica el stock: se lo pide a [Inventario](../inventario). No consulta a Usuarios: la identidad llega del gateway en `X-User-Id`, `X-User-Email` y `X-User-Role`.
+No modifica el stock: se lo pide a [Inventario](../inventario). No consulta a Usuarios: el gateway valida el token e informa la identidad en `X-User-Id`, `X-User-Email` y `X-User-Role` ([ADR-016](../../docs/adr/ADR-016-validacion-del-token-en-el-gateway.md)).
 
 ## Cómo levantarlo
 
@@ -29,7 +29,10 @@ Desde la raíz: `docker compose up --build`.
 ## Probarlo
 
 ```bash
-A="X-Admin-Key: clave-admin-local"
+# Token de administrador (valores por defecto de Docker Compose). Vence en 1 hora.
+TOKEN=$(curl -s localhost:8080/usuarios/v1/sesiones -H "Content-Type: application/json" \
+  -d '{"email":"admin@fav.example","contrasena":"cambiar-admin-local"}' | sed 's/.*"token":"\([^"]*\)".*/\1/')
+A="Authorization: Bearer $TOKEN"
 J="Content-Type: application/json"
 
 # Comprar con Mercado Pago: devuelve pago.urlPago. Abrila y aprobá o rechazá el pago.
@@ -117,7 +120,7 @@ Los tests de integración usan la base `ventas_test`, no la del servicio.
 
 **Verificado el 04/11/2026** con el sistema levantado por Docker: compra con los dos medios, pedido externo, aviso duplicado, pago rechazado, firma inválida, cancelación, avance de estados, venta del local con físico negativo, vencimiento por RabbitMQ, mensaje inválido a la DLQ, y caídas de Mercado Pago, Inventario y RabbitMQ.
 
-**Sin probar:** la API real de Mercado Pago; `/v1/mis-compras` por el gateway (necesita el JWT); el circuit breaker abierto con el sistema levantado (solo con un test del adaptador); y el reintento de mails con Mailpit caído.
+**Sin probar:** la API real de Mercado Pago; el circuit breaker abierto con el sistema levantado (solo con un test del adaptador); y el reintento de mails con Mailpit caído.
 
 ## Configuración
 

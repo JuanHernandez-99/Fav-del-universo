@@ -216,7 +216,7 @@ El estado de una operación tiene que poder entenderse sin revisar cada componen
 - **Tablero** con el estado general del sistema y al menos una alerta.
 - **[?]** herramientas: se definen cuando se dé el teórico de observabilidad.
 
-## 11. Pruebas de carga (previstas, guion sin ejecutar)
+## 11. Pruebas de carga (previstas, guion validado con una corrida)
 
 Se simula un **pico de demanda** como los que describe el cliente (cambio de temporada, diciembre): muchos compradores navegando y buscando a la vez, y compras concurrentes sobre las mismas variantes. Se mide latencia, errores, reparto entre las réplicas de Catálogo y el comportamiento de las reservas. El volumen real es bajo (10 a 20 prendas por semana), así que el escenario de pico es una hipótesis que se documenta como tal (**[ADR-013](adr/ADR-013-capacidad-y-costos.md), D13**). El guion de k6 está en `loadtest/` y todavía no se ejecutó.
 
@@ -352,12 +352,12 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
 | Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote y catálogo público, sin eventos ni trazas ni métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend no está | — |
-| Gateway único | Punto único de falla; la validación del JWT no está (se usa `X-Admin-Key`) | ADR-012 |
+| Gateway único | Punto único de falla | ADR-012 |
+| Encabezados de identidad | Los servicios confían en `X-User-*`: en la nube sus puertos no pueden quedar abiertos | ADR-016 |
 | Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |
 | Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |
-| Identidad en Ventas | Sin JWT, el gateway no informa quién compra: toda compra por el gateway es de invitado y "Mis compras" responde `401` | ADR-001 |
 | Observabilidad | Sin tablero ni alertas; Jaeger y Prometheus pierden datos al reiniciar; el gateway no crea spans | ADR-011 |
 | Búsqueda y caché | Solo diseño | ADR-006, ADR-007 |
-| Capacidad y costos | Guion de carga sin ejecutar; costos sin completar | ADR-013 |
+| Capacidad y costos | Guion de carga corrido una vez para validarlo, sin análisis; costos sin completar | ADR-013 |
 | Núcleo de Inventario | Sin tests unitarios de `aplicacion`; etiquetas `json` en `dominio` | ADR-002 |
 | Resiliencia comprobada | Falta `docs/POSTMORTEM.md` con una falla controlada ensayada | ADR-010 |

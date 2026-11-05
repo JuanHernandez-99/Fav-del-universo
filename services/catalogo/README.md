@@ -15,7 +15,7 @@ Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, c
 | **Base** | MongoDB con tres colecciones (`productos`, `categorias`, `promociones`), índices y validación de esquema |
 | **Documentación** | Especificación en `api/openapi.yaml` y decisiones en `DISENO.md` |
 
-Se levanta con el `docker-compose.yml` de la raíz: dos réplicas detrás del gateway, más `catalogo-init`, que prepara la base (`DISENO.md`, sección 8). Desde afuera se entra por el gateway, en `/catalogo/`, con la cabecera `X-Admin-Key`. Ventas usa la entrada interna `http://gateway:8081/catalogo/`. Tests: `go test ./...`.
+Se levanta con el `docker-compose.yml` de la raíz: dos réplicas detrás del gateway, más `catalogo-init`, que prepara la base (`DISENO.md`, sección 8). Desde afuera se entra por el gateway, en `/catalogo/`, con el token de administrador. Ventas usa la entrada interna `http://gateway:8081/catalogo/`. Tests: `go test ./...`.
 
 Carpetas: `api/` (OpenAPI), `db/` (scripts, datos de ejemplo y consultas de MongoDB) y `pruebas/` (concurrencia y esquema).
 

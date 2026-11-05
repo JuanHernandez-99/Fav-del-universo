@@ -4,8 +4,8 @@
 Resultado esperado: exactamente un 201, diecinueve 409, el producto con una sola variante S / Blanco
 y la versión subida una sola vez.
 
-Uso, con FAV levantado (solo usa la biblioteca estándar de Python). Entra por el gateway, con la clave
-de administración (ADMIN_API_KEY):
+Uso, con FAV levantado (solo usa la biblioteca estándar de Python). Entra por el gateway, con el token del
+administrador (ADMIN_EMAIL y ADMIN_PASSWORD, con los valores por defecto de Docker Compose):
   python services/catalogo/pruebas/concurrencia_variante.py [url_base]   # por defecto http://localhost:8080/catalogo
 """
 
@@ -19,15 +19,27 @@ from collections import Counter
 from datetime import datetime
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8080/catalogo"
-CLAVE_ADMIN = os.environ.get("ADMIN_API_KEY", "clave-admin-local")
+GATEWAY = BASE.rsplit("/catalogo", 1)[0]
 PEDIDOS = 20
 VARIANTE = {"talle": "S", "color": "Blanco"}
+
+
+def obtener_token():
+    credenciales = {"email": os.environ.get("ADMIN_EMAIL", "admin@fav.example"),
+                    "contrasena": os.environ.get("ADMIN_PASSWORD", "cambiar-admin-local")}
+    pedido = urllib.request.Request(GATEWAY + "/usuarios/v1/sesiones", data=json.dumps(credenciales).encode("utf-8"),
+                                    method="POST", headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(pedido, timeout=10) as r:
+        return json.loads(r.read())["token"]
+
+
+TOKEN = obtener_token()
 
 
 def pedir(metodo, ruta, cuerpo=None):
     datos = json.dumps(cuerpo).encode("utf-8") if cuerpo is not None else None
     pedido = urllib.request.Request(BASE + ruta, data=datos, method=metodo,
-                                    headers={"Content-Type": "application/json", "X-Admin-Key": CLAVE_ADMIN})
+                                    headers={"Content-Type": "application/json", "Authorization": "Bearer " + TOKEN})
     try:
         with urllib.request.urlopen(pedido, timeout=10) as r:
             return r.status, json.loads(r.read() or b"null")

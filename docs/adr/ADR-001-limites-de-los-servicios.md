@@ -148,6 +148,7 @@ En las dos, el consumidor externo depende de un solo servicio y la capacidad es 
 
 ## Pendientes
 
+- **Cómo valida el token el gateway:** resuelto en [ADR-016](ADR-016-validacion-del-token-en-el-gateway.md). Con Usuarios detenido, una sesión ya iniciada sigue comprando (comprobado el 04/11/2026).
 - **Qué capacidad se publica (A o B).** Se elige según el grupo consumidor que asigne la cátedra. Cambia qué servicio la expone, no los límites (ADR-008).
 - **Dónde guarda el token el frontend:** se confirma al implementar el frontend. La firma y el vencimiento están resueltos en ADR-015.
 

@@ -2,6 +2,10 @@
 # Rutea la capacidad publicada (productos a Catálogo, pedidos a Ventas), la tienda a Ventas y las rutas de
 # administración a Inventario, Catálogo y Ventas, con balanceo y verificación de disponibilidad (ADR-012).
 
+# Valida el token con njs (ADR-016).
+js_path "/etc/nginx/njs/";
+js_import jwt from jwt.js;
+
 # DNS interno de Docker. `resolve` en cada upstream vuelve a consultarlo cada 5 s,
 # así una réplica nueva o reiniciada (con otra IP) entra al balanceo sin reiniciar nginx.
 resolver 127.0.0.11 valid=5s ipv6=off;
@@ -43,12 +47,6 @@ map $http_x_correlation_id $correlacion {
 map $http_x_api_key $grupo_valido {
     default                0;
     "${CAPACIDAD_API_KEY}" 1;
-}
-
-# Clave provisoria del panel, hasta que exista Usuarios y el gateway valide el JWT (ADR-001).
-map $http_x_admin_key $admin_valido {
-    default            0;
-    "${ADMIN_API_KEY}" 1;
 }
 
 # Límite por grupo: 60 pedidos por minuto, con ráfagas de hasta 20 (contrato, respuesta 429).
@@ -110,18 +108,46 @@ server {
         proxy_pass http://ventas;
     }
 
-    # Tienda: compra, cancelación, "mis compras" y aviso de Mercado Pago. Son públicas (se puede comprar
-    # sin cuenta), por eso se borra la identidad que mande el cliente. Cuando el gateway valide el JWT,
-    # estos encabezados saldrán del token (ADR-001).
-    location ~ ^/ventas/v1/(compras|compras/[^/]+/cancelar|mis-compras|mis-compras/[^/]+|pagos/aviso)$ {
+    # Validación del token: solo se llega por auth_request (ADR-016).
+    location = /_auth/opcional {
+        internal;
+        js_content jwt.opcional;
+    }
+
+    location = /_auth/administrador {
+        internal;
+        js_content jwt.administrador;
+    }
+
+    location @no_autenticado {
+        add_header X-Correlation-Id $correlacion always;
+        add_header WWW-Authenticate Bearer always;
+        return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+    }
+
+    location @no_autorizado {
+        add_header X-Correlation-Id $correlacion always;
+        return 403 '{"type":"https://fav.example/errores/no-autorizado","title":"No autorizado","status":403,"codigo":"NO_AUTORIZADO"}';
+    }
+
+    # Tienda: se puede comprar sin cuenta, así que el token es opcional. Si viene, tiene que ser válido.
+    # "Mis compras" sin token la rechaza Ventas (HU-14.2).
+    location ~ ^/ventas/v1/(compras|compras/[^/]+/cancelar|mis-compras|mis-compras/[^/]+)$ {
+        auth_request /_auth/opcional;
+        include /etc/nginx/snippets/identidad.conf;
+        rewrite ^/ventas/(.*)$ /$1 break;
+        proxy_pass http://ventas;
+    }
+
+    # Aviso de Mercado Pago: no lleva token, lo valida Ventas con la firma.
+    location = /ventas/v1/pagos/aviso {
         proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Correlation-Id $correlacion;
         proxy_set_header X-User-Id "";
         proxy_set_header X-User-Email "";
         proxy_set_header X-User-Role "";
-        rewrite ^/ventas/(.*)$ /$1 break;
-        proxy_pass http://ventas;
+        proxy_pass http://ventas/v1/pagos/aviso;
     }
 
     # Registro e inicio de sesión. Son públicas: no pasan los encabezados de identidad.
@@ -139,42 +165,22 @@ server {
 
     # Panel de administración: ventas por estado, confirmar transferencias y ventas del local.
     location /ventas/v1/admin/ {
-        if ($admin_valido = 0) {
-            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
-        }
-        proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Correlation-Id $correlacion;
-        proxy_set_header X-User-Id "admin";
-        proxy_set_header X-User-Email "";
-        proxy_set_header X-User-Role "administrador";
+        auth_request /_auth/administrador;
+        include /etc/nginx/snippets/identidad.conf;
         proxy_pass http://ventas/v1/admin/;
     }
 
     # Panel de administración: stock, transferencias y consignación.
     location /inventario/ {
-        if ($admin_valido = 0) {
-            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
-        }
-        proxy_set_header X-User-Id "admin";
-        proxy_set_header X-User-Role "administrador";
-        # proxy_set_header en una location anula los heredados: se repiten los comunes.
-        proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Correlation-Id $correlacion;
+        auth_request /_auth/administrador;
+        include /etc/nginx/snippets/identidad.conf;
         proxy_pass http://inventario/;
     }
 
     # Panel de administración: productos y variantes de Catálogo.
     location /catalogo/ {
-        if ($admin_valido = 0) {
-            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
-        }
-        proxy_set_header X-User-Id "admin";
-        proxy_set_header X-User-Role "administrador";
-        proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Correlation-Id $correlacion;
+        auth_request /_auth/administrador;
+        include /etc/nginx/snippets/identidad.conf;
         proxy_pass http://catalogo/;
     }
 

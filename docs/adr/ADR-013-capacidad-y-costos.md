@@ -2,7 +2,7 @@
 
 |                             |                                                                                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**                  | **Propuesta** · Entrega 2. Hay un guion de prueba de carga (`loadtest/`), **sin ejecutar**. No hay mediciones ni costos calculados.                      |
+| **Estado**                  | **Propuesta** · Entrega 2. Hay un guion de prueba de carga (`loadtest/`), corrido una vez solo para validarlo. No hay análisis de capacidad ni costos calculados.                      |
 | **Fecha**                   | 23/10/2026                                                                                                                                              |
 | **Decisión de la consigna** | D13 · Capacidad y costos                                                                                                                                |
 | **Relacionadas**            | [ADR-004](ADR-004-consistencia-y-concurrencia.md) (contención), [ADR-007](ADR-007-cache.md) (caché), [ADR-011](ADR-011-observabilidad.md) (métricas), [ADR-012](ADR-012-balanceo.md) (réplicas) |

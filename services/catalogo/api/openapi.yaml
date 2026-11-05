@@ -14,7 +14,7 @@ servers:
   - url: http://localhost:8080/catalogo
     description: Gateway de FAV (local)
 security:
-  - ClaveAdmin: []
+  - TokenAdmin: []
 tags:
   - name: Productos
   - name: Variantes
@@ -353,11 +353,11 @@ paths:
 
 components:
   securitySchemes:
-    ClaveAdmin:
-      type: apiKey
-      in: header
-      name: X-Admin-Key
-      description: Clave provisoria del panel, la valida el gateway (ADMIN_API_KEY).
+    TokenAdmin:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token con rol administrador, de `POST /usuarios/v1/sesiones`. Lo valida el gateway (ADR-016).
   parameters:
     ProductoId:
       name: id

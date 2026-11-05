@@ -2,7 +2,7 @@
 
 Registro, inicio de sesión, emisión del token y roles (comprador y administrador).
 
-> Estado: **funcionando**. El gateway todavía no valida el token: hasta entonces se puede iniciar sesión, pero el token no abre "Mis compras" ni el panel.
+> Estado: **funcionando**. El gateway valida el token ([ADR-016](../../docs/adr/ADR-016-validacion-del-token-en-el-gateway.md)).
 
 | | |
 |---|---|
@@ -51,7 +51,7 @@ USUARIOS_TEST_DSN="root:cambiar@tcp(localhost:3309)/usuarios_test?parseTime=true
 
 **Verificado el 04/11/2026** con el sistema levantado por Docker: registro, email repetido, inicio de sesión, firma verificada con la clave pública generada, hash en la base, cuenta de administrador, claves conservadas al reiniciar, una compra de invitado con Usuarios detenido y límite de intentos (`429`).
 
-**Sin probar:** una computadora limpia desde cero (sí, volúmenes de claves y base nuevos), y un token vencido, que se rechazará recién cuando el gateway lo valide.
+**Sin probar:** una computadora limpia desde cero. Sí se probó con volúmenes de claves y base nuevos.
 
 ## Configuración
 

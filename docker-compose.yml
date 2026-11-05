@@ -195,12 +195,20 @@ services:
     image: nginx:1.28-alpine
     environment:
       CAPACIDAD_API_KEY: ${CAPACIDAD_API_KEY:-clave-grupo-proveedores}
-      ADMIN_API_KEY: ${ADMIN_API_KEY:-clave-admin-local}
-      NGINX_ENVSUBST_FILTER: "^(CAPACIDAD_API_KEY|ADMIN_API_KEY)$" # no tocar las $variables de nginx
+      NGINX_ENVSUBST_FILTER: "^CAPACIDAD_API_KEY$" # no tocar las $variables de nginx
     volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./gateway/templates:/etc/nginx/templates:ro
+      - ./gateway/njs:/etc/nginx/njs:ro
+      - ./gateway/snippets:/etc/nginx/snippets:ro
+      - jwt-publica:/claves/publica:ro # verifica el token; la privada no la monta (ADR-015)
     ports: ["8080:8080"]
-    depends_on: [inventario, catalogo, ventas, usuarios]
+    depends_on:
+      inventario: { condition: service_started }
+      catalogo: { condition: service_started }
+      ventas: { condition: service_started }
+      usuarios: { condition: service_started }
+      usuarios-init: { condition: service_completed_successfully }
 
   # ---------- Dependencias simuladas ----------
   # Mercado Pago (ADR-014).
