@@ -338,7 +338,7 @@ services/inventario/            # hexagonal
 | Justificación de los estilos internos de cada servicio                                        | D2 (ADR-002)                              |
 | Motor de búsqueda y retraso máximo del índice                                                 | D6                                        |
 | Qué se cachea exactamente y tiempo de vencimiento                                             | D7                                        |
-| Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: pendiente                | D2 / D12                                  |
+| Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: **resuelto, React con Vite** (ADR-017)                | D2 / D12                                  |
 | Herramientas de observabilidad y retención de métricas                                        | D11                                       |
 | Contrato del gimnasio y cómo identifica los productos de FAV | D9 |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
@@ -352,7 +352,7 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote y catálogo público, sin eventos ni trazas ni métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend no está | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote y catálogo público, sin eventos ni trazas ni métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend está en curso: tienda y carrito, sin compra ni panel (ADR-017) | — |
 | Gateway único | Punto único de falla | ADR-012 |
 | Encabezados de identidad | Los servicios confían en `X-User-*`: en la nube sus puertos no pueden quedar abiertos | ADR-016 |
 | Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |

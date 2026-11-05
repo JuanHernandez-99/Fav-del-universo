@@ -37,6 +37,12 @@ upstream ventas {
     keepalive 16;
 }
 
+upstream frontend {
+    zone frontend 64k;
+    server frontend:80 resolve max_fails=2 fail_timeout=10s;
+    keepalive 8;
+}
+
 # Correlation id: se respeta el del cliente; si no viene, se usa el id del pedido de nginx (ADR-005, punto 7).
 map $http_x_correlation_id $correlacion {
     ""      $request_id;
@@ -205,6 +211,19 @@ server {
         auth_request /_auth/administrador;
         include /etc/nginx/snippets/identidad.conf;
         proxy_pass http://catalogo/;
+    }
+
+    # Una ruta de la API que no existe es un 404, no la página de la tienda.
+    location /v1/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+    location /ventas/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+    location /usuarios/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+
+    # Lo demás es la tienda: mismo origen que la API, así que no hace falta CORS (ADR-017).
+    location / {
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_pass http://frontend;
     }
 
     default_type application/problem+json;

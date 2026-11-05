@@ -9,6 +9,7 @@ Punto de entrada único del sistema: valida el token, rutea a los servicios y co
 - Valida la clave `X-API-Key` de los grupos externos **[propuesta]** y rutea `GET /v1/productos` a Catálogo y `POST /v1/pedidos` a Ventas ([ADR-008](../docs/adr/ADR-008-contrato-propio.md)).
 - Recibe el aviso de pago de Mercado Pago y lo reenvía a Ventas.
 - Deja pasar sin token la lectura de la tienda: `/catalogo/v1/tienda/productos` y `/inventario/v1/disponibilidad`. El resto de `/catalogo/` e `/inventario/` sigue siendo solo de administrador.
+- Sirve la tienda en `/`, en el mismo origen que la API ([ADR-017](../docs/adr/ADR-017-frontend.md)).
 - **No tiene lógica de negocio ni compone respuestas** de varios servicios.
 - Balancea entre las dos réplicas de Inventario y las dos de Catálogo.
 

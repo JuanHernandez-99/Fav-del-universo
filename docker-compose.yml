@@ -190,6 +190,11 @@ services:
       timeout: 5s
       retries: 20
 
+  # ---------- Frontend ----------
+  # Sin puerto propio: se entra por el gateway (ADR-017).
+  frontend:
+    build: ./frontend
+
   # ---------- Gateway ----------
   gateway:
     image: nginx:1.28-alpine
@@ -209,6 +214,7 @@ services:
       ventas: { condition: service_started }
       usuarios: { condition: service_started }
       usuarios-init: { condition: service_completed_successfully }
+      frontend: { condition: service_started }
 
   # ---------- Dependencias simuladas ----------
   # Mercado Pago (ADR-014).
