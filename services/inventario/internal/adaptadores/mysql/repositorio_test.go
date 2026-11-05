@@ -234,6 +234,106 @@ func TestTransferenciaYReservaConcurrentes(t *testing.T) {
 	}
 }
 
+func ajuste(t *testing.T, variante string, canal dominio.Canal, cantidad int) dominio.Ajuste {
+	t.Helper()
+	a, err := dominio.NuevoAjuste(uuid.NewString(), variante, canal, cantidad, dominio.MotivoPerdida, "prueba", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a
+}
+
+// HU-08: el ajuste suma o resta, queda registrado con su motivo y no se aplica dos veces.
+func TestAjusteRegistraElMotivoYEsIdempotente(t *testing.T) {
+	repo, db := repoDePrueba(t)
+	ctx := context.Background()
+	variante := varianteNueva(t, db, 5, 4)
+	a := ajuste(t, variante, dominio.CanalFisico, -3)
+	for range 2 {
+		if s, err := repo.Ajustar(ctx, a); err != nil || s.Fisico != 1 || s.Online != 5 {
+			t.Fatalf("ajuste: %+v, %v", s, err)
+		}
+	}
+	var motivo string
+	var movimientos int
+	if err := db.QueryRow(`SELECT motivo FROM ajustes WHERE clave_idempotencia = ?`, a.ClaveIdempotencia).Scan(&motivo); err != nil || motivo != "PERDIDA" {
+		t.Errorf("ajuste registrado: %q, %v", motivo, err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM movimientos WHERE referencia = ? AND tipo = 'AJUSTE' AND cantidad = -3`, a.ClaveIdempotencia).Scan(&movimientos); err != nil || movimientos != 1 {
+		t.Errorf("movimientos: %d, %v", movimientos, err)
+	}
+	otro := a
+	otro.Motivo = dominio.MotivoFalla
+	if _, err := repo.Ajustar(ctx, otro); !errors.Is(err, dominio.ErrClaveReutilizada) {
+		t.Errorf("misma clave con otro motivo: %v", err)
+	}
+}
+
+// HU-08.3: con 5 online y 2 reservadas, restar 4 se rechaza; restar 3 deja 2, todas reservadas.
+func TestAjusteNoDejaElOnlinePorDebajoDeLoReservado(t *testing.T) {
+	repo, db := repoDePrueba(t)
+	ctx := context.Background()
+	variante := varianteNueva(t, db, 5, 0)
+	if _, _, err := repo.CrearReserva(ctx, nuevaReserva(t, dominio.Item{VarianteID: variante, Cantidad: 2})); err != nil {
+		t.Fatal(err)
+	}
+	var stock *dominio.ErrorStockInsuficiente
+	if _, err := repo.Ajustar(ctx, ajuste(t, variante, dominio.CanalOnline, -4)); !errors.As(err, &stock) || stock.Faltantes[0].Disponible != 3 {
+		t.Errorf("restar 4: %v", err)
+	}
+	if s, err := repo.Ajustar(ctx, ajuste(t, variante, dominio.CanalOnline, -3)); err != nil || s.Online != 2 || s.Reservado != 2 {
+		t.Errorf("restar 3: %+v, %v", s, err)
+	}
+}
+
+// El físico no queda negativo por un ajuste [propuesta]. Sumar sí corrige uno negativo (RN-25).
+func TestAjusteFisicoNoQuedaNegativoPeroCorrigeUnNegativo(t *testing.T) {
+	repo, db := repoDePrueba(t)
+	ctx := context.Background()
+	variante := varianteNueva(t, db, 0, -2)
+	if _, err := repo.Ajustar(ctx, ajuste(t, variante, dominio.CanalFisico, -1)); !errors.Is(err, dominio.ErrStockInsuficiente) {
+		t.Errorf("restar con el físico en -2: %v", err)
+	}
+	s, err := repo.Ajustar(ctx, ajuste(t, variante, dominio.CanalFisico, 5))
+	if err != nil || s.Fisico != 3 || s.AConfirmar() {
+		t.Errorf("sumar 5: %+v, %v", s, err)
+	}
+}
+
+func TestAjusteSobreUnaVarianteSinStock(t *testing.T) {
+	repo, _ := repoDePrueba(t)
+	ctx := context.Background()
+	variante := "test-" + uuid.NewString()
+	if _, err := repo.Ajustar(ctx, ajuste(t, variante, dominio.CanalOnline, -1)); !errors.Is(err, dominio.ErrVarianteInexistente) {
+		t.Errorf("restar a una variante sin stock: %v", err)
+	}
+	if s, err := repo.Ajustar(ctx, ajuste(t, variante, dominio.CanalOnline, 2)); err != nil || s.Online != 2 {
+		t.Errorf("sumar crea la fila: %+v, %v", s, err)
+	}
+}
+
+// Un ajuste y una reserva sobre las últimas unidades a la vez: el online nunca queda por debajo de lo reservado.
+func TestAjusteYReservaConcurrentes(t *testing.T) {
+	repo, db := repoDePrueba(t)
+	ctx := context.Background()
+	for range 20 {
+		variante := varianteNueva(t, db, 1, 0)
+		var wg sync.WaitGroup
+		var errAjuste, errReserva error
+		wg.Add(2)
+		go func() { defer wg.Done(); _, errAjuste = repo.Ajustar(ctx, ajuste(t, variante, dominio.CanalOnline, -1)) }()
+		go func() {
+			defer wg.Done()
+			_, _, errReserva = repo.CrearReserva(ctx, nuevaReserva(t, dominio.Item{VarianteID: variante, Cantidad: 1}))
+		}()
+		wg.Wait()
+		s := stockDe(t, repo, variante)
+		if (errAjuste == nil) == (errReserva == nil) || s.Online < s.Reservado {
+			t.Fatalf("ajuste: %v, reserva: %v, stock: %+v", errAjuste, errReserva, s)
+		}
+	}
+}
+
 func TestTransferenciaNoMueveLoReservado(t *testing.T) {
 	repo, db := repoDePrueba(t)
 	ctx := context.Background()

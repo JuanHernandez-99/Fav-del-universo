@@ -313,6 +313,43 @@ func (r *Repositorio) Transferir(ctx context.Context, t dominio.Transferencia) (
 	})
 }
 
+// Ajustar suma o resta unidades con un motivo (HU-08). Restar es una actualización condicional, como la
+// transferencia: el online no baja de lo reservado (HU-08.3) y el físico no queda negativo [propuesta].
+// Sumar crea la fila si la variante no tenía stock, como un ingreso.
+func (r *Repositorio) Ajustar(ctx context.Context, a dominio.Ajuste) (dominio.Stock, error) {
+	return r.operacionIdempotente(ctx, a.ClaveIdempotencia, "AJUSTE", a.Huella(), a.VarianteID, func(tx *sql.Tx) error {
+		columna := columnaDe(a.Canal)
+		if a.Cantidad > 0 {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO stock (variante_id, `+columna+`) VALUES (?, ?)
+				 ON DUPLICATE KEY UPDATE `+columna+` = `+columna+` + VALUES(`+columna+`), actualizado_en = NOW()`,
+				a.VarianteID, a.Cantidad); err != nil {
+				return err
+			}
+		} else {
+			limite := `fisico + ? >= 0`
+			if a.Canal == dominio.CanalOnline {
+				limite = `online + ? >= reservado`
+			}
+			resultado, err := tx.ExecContext(ctx,
+				`UPDATE stock SET `+columna+` = `+columna+` + ?, actualizado_en = NOW() WHERE variante_id = ? AND `+limite,
+				a.Cantidad, a.VarianteID, a.Cantidad)
+			if err != nil {
+				return err
+			}
+			if n, _ := resultado.RowsAffected(); n == 0 {
+				return faltanteDe(ctx, tx, a.VarianteID, a.Canal, -a.Cantidad)
+			}
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO ajustes (clave_idempotencia, variante_id, canal, cantidad, motivo, nota, usuario) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			a.ClaveIdempotencia, a.VarianteID, a.Canal, a.Cantidad, a.Motivo, a.Nota, truncar(a.Usuario, 100)); err != nil {
+			return err
+		}
+		return registrarMovimiento(ctx, tx, a.VarianteID, "AJUSTE", a.Canal, a.Cantidad, a.ClaveIdempotencia, a.Usuario)
+	})
+}
+
 // DescontarFisico baja el físico sin condición: puede quedar negativo (RN-25). Con INSERT … ON DUPLICATE
 // una variante sin fila de stock también se registra, porque la venta del local no se bloquea (RN-06).
 func (r *Repositorio) DescontarFisico(ctx context.Context, d dominio.DescuentoFisico) ([]dominio.Stock, error) {

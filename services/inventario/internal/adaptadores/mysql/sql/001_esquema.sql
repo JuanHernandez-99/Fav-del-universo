@@ -45,6 +45,21 @@ CREATE TABLE IF NOT EXISTS movimientos (
   KEY movimientos_variante (variante_id, creado_en)
 );
 
+-- Ajustes de stock con su motivo (HU-08). La cantidad también queda en movimientos, con tipo AJUSTE.
+-- Tabla aparte, y no columnas nuevas en movimientos, porque este script se aplica con CREATE TABLE IF NOT EXISTS
+-- y no modificaría una tabla ya creada.
+CREATE TABLE IF NOT EXISTS ajustes (
+  clave_idempotencia  VARCHAR(100) NOT NULL PRIMARY KEY,
+  variante_id         VARCHAR(100) NOT NULL,
+  canal               VARCHAR(10)  NOT NULL,
+  cantidad            INT          NOT NULL,
+  motivo              VARCHAR(30)  NOT NULL,
+  nota                VARCHAR(200) NOT NULL DEFAULT '',
+  usuario             VARCHAR(100) NOT NULL DEFAULT '',
+  creado_en           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY ajustes_variante (variante_id, creado_en)
+);
+
 -- Claves de idempotencia de ingresos y transferencias, con el resultado para devolverlo en un reintento.
 CREATE TABLE IF NOT EXISTS operaciones (
   clave_idempotencia  VARCHAR(100) NOT NULL PRIMARY KEY,

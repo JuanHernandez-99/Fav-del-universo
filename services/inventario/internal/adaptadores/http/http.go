@@ -41,6 +41,7 @@ func NuevoRouter(s *aplicacion.Servicio) http.Handler {
 	mux.HandleFunc("GET /v1/disponibilidad", h.consultarDisponibilidad)
 	mux.HandleFunc("POST /v1/ingresos", h.ingresar)
 	mux.HandleFunc("POST /v1/transferencias", h.transferir)
+	mux.HandleFunc("POST /v1/ajustes", h.ajustar)
 	mux.HandleFunc("POST /v1/descuentos-fisicos", h.descontarFisico)
 
 	mux.HandleFunc("POST /v1/reposiciones", h.reponer)
@@ -226,6 +227,22 @@ func (h *Handler) transferir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st, err := h.s.Transferir(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Origen, p.Cantidad, usuario(r))
+	responderStock(w, r, st, err)
+}
+
+// ajustar corrige el stock de un canal con un motivo (HU-08). La cantidad es negativa para restar.
+func (h *Handler) ajustar(w http.ResponseWriter, r *http.Request) {
+	var p struct {
+		VarianteID string         `json:"varianteId"`
+		Canal      dominio.Canal  `json:"canal"`
+		Cantidad   int            `json:"cantidad"`
+		Motivo     dominio.Motivo `json:"motivo"`
+		Nota       string         `json:"nota"`
+	}
+	if !leerJSON(w, r, &p) {
+		return
+	}
+	st, err := h.s.Ajustar(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Canal, p.Cantidad, p.Motivo, p.Nota, usuario(r))
 	responderStock(w, r, st, err)
 }
 

@@ -66,6 +66,7 @@ curl localhost:8080/v1/pedidos -H "X-API-Key: clave-grupo-proveedores" -H "Idemp
 | `GET /v1/disponibilidad?variantes=a,b` | Tienda (pública) | Hasta 200 ids. `disponible` por variante: unidades online menos reservadas (HU-01.5). No informa el físico. Una variante sin fila de stock figura con 0 |
 | `POST /v1/ingresos` | Panel | Suma unidades a un canal; da de alta la variante si no existe |
 | `POST /v1/transferencias` | Panel | Mueve unidades entre canales en una transacción |
+| `POST /v1/ajustes` | Panel | Suma o resta unidades de un canal con un motivo: `PERDIDA`, `FALLA` o `CORRECCION_CONTEO`, más una nota opcional (HU-08). `Idempotency-Key` obligatoria. Al restar, el online no baja de lo reservado y el físico no queda negativo (`409 STOCK_INSUFICIENTE`) |
 | `POST /v1/descuentos-fisicos` | Ventas | Baja el físico por una venta del local; puede quedar negativo (RN-25). `Idempotency-Key` obligatoria. Cuerpo: `referencia`, `items` |
 | `POST /v1/reposiciones` | Panel | Envía prendas al gimnasio (`202`) |
 | `GET /v1/consignacion` | Panel | Stock de FAV en el gimnasio (`503 GIMNASIO_NO_DISPONIBLE` si no responde) |

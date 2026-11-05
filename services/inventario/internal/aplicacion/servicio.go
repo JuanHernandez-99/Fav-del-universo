@@ -140,6 +140,19 @@ func (s *Servicio) Transferir(ctx context.Context, clave, varianteID string, ori
 	return st, err
 }
 
+// Ajustar corrige el stock de un canal con un motivo (HU-08).
+func (s *Servicio) Ajustar(ctx context.Context, clave, varianteID string, canal dominio.Canal, cantidad int, motivo dominio.Motivo, nota, usuario string) (dominio.Stock, error) {
+	a, err := dominio.NuevoAjuste(clave, varianteID, canal, cantidad, motivo, nota, usuario)
+	if err != nil {
+		return dominio.Stock{}, err
+	}
+	st, err := s.repo.Ajustar(ctx, a)
+	if err == nil {
+		slog.InfoContext(ctx, "ajuste de stock", "variante_id", varianteID, "canal", canal, "cantidad", cantidad, "motivo", motivo)
+	}
+	return st, err
+}
+
 // DescontarFisico aplica una venta del local sobre el stock físico (HU-17).
 func (s *Servicio) DescontarFisico(ctx context.Context, clave, referencia string, items []dominio.Item, usuario string) ([]dominio.Stock, error) {
 	d, err := dominio.NuevoDescuentoFisico(clave, referencia, items, usuario)
