@@ -381,6 +381,43 @@ a.panel-fila:hover { background: var(--papel); }
 .local-monto { max-width: 22rem; }
 .local-formulario .acceso-error { max-width: 50ch; }
 
+/* ---------- Productos ---------- */
+.panel-encabezado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.2rem; }
+.panel-encabezado h1 { margin: 0; font-size: clamp(2.1rem, 4vw, 3rem); font-weight: 400; }
+.panel-buscar { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: .8rem; }
+.panel-buscar form { flex: 1 1 18rem; }
+.panel-buscar input, .panel-buscar select { width: 100%; height: 2.6rem; padding: 0 .8rem; background: #fff; border: 1px solid var(--linea); border-radius: 8px; }
+.panel-buscar select { width: auto; }
+.panel-fila-productos { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 5rem 7rem 8rem; }
+.producto-editor { max-width: 780px; }
+.producto-editor h2 { margin: 2rem 0 .8rem; font-size: 1.4rem; }
+.producto-publicar { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.producto-formulario textarea, .producto-formulario select, .producto-foto select, .producto-nueva-variante select, .producto-nueva-variante input, .producto-colores input {
+  width: 100%; min-height: 2.95rem; padding: .6rem .85rem; background: #fff; border: 1px solid var(--linea); border-radius: 8px; font: inherit; }
+.producto-formulario textarea { resize: vertical; }
+.producto-formulario .acceso-campo select[aria-invalid='true'], .producto-formulario textarea[aria-invalid='true'] { border-color: var(--coral); }
+.producto-fila { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.producto-variantes { margin-top: .4rem; }
+.producto-talles { display: flex; flex-wrap: wrap; gap: .45rem; margin-bottom: .8rem; }
+.producto-talles label { display: flex; align-items: center; gap: .35rem; padding: .45rem .8rem; background: #fff; border: 1px solid var(--linea); border-radius: 8px; font-weight: 600; font-size: .9rem; cursor: pointer; }
+.producto-talles label.elegido { background: var(--noche); border-color: var(--noche); color: var(--papel); }
+.producto-talles input { position: absolute; opacity: 0; pointer-events: none; }
+.producto-talles label:focus-within { outline: 2px solid var(--coral); outline-offset: 2px; }
+.producto-colores { display: flex; gap: .8rem; align-items: center; max-width: 28rem; }
+.producto-chips { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .8rem; }
+.producto-chips li { display: flex; align-items: center; gap: .4rem; padding: .3rem .7rem; background: #fff; border: 1px solid var(--linea); border-radius: 999px; font-size: .86rem; }
+.producto-chips button { padding: 0 .1rem; background: none; border: 0; font-size: 1.05rem; line-height: 1; color: var(--tinta-suave); }
+.campo-error { display: block; margin-top: .4rem; font-size: .8rem; color: var(--coral-oscuro); }
+.producto-foto { display: grid; grid-template-columns: minmax(0, 1fr) 12rem auto; gap: .8rem; align-items: center; }
+.producto-foto .acceso-campo { margin-bottom: .6rem; }
+.producto-foto select { margin-top: .9rem; }
+.producto-guardar { margin-top: 1.8rem; padding-top: 1.2rem; border-top: 1px solid var(--linea); }
+.producto-existentes { margin-top: 1rem; padding-top: .5rem; border-top: 1px solid var(--linea); }
+.producto-nueva-variante { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: 1rem; }
+.producto-nueva-variante select { width: 8rem; }
+.producto-nueva-variante input { flex: 1 1 12rem; width: auto; }
+.producto-editor ul.acceso-error { padding-left: 1.6rem; list-style: disc; }
+
 /* ---------- Pie ---------- */
 .pie { background: var(--noche); color: #d9d0e4; font-size: .9rem; }
 .pie-interior { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2rem; max-width: var(--ancho); margin: auto; padding: 3rem var(--margen); }
@@ -402,6 +439,8 @@ a.panel-fila:hover { background: var(--papel); }
   .ficha-datos, .carrito-resumen { position: static; }
   .carrito-columnas, .resultado { grid-template-columns: 1fr; }
   .panel { grid-template-columns: 1fr; }
+  .producto-fila, .producto-foto { grid-template-columns: 1fr; }
+  .producto-foto select { margin-top: 0; }
   .panel-menu { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }
   .panel-titulo { margin: 0 .5rem 0 0; }
   .panel-fila { grid-template-columns: 1fr auto; gap: .25rem .8rem; }

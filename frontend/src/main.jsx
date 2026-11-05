@@ -18,6 +18,8 @@ import Panel from './paginas/panel/Panel.jsx';
 import PanelVentas from './paginas/panel/PanelVentas.jsx';
 import PanelVenta from './paginas/panel/PanelVenta.jsx';
 import PanelVentaLocal from './paginas/panel/PanelVentaLocal.jsx';
+import PanelProductos from './paginas/panel/PanelProductos.jsx';
+import PanelProducto from './paginas/panel/PanelProducto.jsx';
 import NoEncontrada from './paginas/NoEncontrada.jsx';
 
 createRoot(document.getElementById('raiz')).render(
@@ -38,6 +40,9 @@ createRoot(document.getElementById('raiz')).render(
                 <Route path="ventas" element={<PanelVentas />} />
                 <Route path="ventas/:id" element={<PanelVenta />} />
                 <Route path="venta-local" element={<PanelVentaLocal />} />
+                <Route path="productos" element={<PanelProductos />} />
+                <Route path="productos/nuevo" element={<PanelProducto key="nuevo" />} />
+                <Route path="productos/:id" element={<PanelProducto key="editar" />} />
               </Route>
               <Route path="ingresar" element={<Acceso key="ingresar" modo="ingresar" />} />
               <Route path="registrarme" element={<Acceso key="registrar" modo="registrar" />} />

@@ -84,6 +84,23 @@ export const confirmarTransferencia = (id, token) =>
 export const avanzarVenta = (id, token) =>
   pedir(`/ventas/v1/admin/ventas/${encodeURIComponent(id)}/avanzar`, { method: 'POST', headers: conToken(token) });
 
+export function listarProductosAdmin(token, filtros, opciones) {
+  const parametros = new URLSearchParams();
+  for (const [nombre, valor] of Object.entries(filtros)) if (valor !== '' && valor != null) parametros.set(nombre, valor);
+  return pedir(`/catalogo/v1/admin/productos?${parametros}`, { ...opciones, headers: conToken(token) });
+}
+
+const rutaProducto = (id) => `/catalogo/v1/admin/productos/${encodeURIComponent(id)}`;
+const enviarJSON = (metodo, ruta, token, cuerpo) =>
+  pedir(ruta, { method: metodo, headers: { 'Content-Type': 'application/json', ...conToken(token) }, body: JSON.stringify(cuerpo) });
+
+export const obtenerProductoAdmin = (id, token) => pedir(rutaProducto(id), { headers: conToken(token) });
+export const crearProducto = (token, producto) => enviarJSON('POST', '/catalogo/v1/admin/productos', token, producto);
+export const actualizarProducto = (token, id, datos) => enviarJSON('PUT', rutaProducto(id), token, datos);
+export const publicarProducto = (token, id) => pedir(`${rutaProducto(id)}/publicar`, { method: 'POST', headers: conToken(token) });
+export const despublicarProducto = (token, id) => pedir(rutaProducto(id), { method: 'DELETE', headers: conToken(token) });
+export const agregarVarianteAdmin = (token, id, variante) => enviarJSON('POST', `${rutaProducto(id)}/variantes`, token, variante);
+
 export const buscarProductosAdmin = (token, q, opciones) =>
   pedir(`/catalogo/v1/admin/productos?${new URLSearchParams({ q, tamano: 8 })}`, { ...opciones, headers: conToken(token) });
 

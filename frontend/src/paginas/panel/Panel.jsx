@@ -24,6 +24,7 @@ export default function Panel() {
         <p className="panel-titulo">Panel</p>
         <NavLink to="/panel/ventas" end>Ventas</NavLink>
         <NavLink to="/panel/venta-local">Venta del local</NavLink>
+        <NavLink to="/panel/productos">Productos</NavLink>
       </nav>
       <div className="panel-contenido"><Outlet /></div>
     </div>
