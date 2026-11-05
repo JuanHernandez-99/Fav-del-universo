@@ -223,7 +223,8 @@ button:disabled { cursor: not-allowed; }
 .navegacion { display: flex; align-items: center; gap: clamp(.8rem, 2vw, 1.5rem); }
 .enlace-cuenta { font-weight: 600; font-size: .93rem; text-decoration: none; }
 .enlace-cuenta:hover { text-decoration: underline; text-underline-offset: 3px; }
-.cuenta { display: flex; align-items: center; gap: .7rem; font-size: .88rem; }
+.cuenta { display: flex; align-items: center; gap: .9rem; font-size: .88rem; }
+.enlace-cuenta[aria-current='page'] { text-decoration: underline; text-underline-offset: 3px; }
 .cuenta-email { max-width: 13rem; overflow: hidden; color: var(--tinta-suave); text-overflow: ellipsis; white-space: nowrap; }
 
 .acceso { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: calc(100vh - 4.6rem); }
@@ -297,6 +298,25 @@ button:disabled { cursor: not-allowed; }
 .resultado .acceso-error { margin-top: 1.2rem; max-width: 50ch; }
 .resultado-seguir { margin-top: 1.8rem; }
 .resultado-referencia { font-size: .74rem; color: var(--tinta-suave); overflow-wrap: anywhere; }
+
+/* ---------- Mis compras ---------- */
+.mis-compras { max-width: 860px; min-height: 60vh; margin: auto; padding: clamp(1.8rem, 4vw, 3.4rem) var(--margen) 4.5rem; }
+.mis-compras > h1 { margin-bottom: 1.6rem; font-size: clamp(2.4rem, 5vw, 3.8rem); font-weight: 400; }
+.mis-compras-lista { display: grid; gap: .9rem; }
+.mis-compras-tarjeta { display: block; padding: 1.2rem 1.35rem; background: #fff; border: 1px solid var(--linea); border-radius: 10px; text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+.mis-compras-tarjeta:hover { border-color: var(--tinta); box-shadow: 0 6px 18px rgb(38 31 46 / .08); }
+.mis-compras-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem 1rem; }
+.mis-compras-cabecera time { font: 500 1.14rem var(--serif); }
+.mis-compras-cabecera .resultado-estado { margin: 0; }
+.mis-compras-prendas { margin: .75rem 0 .9rem; font-size: .93rem; }
+.mis-compras-prendas li + li { margin-top: .22rem; }
+.mis-compras-prendas small { color: var(--tinta-suave); }
+.mis-compras-pie { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: .8rem; border-top: 1px solid var(--linea); font-size: .88rem; font-weight: 600; }
+.mis-compras-pie strong { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.mis-compras-mas { display: flex; margin: 1.6rem auto 0; }
+.mis-compras-esqueleto { height: 12rem; border-radius: 10px; background: var(--papel-oscuro); animation: latido 1.3s ease-in-out infinite alternate; }
+.mis-compras .aviso { margin: 0 0 1rem; }
+.resultado-mis-compras { display: block; width: fit-content; margin-top: 1rem; font-size: .9rem; font-weight: 600; text-underline-offset: 3px; }
 
 /* ---------- Pie ---------- */
 .pie { background: var(--noche); color: #d9d0e4; font-size: .9rem; }

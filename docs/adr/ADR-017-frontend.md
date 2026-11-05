@@ -29,6 +29,7 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 | **Sesión** | El token se guarda en `sessionStorage`. Se borra al cerrar la pestaña y no se comparte entre pestañas. Sin refresh token (ADR-001): al vencer, hay que volver a ingresar. El frontend lo lee solo para mostrar el email y saber cuándo vence; lo valida el gateway (ADR-016) |
 | **Clave de idempotencia** | La genera el navegador y se guarda en `sessionStorage` junto con el contenido del pedido. El mismo pedido reintentado usa la misma clave (HU-11.8); si cambió, una nueva |
 | **Volver de Mercado Pago** | El pago se abre en otra pestaña y la tienda sigue abierta. Con cuenta, la tienda consulta el estado cada 3 s mientras está pendiente. Sin cuenta no hay de dónde consultarlo (RN-24): se informa por mail |
+| **Datos al cerrar la sesión** | "Salir" borra el token, las compras guardadas en la pestaña y la clave de idempotencia. No se muestra una compra de otra cuenta en una computadora compartida. El carrito se conserva, porque no es de la cuenta sino del navegador (HU-10.4) |
 | **Composición** | Productos y unidades disponibles se piden por separado y el frontend junta las respuestas (ADR-006) |
 | **Stock visible** | El comprador ve las unidades online disponibles, sin físico ni reservadas (HU-01.5). La ficha y el carrito no dejan pedir más. Es un dato del momento: la reserva la decide Inventario al comprar (`409 STOCK_INSUFICIENTE`) |
 
@@ -65,4 +66,4 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 
 ## Validación
 
-El 05/11/2026, en un navegador real (Edge) y por el gateway: catálogo, búsqueda, filtros, orden, promociones, ficha, carrito, avisos de sin stock y de prenda despublicada, y vista de celular. Con Inventario caído se ven las prendas con un aviso, sin marcarlas "sin stock", y no se puede agregar al carrito. Con Catálogo caído aparece un mensaje claro, y "Reintentar" recupera la tienda cuando vuelve. Registro, inicio de sesión, cierre y sesión vencida, también en el navegador.
+El 05/11/2026, en un navegador real (Edge) y por el gateway: catálogo, búsqueda, filtros, orden, promociones, ficha, carrito, avisos de sin stock y de prenda despublicada, y vista de celular. Con Inventario caído se ven las prendas con un aviso, sin marcarlas "sin stock", y no se puede agregar al carrito. Con Catálogo caído aparece un mensaje claro, y "Reintentar" recupera la tienda cuando vuelve. Registro, inicio de sesión, cierre y sesión vencida, compra con los dos medios y "Mis compras", también en el navegador.

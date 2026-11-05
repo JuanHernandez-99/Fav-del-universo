@@ -38,6 +38,7 @@ function Cuenta({ pathname, search }) {
   if (!sesion) return <Link to={enlaceIngresar(pathname, search)} className="enlace-cuenta">Ingresar</Link>;
   return (
     <div className="cuenta">
+      <NavLink to="/mis-compras" className="enlace-cuenta">Mis compras</NavLink>
       <span className="cuenta-email" title={sesion.email}>{sesion.email}</span>
       <button type="button" className="boton-texto" onClick={cerrar}>Salir</button>
     </div>

@@ -60,6 +60,18 @@ export function leerVenta(id, almacen = sessionStorage) {
   }
 }
 
+// Al cerrar la sesión no queda nada de la compra en la pestaña: la computadora puede ser compartida.
+export function olvidarVentas(almacen = sessionStorage) {
+  try {
+    const claves = Array.from({ length: almacen.length }, (_, i) => almacen.key(i));
+    for (const clave of claves) {
+      if (clave.startsWith(PREFIJO_VENTA)) almacen.removeItem(clave);
+    }
+  } catch {
+    // Nada que borrar.
+  }
+}
+
 export const MEDIOS = {
   MERCADO_PAGO: { nombre: 'Mercado Pago', detalle: 'Pagás ahora. Te reservamos las prendas por 20 minutos.' }, // RN-08
   TRANSFERENCIA: { nombre: 'Transferencia bancaria', detalle: 'Te reservamos las prendas hasta 48 horas, hasta que confirmemos el pago.' }, // RN-09

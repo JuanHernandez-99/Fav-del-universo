@@ -76,10 +76,14 @@ export default function CompraResultado() {
     setVenta(nueva);
   };
 
-  // Con cuenta, Ventas informa el estado. Se consulta mientras esté pendiente. El invitado no puede consultarlo (RN-24).
+  // Al cerrar la sesión, deja de mostrarse la compra de esa cuenta. La del invitado sigue en su pestaña.
+  useEffect(() => { if (!sesion) setVenta(leerVenta(id)); }, [sesion, id]);
+
+  // Con cuenta, Ventas informa el estado: se consulta al entrar, porque lo guardado puede estar viejo (HU-23.3),
+  // y se repite mientras esté pendiente. El invitado no puede consultarlo (RN-24).
   const pendiente = !venta || venta.estado === 'PENDIENTE_DE_PAGO';
   useEffect(() => {
-    if (!sesion || !pendiente) return undefined;
+    if (!sesion) return undefined;
     let vigente = true;
     const consultar = async () => {
       try {
@@ -91,7 +95,7 @@ export default function CompraResultado() {
       }
     };
     consultar();
-    const temporizador = setInterval(consultar, CADA_MS);
+    const temporizador = pendiente ? setInterval(consultar, CADA_MS) : null;
     return () => { vigente = false; clearInterval(temporizador); };
   }, [id, sesion, pendiente]);
 
@@ -147,6 +151,7 @@ export default function CompraResultado() {
           )
         )}
         {venta.estado !== 'PENDIENTE_DE_PAGO' && <Link to="/" className="boton resultado-seguir">Volver a la tienda</Link>}
+        {sesion && <Link to="/mis-compras" className="resultado-mis-compras">Ver todas mis compras</Link>}
       </div>
 
       <aside className="carrito-resumen" aria-label="Detalle de la compra">

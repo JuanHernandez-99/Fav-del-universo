@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as api from '../api.js';
+import { olvidarClave, olvidarVentas } from '../compra/compra.js';
 import { borrarToken, guardarToken, leerSesion, sesionDesdeToken } from './sesion.js';
 
 const Contexto = createContext(null);
@@ -12,6 +13,8 @@ export function ProveedorSesion({ children }) {
 
   const cerrar = useCallback(() => {
     borrarToken();
+    olvidarVentas();
+    olvidarClave();
     setSesion(null);
   }, []);
 

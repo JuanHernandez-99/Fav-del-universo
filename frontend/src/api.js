@@ -59,6 +59,10 @@ export function cancelarCompra(id, token) {
   return pedir(`/ventas/v1/compras/${encodeURIComponent(id)}/cancelar`, { method: 'POST', headers: conToken(token) });
 }
 
+export function listarMisCompras(token, { limite, desde }, opciones) {
+  return pedir(`/ventas/v1/mis-compras?limite=${limite}&desde=${desde}`, { ...opciones, headers: conToken(token) });
+}
+
 export function obtenerMiCompra(id, token) {
   return pedir(`/ventas/v1/mis-compras/${encodeURIComponent(id)}`, { headers: conToken(token) });
 }

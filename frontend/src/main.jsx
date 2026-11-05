@@ -13,6 +13,7 @@ import Carrito from './paginas/Carrito.jsx';
 import Acceso from './paginas/Acceso.jsx';
 import Comprar from './paginas/Comprar.jsx';
 import CompraResultado from './paginas/CompraResultado.jsx';
+import MisCompras from './paginas/MisCompras.jsx';
 import NoEncontrada from './paginas/NoEncontrada.jsx';
 
 createRoot(document.getElementById('raiz')).render(
@@ -27,6 +28,7 @@ createRoot(document.getElementById('raiz')).render(
               <Route path="carrito" element={<Carrito />} />
               <Route path="comprar" element={<Comprar />} />
               <Route path="compra/:id" element={<CompraResultado />} />
+              <Route path="mis-compras" element={<MisCompras />} />
               <Route path="ingresar" element={<Acceso key="ingresar" modo="ingresar" />} />
               <Route path="registrarme" element={<Acceso key="registrar" modo="registrar" />} />
               <Route path="*" element={<NoEncontrada />} />

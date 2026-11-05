@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { claveDelPedido, explicarError, guardarVenta, leerVenta, olvidarClave } from './compra.js';
+import { claveDelPedido, explicarError, guardarVenta, leerVenta, olvidarClave, olvidarVentas } from './compra.js';
 
 const almacenFalso = () => {
   const datos = new Map();
-  return { getItem: (k) => datos.get(k) ?? null, setItem: (k, v) => datos.set(k, v), removeItem: (k) => datos.delete(k) };
+  return {
+    getItem: (k) => datos.get(k) ?? null, setItem: (k, v) => datos.set(k, v), removeItem: (k) => datos.delete(k),
+    get length() { return datos.size; }, key: (i) => [...datos.keys()][i],
+  };
 };
 const contador = () => { let n = 0; return () => `clave-${++n}`; };
 const pedido = {
@@ -58,6 +61,17 @@ describe('guardar la venta en la pestaña', () => {
     guardarVenta({ ventaId: 'v1', total: 100 }, almacen);
     expect(leerVenta('v1', almacen).total).toBe(100);
     expect(leerVenta('v2', almacen)).toBeNull();
+  });
+
+  it('al cerrar la sesión se borran todas las ventas, y solo las ventas', () => {
+    const almacen = almacenFalso();
+    guardarVenta({ ventaId: 'v1' }, almacen);
+    guardarVenta({ ventaId: 'v2' }, almacen);
+    almacen.setItem('otra-cosa', 'x');
+    olvidarVentas(almacen);
+    expect(leerVenta('v1', almacen)).toBeNull();
+    expect(leerVenta('v2', almacen)).toBeNull();
+    expect(almacen.getItem('otra-cosa')).toBe('x');
   });
 });
 
