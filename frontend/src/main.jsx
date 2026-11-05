@@ -22,6 +22,7 @@ import PanelProductos from './paginas/panel/PanelProductos.jsx';
 import PanelProducto from './paginas/panel/PanelProducto.jsx';
 import PanelPromociones from './paginas/panel/PanelPromociones.jsx';
 import PanelPromocion from './paginas/panel/PanelPromocion.jsx';
+import PanelStock from './paginas/panel/PanelStock.jsx';
 import NoEncontrada from './paginas/NoEncontrada.jsx';
 
 createRoot(document.getElementById('raiz')).render(
@@ -48,6 +49,7 @@ createRoot(document.getElementById('raiz')).render(
                 <Route path="promociones" element={<PanelPromociones />} />
                 <Route path="promociones/nueva" element={<PanelPromocion key="nueva" />} />
                 <Route path="promociones/:id" element={<PanelPromocion key="editar" />} />
+                <Route path="stock" element={<PanelStock />} />
               </Route>
               <Route path="ingresar" element={<Acceso key="ingresar" modo="ingresar" />} />
               <Route path="registrarme" element={<Acceso key="registrar" modo="registrar" />} />

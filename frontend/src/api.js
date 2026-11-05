@@ -6,6 +6,8 @@ export class ErrorApi extends Error {
     this.estado = estado;
     this.codigo = cuerpo?.codigo;
     this.errores = cuerpo?.errores;
+    this.faltantes = cuerpo?.faltantes; // STOCK_INSUFICIENTE: cuánto había
+    this.variantes = cuerpo?.variantes; // VARIANTE_INEXISTENTE: cuáles no existen
   }
 }
 
@@ -105,6 +107,20 @@ export const listarPromociones = (token) => pedir('/catalogo/v1/promociones', { 
 export const crearPromocion = (token, promocion) => enviarJSON('POST', '/catalogo/v1/promociones', token, promocion);
 export const actualizarPromocion = (token, id, promocion) =>
   enviarJSON('PUT', `/catalogo/v1/promociones/${encodeURIComponent(id)}`, token, promocion);
+
+// Ingresos, transferencias y ajustes: ruta es "ingresos", "transferencias" o "ajustes" (HU-06 a HU-08).
+export function moverStock(token, ruta, cuerpo, clave) {
+  return pedir(`/inventario/v1/${ruta}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': clave, ...conToken(token) },
+    body: JSON.stringify(cuerpo),
+  });
+}
+
+export const stockACorregir = (token) => pedir('/inventario/v1/stock/a-corregir', { headers: conToken(token) });
+
+export const consultarVariantesAdmin = (token, ids) =>
+  pedir(`/catalogo/v1/variantes?variantes=${ids.map(encodeURIComponent).join(',')}`, { headers: conToken(token) });
 
 export const buscarProductosAdmin = (token, q, opciones) =>
   pedir(`/catalogo/v1/admin/productos?${new URLSearchParams({ q, tamano: 8 })}`, { ...opciones, headers: conToken(token) });
