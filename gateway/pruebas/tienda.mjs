@@ -71,18 +71,18 @@ check('muestra original y con promoción', promo.status === 201 && conPromo.prec
 await http('PUT', `${GW}/catalogo/v1/promociones/${promo.json.promocionId}`, { headers: ADMIN, body: cuerpoPromo('2020-01-01T00:00:00Z', '2020-01-02T00:00:00Z') });
 check('cancelada: vuelve al precio base', (await http('GET', `${TIENDA}/${id}`)).json.precio === 10000);
 
-console.log('\n--- Hay / no hay, sin token ---');
+console.log('\n--- Unidades disponibles, sin token ---');
 const inicial = await http('GET', `${GW}/inventario/v1/disponibilidad?variantes=${varM},${varL}`);
-check('sin token y sin stock: no hay', inicial.status === 200 && inicial.json.items.every((d) => d.hayStock === false), inicial);
-check('sin cantidades en la respuesta', inicial.json.items.every((d) => Object.keys(d).sort().join() === 'hayStock,varianteId'), inicial.json);
+check('sin token y sin stock: no hay', inicial.status === 200 && inicial.json.items.every((d) => d.disponible === 0), inicial);
+check('solo informa las unidades online', inicial.json.items.every((d) => Object.keys(d).sort().join() === 'disponible,varianteId'), inicial.json);
 await http('POST', `${GW}/inventario/v1/ingresos`, { headers: { ...ADMIN, 'Idempotency-Key': randomUUID() }, body: { varianteId: varM, canal: 'FISICO', cantidad: 5 } });
-check('stock solo en el local: no hay online', (await disponibilidad(varM))[0].hayStock === false);
+check('stock solo en el local: no hay online', (await disponibilidad(varM))[0].disponible === 0);
 await http('POST', `${GW}/inventario/v1/ingresos`, { headers: { ...ADMIN, 'Idempotency-Key': randomUUID() }, body: { varianteId: varM, canal: 'ONLINE', cantidad: 1 } });
 const [m, l] = await disponibilidad(varM, varL);
-check('con 1 online: hay, y el otro talle no', m.hayStock === true && l.hayStock === false, [m, l]);
+check('con 1 online: 1, y el otro talle 0', m.disponible === 1 && l.disponible === 0, [m, l]);
 const compra = await http('POST', `${GW}/ventas/v1/compras`, { headers: { 'Idempotency-Key': randomUUID() }, body: { email: 'ana@example.com', medioPago: 'TRANSFERENCIA', items: [{ varianteId: varM, cantidad: 1 }] } });
 check('la compra reserva la última', compra.status === 201, compra);
-check('reservada: ya no hay, al instante', (await disponibilidad(varM))[0].hayStock === false);
+check('reservada: baja a 0, al instante', (await disponibilidad(varM))[0].disponible === 0);
 check('sin ids: 400', (await http('GET', `${GW}/inventario/v1/disponibilidad`)).status === 400);
 
 console.log('\n--- Lo demás sigue protegido ---');
@@ -102,11 +102,12 @@ check('POST a disponibilidad: 405', (await http('POST', `${GW}/inventario/v1/dis
 console.log('\n--- Caídas ---');
 dc('stop inventario');
 const sinInv = await http('GET', `${GW}/inventario/v1/disponibilidad?variantes=${varM}`);
-check('Inventario caído: no responde "no hay"', sinInv.status >= 500, sinInv.status);
+check('Inventario caído: no responde 0', sinInv.status >= 500, sinInv.status);
 console.log(`      (código ${sinInv.status}, tipo ${sinInv.headers.get('content-type')})`);
 check('Inventario caído: los productos se siguen viendo', (await http('GET', TIENDA)).status === 200);
 dc('start inventario');
 check('Inventario vuelve', await esperar(async () => (await http('GET', `${GW}/inventario/v1/disponibilidad?variantes=${varM}`)).status === 200));
+await new Promise((f) => setTimeout(f, 12000)); // tras reiniciar todas las réplicas, ver "Negativas" en ADR-012
 dc('stop catalogo');
 const sinCat = await http('GET', TIENDA);
 check('Catálogo caído: error en el listado', sinCat.status >= 500, sinCat.status);

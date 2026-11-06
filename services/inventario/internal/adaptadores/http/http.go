@@ -38,9 +38,11 @@ func NuevoRouter(s *aplicacion.Servicio) http.Handler {
 	mux.HandleFunc("POST /v1/reservas/{id}/liberar", h.liberar)
 
 	mux.HandleFunc("GET /v1/stock", h.consultarStock)
+	mux.HandleFunc("GET /v1/stock/a-corregir", h.stockACorregir)
 	mux.HandleFunc("GET /v1/disponibilidad", h.consultarDisponibilidad)
 	mux.HandleFunc("POST /v1/ingresos", h.ingresar)
 	mux.HandleFunc("POST /v1/transferencias", h.transferir)
+	mux.HandleFunc("POST /v1/ajustes", h.ajustar)
 	mux.HandleFunc("POST /v1/descuentos-fisicos", h.descontarFisico)
 
 	mux.HandleFunc("POST /v1/reposiciones", h.reponer)
@@ -165,7 +167,22 @@ func (h *Handler) consultarStock(w http.ResponseWriter, r *http.Request) {
 	escribirJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-// consultarDisponibilidad es la ruta pública de la tienda: solo dice si hay, sin cantidades (HU-01.3).
+// stockACorregir es el filtro del panel (HU-09.2). Solo ids y cantidades: producto, talle y color los
+// agrega el panel con Catálogo (ADR-001).
+func (h *Handler) stockACorregir(w http.ResponseWriter, r *http.Request) {
+	stocks, hayMas, err := h.s.StockACorregir(r.Context())
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	items := make([]stockJSON, len(stocks))
+	for i, s := range stocks {
+		items[i] = stockAJSON(s)
+	}
+	escribirJSON(w, http.StatusOK, map[string]any{"items": items, "hayMas": hayMas})
+}
+
+// consultarDisponibilidad es la ruta pública de la tienda: las unidades online disponibles, nada más (HU-01.5).
 func (h *Handler) consultarDisponibilidad(w http.ResponseWriter, r *http.Request) {
 	ids, ok := idsDeVariantes(w, r)
 	if !ok {
@@ -178,11 +195,11 @@ func (h *Handler) consultarDisponibilidad(w http.ResponseWriter, r *http.Request
 	}
 	type disponibilidadJSON struct {
 		VarianteID string `json:"varianteId"`
-		HayStock   bool   `json:"hayStock"`
+		Disponible int    `json:"disponible"`
 	}
 	items := make([]disponibilidadJSON, len(disponibilidad))
 	for i, d := range disponibilidad {
-		items[i] = disponibilidadJSON{d.VarianteID, d.HayStock}
+		items[i] = disponibilidadJSON{d.VarianteID, d.Disponible}
 	}
 	escribirJSON(w, http.StatusOK, map[string]any{"items": items})
 }
@@ -226,6 +243,22 @@ func (h *Handler) transferir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	st, err := h.s.Transferir(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Origen, p.Cantidad, usuario(r))
+	responderStock(w, r, st, err)
+}
+
+// ajustar corrige el stock de un canal con un motivo (HU-08). La cantidad es negativa para restar.
+func (h *Handler) ajustar(w http.ResponseWriter, r *http.Request) {
+	var p struct {
+		VarianteID string         `json:"varianteId"`
+		Canal      dominio.Canal  `json:"canal"`
+		Cantidad   int            `json:"cantidad"`
+		Motivo     dominio.Motivo `json:"motivo"`
+		Nota       string         `json:"nota"`
+	}
+	if !leerJSON(w, r, &p) {
+		return
+	}
+	st, err := h.s.Ajustar(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Canal, p.Cantidad, p.Motivo, p.Nota, usuario(r))
 	responderStock(w, r, st, err)
 }
 

@@ -1,8 +1,10 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.10** · 04/11/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.11** · 05/11/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
+>
+> **Cambios en 0.11** (ADR-017): se agrega HU-01.5: el comprador ve las unidades online disponibles. HU-08.4 y HU-08.5: motivos del ajuste y límite del físico.
 >
 > **Cambios en 0.10** (ADR-015): se agrega RN-26, sobre las contraseñas, y RN-23 indica cómo se crea la cuenta de administrador.
 >
@@ -142,6 +144,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 2. Dado un producto no publicado, cuando el comprador navega o busca, entonces no aparece.
 3. Dada una variante sin stock online disponible, entonces se muestra como "sin stock" y no se puede agregar al carrito.
 4. Dado un producto con una promoción vigente, entonces se muestra el precio original y el precio con promoción. **[?]** cómo se muestra una promoción condicionada al medio de pago.
+5. Cuando elige talle y color, entonces ve cuántas unidades online hay disponibles. **[propuesta]**
 
 **HU-02 · Buscar, filtrar y ordenar.** Como comprador quiero buscar y filtrar productos, para encontrar rápido lo que busco. *(RN-02, RN-17)*
 1. Cuando el comprador busca por texto, entonces obtiene los productos publicados cuyo nombre o descripción coinciden.
@@ -189,6 +192,8 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 1. Cuando ajusta el stock con un motivo, entonces se aplica y queda registrado.
 2. Cuando no indica un motivo, entonces se rechaza. **[propuesta]**
 3. Cuando el ajuste dejaría el stock por debajo de lo reservado, entonces se rechaza.
+4. Los motivos son *pérdida*, *falla* y *corrección de conteo*, con una nota opcional. **[propuesta]**
+5. Cuando el ajuste dejaría el stock físico negativo, entonces se rechaza; sumar siempre se puede, y así se corrige un físico negativo (RN-25). **[propuesta]**
 
 **HU-09 · Ver el stock y las variantes a corregir (admin).** Como administrador quiero ver el stock de cada variante y cuáles tienen el stock físico mal registrado, para decidir qué reponer y qué corregir. *(RN-01, RN-25 · ADR-001)*
 1. Cuando abre un producto en el panel, entonces ve cada variante (talle y color) con su stock online, su stock físico y las unidades reservadas.

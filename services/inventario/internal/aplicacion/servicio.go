@@ -98,20 +98,36 @@ func (s *Servicio) ConsultarStock(ctx context.Context, varianteIDs []string) ([]
 	return s.repo.ConsultarStock(ctx, varianteIDs)
 }
 
+// MaximoACorregir acota la lista de stock a corregir. Con 10 a 20 prendas por semana (SPEC §3) no se espera
+// llegar: si se llega, la respuesta lo indica.
+const MaximoACorregir = 500
+
+// StockACorregir devuelve las variantes con físico negativo (HU-09.2) y si hay más que las devueltas.
+func (s *Servicio) StockACorregir(ctx context.Context) ([]dominio.Stock, bool, error) {
+	stocks, err := s.repo.StockACorregir(ctx, MaximoACorregir+1)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(stocks) > MaximoACorregir {
+		return stocks[:MaximoACorregir], true, nil
+	}
+	return stocks, false, nil
+}
+
 // ConsultarDisponibilidad responde por cada id pedido, en el mismo orden. Una variante sin fila de stock
-// no tiene unidades: se responde que no hay.
+// no tiene unidades: se responde 0.
 func (s *Servicio) ConsultarDisponibilidad(ctx context.Context, varianteIDs []string) ([]dominio.Disponibilidad, error) {
 	stocks, err := s.repo.ConsultarStock(ctx, varianteIDs)
 	if err != nil {
 		return nil, err
 	}
-	disponibles := make(map[string]bool, len(stocks))
+	disponibles := make(map[string]int, len(stocks))
 	for _, st := range stocks {
-		disponibles[st.VarianteID] = st.DisponibleOnline() > 0
+		disponibles[st.VarianteID] = max(st.DisponibleOnline(), 0)
 	}
 	resultado := make([]dominio.Disponibilidad, len(varianteIDs))
 	for i, id := range varianteIDs {
-		resultado[i] = dominio.Disponibilidad{VarianteID: id, HayStock: disponibles[id]}
+		resultado[i] = dominio.Disponibilidad{VarianteID: id, Disponible: disponibles[id]}
 	}
 	return resultado, nil
 }
@@ -136,6 +152,19 @@ func (s *Servicio) Transferir(ctx context.Context, clave, varianteID string, ori
 	st, err := s.repo.Transferir(ctx, t)
 	if err == nil {
 		slog.InfoContext(ctx, "transferencia de stock", "variante_id", varianteID, "origen", origen, "destino", t.Destino(), "cantidad", cantidad)
+	}
+	return st, err
+}
+
+// Ajustar corrige el stock de un canal con un motivo (HU-08).
+func (s *Servicio) Ajustar(ctx context.Context, clave, varianteID string, canal dominio.Canal, cantidad int, motivo dominio.Motivo, nota, usuario string) (dominio.Stock, error) {
+	a, err := dominio.NuevoAjuste(clave, varianteID, canal, cantidad, motivo, nota, usuario)
+	if err != nil {
+		return dominio.Stock{}, err
+	}
+	st, err := s.repo.Ajustar(ctx, a)
+	if err == nil {
+		slog.InfoContext(ctx, "ajuste de stock", "variante_id", varianteID, "canal", canal, "cantidad", cantidad, "motivo", motivo)
 	}
 	return st, err
 }

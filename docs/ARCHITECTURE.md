@@ -102,7 +102,7 @@ Se resumen acá y se justifican en el [**ADR-001 (D1)**](adr/ADR-001-limites-de-
 | ------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Producto, variante, fotos, categoría | Catálogo                                                            | Inventario conoce solo el identificador de la variante. Ventas guarda una copia de nombre, talle, color y precio en cada venta **[propuesta]**, para que una venta registrada conserve su precio (HU-05). El frontend del panel los combina con el stock de Inventario (HU-09). |
 | Precio base y promociones            | Catálogo                                                            | Ventas consulta el precio vigente al momento de comprar **[propuesta]**.                                                                                                                                                                                                        |
-| Stock, reservas y movimientos        | Inventario                                                          | Ventas reserva, libera y descuenta mediante su API. El panel consulta el stock por ids de variante. La tienda consulta si hay stock (sí o no, sin cantidades) con `GET /v1/disponibilidad`.                                                                                          |
+| Stock, reservas y movimientos        | Inventario                                                          | Ventas reserva, libera y descuenta mediante su API. El panel consulta el stock por ids de variante. La tienda consulta las unidades online disponibles con `GET /v1/disponibilidad`, sin físico ni reservadas.                                                                                          |
 | Venta, ítems, pagos y estados        | Ventas                                                              | El comprador registrado los consulta a través del gateway; se filtran por su id de usuario.                                                                                                                                                                                     |
 | Usuario, credenciales y rol          | Usuarios                                                            | El gateway valida el token. Ventas recibe el id y el email del comprador desde el token y los guarda en cada venta.                                                                                                                                                             |
 | Carrito                              | Frontend (navegador del comprador)                                  | No llega al backend hasta que el comprador aprieta "Comprar".                                                                                                                                                                                                                   |
@@ -338,12 +338,11 @@ services/inventario/            # hexagonal
 | Justificación de los estilos internos de cada servicio                                        | D2 (ADR-002)                              |
 | Motor de búsqueda y retraso máximo del índice                                                 | D6                                        |
 | Qué se cachea exactamente y tiempo de vencimiento                                             | D7                                        |
-| Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: pendiente                | D2 / D12                                  |
+| Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: **resuelto, React con Vite** (ADR-017)                | D2 / D12                                  |
 | Herramientas de observabilidad y retención de métricas                                        | D11                                       |
 | Contrato del gimnasio y cómo identifica los productos de FAV | D9 |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
 | Dónde se almacenan las fotos de los productos                                                 | D3                                        |
-| Dónde guarda el token el frontend                                                             | Implementación del frontend               |
 | Proveedor de nube                                                                             | D13                                       |
 
 ## 16. Limitaciones conocidas y deuda técnica
@@ -352,7 +351,7 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote y catálogo público, sin eventos ni trazas ni métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend no está | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote y catálogo público, sin eventos ni trazas ni métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend tiene la tienda, la compra, "Mis compras" y el panel; falta la política de cambios (ADR-017) | — |
 | Gateway único | Punto único de falla | ADR-012 |
 | Encabezados de identidad | Los servicios confían en `X-User-*`: en la nube sus puertos no pueden quedar abiertos | ADR-016 |
 | Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |

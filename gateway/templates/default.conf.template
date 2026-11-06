@@ -37,6 +37,12 @@ upstream ventas {
     keepalive 16;
 }
 
+upstream frontend {
+    zone frontend 64k;
+    server frontend:80 resolve max_fails=2 fail_timeout=10s;
+    keepalive 8;
+}
+
 # Correlation id: se respeta el del cliente; si no viene, se usa el id del pedido de nginx (ADR-005, punto 7).
 map $http_x_correlation_id $correlacion {
     ""      $request_id;
@@ -83,6 +89,24 @@ server {
     add_header X-Correlation-Id $correlacion always;
 
     location = /healthz { access_log off; return 200; }
+
+    # Errores que genera el propio nginx, con el formato del contrato en lugar de su página HTML. Sin réplicas
+    # que atiendan, responde 503 y se puede reintentar. Los errores de los servicios no pasan por acá
+    # (proxy_intercept_errors está apagado): un 503 GIMNASIO_NO_DISPONIBLE llega tal cual.
+    error_page 502 503 504 = @no_disponible;
+    error_page 429 = @limite_excedido;
+
+    location @no_disponible {
+        add_header X-Correlation-Id $correlacion always;
+        add_header Retry-After 1 always;
+        return 503 '{"type":"https://fav.example/errores/no-disponible","title":"Servicio no disponible","status":503,"detail":"Reintentar con la misma Idempotency-Key.","codigo":"NO_DISPONIBLE"}';
+    }
+
+    location @limite_excedido {
+        add_header X-Correlation-Id $correlacion always;
+        add_header Retry-After 2 always;
+        return 429 '{"type":"https://fav.example/errores/limite-excedido","title":"Límite excedido","status":429,"detail":"Reintentar después de Retry-After.","codigo":"LIMITE_EXCEDIDO"}';
+    }
 
     # Capacidad publicada: catálogo y pedidos (contrato catalogo-pedidos-v1).
     location = /v1/productos {
@@ -205,6 +229,27 @@ server {
         auth_request /_auth/administrador;
         include /etc/nginx/snippets/identidad.conf;
         proxy_pass http://catalogo/;
+    }
+
+    # Una ruta de la API que no existe es un 404, no la página de la tienda.
+    location /v1/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+    location /ventas/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+    location /usuarios/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+
+    # Lo demás es la tienda: mismo origen que la API, así que no hace falta CORS (ADR-017).
+    location / {
+        error_page 502 503 504 = @tienda_no_disponible; # acá llega una persona: se le responde una página
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_pass http://frontend;
+    }
+
+    location @tienda_no_disponible {
+        default_type "text/html; charset=utf-8";
+        add_header X-Correlation-Id $correlacion always;
+        add_header Retry-After 5 always;
+        return 503 '<!doctype html><html lang="es-AR"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>FAV del universo</title><body style="font-family:Georgia,serif;text-align:center;padding:4rem 1rem;background:#fbf7f0;color:#261f2e"><h1>La tienda no está disponible en este momento</h1><p>Es un problema de nuestro lado. Probá de nuevo en un rato.</p></body></html>';
     }
 
     default_type application/problem+json;

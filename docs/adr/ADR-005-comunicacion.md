@@ -2,12 +2,12 @@
 
 | | |
 |---|---|
-| **Estado** | Aceptada (versión inicial) · Entrega 1. Se valida en la Entrega 2. |
+| **Estado** | Aceptada y validada con el sistema completo (05/11/2026). Ver "Validación". |
 | **Fecha** | 09/10/2026 |
 | **Decisión de la consigna** | D5 · Comunicación entre servicios |
 | **Relacionadas** | [ADR-001](ADR-001-limites-de-los-servicios.md) (relaciones entre servicios), [ADR-003](ADR-003-persistencia.md) (outbox e idempotencia en la base), ADR-004 (concurrencia, Entrega 2), [ADR-008](ADR-008-contrato-propio.md) (capacidad publicada), ADR-010 (resiliencia, Entrega 2) |
 
-> Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar. Los valores numéricos son **[propuesta]** hasta medirlos en la Entrega 2.
+> Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar. Los tiempos y reintentos se probaron con caídas y demoras provocadas, no con carga real (ADR-013).
 
 > **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
 
@@ -42,9 +42,9 @@ ADR-001 fija qué servicios se hablan y dejó abierto si la confirmación de la 
 | Mercado Pago → Gateway → Ventas: aviso del pago | Síncrona (webhook) | Lo inicia Mercado Pago. |
 | Ventas → proveedor de mail | Asíncrona dentro de Ventas | No debe bloquear la venta (punto 6). |
 | Inventario → Ventas: `ReservaVencida` | **Evento** (RabbitMQ) | El vencimiento ocurre sin que nadie lo pida; Ventas reacciona cuando puede. |
-| Catálogo → Inventario: `VarianteCreada` **[propuesta]** | **Evento** | Crear un producto no debe depender de que Inventario esté disponible. |
+| Catálogo → Inventario: `VarianteCreada` **[propuesta]**, sin implementar | **Evento** | Crear un producto no debe depender de que Inventario esté disponible. Hoy la variante aparece en Inventario con su primer ingreso. |
 | Catálogo e Inventario → índice de búsqueda | **Evento** **[propuesta]** | Se tolera un retraso acotado (ADR-006). |
-| Grupo consumidor → Gateway → Inventario (A) o Ventas (B) | Síncrona | Según el contrato publicado (ADR-008). |
+| Grupo de proveedores → Gateway → Catálogo y Ventas | Síncrona | Según el contrato publicado (ADR-008). |
 
 El evento de dominio que pide la consigna es **`ReservaVencida`**: lo publica Inventario y lo consume Ventas.
 
@@ -55,12 +55,12 @@ El evento de dominio que pide la consigna es **`ReservaVencida`**: lo publica In
 | Gateway → cualquier servicio | 5 s | No | — | Rate limiting por cliente |
 | Ventas → Catálogo (precio) | 1 s | 1 | Timeout, conexión rechazada, 502, 503, 504 | Es una lectura: reintentar no tiene efectos |
 | Ventas → Inventario (reservar, liberar, confirmar, descontar) | 2 s | 2 (3 intentos en total), con espera de 200 ms y 400 ms más un componente aleatorio | Timeout, conexión rechazada, 502, 503, 504 | Clave de idempotencia en cada operación |
-| Ventas → Mercado Pago (crear pago) | 5 s | No **[?]** | — | Circuit breaker: se abre tras 5 fallas seguidas y prueba de nuevo a los 30 s |
+| Ventas → Mercado Pago (crear pago) | 5 s | No: se reintenta la compra entera con la misma `Idempotency-Key`, que retoma solo el pago (ADR-014) | — | Circuit breaker: se abre tras 5 fallas seguidas y prueba de nuevo a los 30 s |
 | Ventas → proveedor de mail | 10 s | 5, con espera creciente (1, 5, 15, 30 y 60 min) | Cualquier falla | Fuera de la transacción de la venta |
 
 **Nunca se reintenta un error de negocio** (`4xx`, como sin stock o reserva vencida): la respuesta es definitiva.
 
-**[?]** Mercado Pago: se reintentará la creación del pago solo si su API acepta una clave de idempotencia. Se verifica al implementar.
+**Mercado Pago:** Ventas no reintenta crear el pago. Si no responde, la venta queda creada y responde `503`; el reintento del comprador, con la misma clave, retoma solo el pago (ADR-014).
 
 ### 3. Respuestas tardías o ausentes
 
@@ -143,11 +143,10 @@ Cada pedido lleva un identificador de correlación (`X-Correlation-Id`). Si no v
 
 ## Pendientes
 
-- **Cómo recibe el entorno local los avisos de Mercado Pago.** **[?]** Un túnel público hacia la máquina local, o un simulador del aviso para las pruebas.
-- **Si la API de Mercado Pago acepta clave de idempotencia** para reintentar la creación del pago.
-- **Proveedor de mail.** **[?]**
-- **Eventos del índice de búsqueda y retraso máximo:** ADR-006 (Entrega 2).
-- **Valores de timeouts y reintentos:** se ajustan con las mediciones de la Entrega 2.
+- **Resueltos en ADR-014:** el entorno local usa un simulador de Mercado Pago que envía el aviso firmado, y los mails van a Mailpit.
+- **Eventos del índice de búsqueda y retraso máximo:** ADR-006.
+- **`VarianteCreada`:** sin implementar. No hace falta para la consigna, que pide un evento de dominio (`ReservaVencida`), pero sí para HU-03.6.
+- **Valores de timeouts y reintentos:** se revisan con las pruebas de carga (ADR-013).
 
 ## Validación prevista (Entrega 2)
 
@@ -179,5 +178,23 @@ Contrastado con el código de Inventario, el gateway y el mock de Ventas.
 | Outbox | **Implementado:** un proceso de Inventario publica a RabbitMQ con confirmación del broker. Con RabbitMQ detenido se puede comprar y, al volver, el evento llega. Sigue sin columna `version`: el sobre la agrega al publicar. |
 | Consumo idempotente y DLQ | **Implementados** en Ventas. Un mensaje inválido terminó en `ventas.reserva-vencida.dlq`. La alerta sobre la DLQ sigue pendiente (ADR-011). |
 | Reintentos del punto 2 | Implementados, dentro de los 4,5 s por pedido (ADR-014). |
+
+### Respuesta tardía: Inventario colgado (05/11/2026)
+
+Con las dos réplicas de Inventario congeladas (`docker compose pause inventario`: aceptan la conexión pero no responden), por el gateway:
+
+| Paso | Resultado |
+|---|---|
+| Compra por transferencia | `503 NO_DISPONIBLE` con `Retry-After: 2`, a los **4,5 s**: el corte de Ventas, antes que los 5 s del gateway. En los logs, tres intentos a Inventario con espera de 210 ms y 450 ms |
+| Ventas creadas | Ninguna |
+| Unidades reservadas al descongelar | Ninguna de más: la respuesta tardía no dejó una reserva suelta |
+| Reintento con la misma clave | `201`, una sola reserva; un tercer envío devuelve la misma venta |
+| Inventario después | Docker lo marcó *unhealthy* mientras estuvo congelado y volvió a *healthy* solo |
+
+**No probado:** una respuesta que llega después del corte y sí aplica la reserva. Si pasara, la reserva vencería sola (punto 3) o la recuperaría el reintento con la misma clave (ADR-014).
+
+### Errores del gateway (05/11/2026)
+
+Sin réplicas que respondan, el gateway responde `503 NO_DISPONIBLE` en JSON con `Retry-After`, como el contrato, y no el `502` o `504` de nginx (ADR-010, `gateway/pruebas/errores.mjs`).
 
 **Problema detectado (resuelto por ADR-014):** los reintentos del mock de Ventas y los del gateway se suman, y el tiempo total de Ventas puede superar los 5 s del gateway (ADR-010). Hay que alinear los tiempos al implementar Ventas.

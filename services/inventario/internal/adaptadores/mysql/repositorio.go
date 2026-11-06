@@ -261,6 +261,22 @@ func (r *Repositorio) ConsultarStock(ctx context.Context, ids []string) ([]domin
 	if err != nil {
 		return nil, err
 	}
+	return leerStocks(filas)
+}
+
+// StockACorregir lista las variantes con físico negativo, primero las más negativas (RN-25, HU-09.2).
+// Sin índice sobre fisico: con el volumen de FAV la tabla tiene cientos de filas y se recorre entera.
+func (r *Repositorio) StockACorregir(ctx context.Context, limite int) ([]dominio.Stock, error) {
+	filas, err := r.db.QueryContext(ctx,
+		`SELECT variante_id, online, fisico, reservado, actualizado_en FROM stock
+		 WHERE fisico < 0 ORDER BY fisico, variante_id LIMIT ?`, limite)
+	if err != nil {
+		return nil, err
+	}
+	return leerStocks(filas)
+}
+
+func leerStocks(filas *sql.Rows) ([]dominio.Stock, error) {
 	defer filas.Close()
 	var stocks []dominio.Stock
 	for filas.Next() {
@@ -310,6 +326,43 @@ func (r *Repositorio) Transferir(ctx context.Context, t dominio.Transferencia) (
 			return err
 		}
 		return registrarMovimiento(ctx, tx, t.VarianteID, "TRANSFERENCIA", t.Destino(), t.Cantidad, t.ClaveIdempotencia, t.Usuario)
+	})
+}
+
+// Ajustar suma o resta unidades con un motivo (HU-08). Restar es una actualización condicional, como la
+// transferencia: el online no baja de lo reservado (HU-08.3) y el físico no queda negativo [propuesta].
+// Sumar crea la fila si la variante no tenía stock, como un ingreso.
+func (r *Repositorio) Ajustar(ctx context.Context, a dominio.Ajuste) (dominio.Stock, error) {
+	return r.operacionIdempotente(ctx, a.ClaveIdempotencia, "AJUSTE", a.Huella(), a.VarianteID, func(tx *sql.Tx) error {
+		columna := columnaDe(a.Canal)
+		if a.Cantidad > 0 {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO stock (variante_id, `+columna+`) VALUES (?, ?)
+				 ON DUPLICATE KEY UPDATE `+columna+` = `+columna+` + VALUES(`+columna+`), actualizado_en = NOW()`,
+				a.VarianteID, a.Cantidad); err != nil {
+				return err
+			}
+		} else {
+			limite := `fisico + ? >= 0`
+			if a.Canal == dominio.CanalOnline {
+				limite = `online + ? >= reservado`
+			}
+			resultado, err := tx.ExecContext(ctx,
+				`UPDATE stock SET `+columna+` = `+columna+` + ?, actualizado_en = NOW() WHERE variante_id = ? AND `+limite,
+				a.Cantidad, a.VarianteID, a.Cantidad)
+			if err != nil {
+				return err
+			}
+			if n, _ := resultado.RowsAffected(); n == 0 {
+				return faltanteDe(ctx, tx, a.VarianteID, a.Canal, -a.Cantidad)
+			}
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO ajustes (clave_idempotencia, variante_id, canal, cantidad, motivo, nota, usuario) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			a.ClaveIdempotencia, a.VarianteID, a.Canal, a.Cantidad, a.Motivo, a.Nota, truncar(a.Usuario, 100)); err != nil {
+			return err
+		}
+		return registrarMovimiento(ctx, tx, a.VarianteID, "AJUSTE", a.Canal, a.Cantidad, a.ClaveIdempotencia, a.Usuario)
 	})
 }
 
