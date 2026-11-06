@@ -16,38 +16,48 @@ function CampoPrecio({ etiqueta, valor, alCambiar }) {
   );
 }
 
+// Columna de filtros a la izquierda. En pantallas angostas se pliega detrás de un botón.
 export default function Filtros({ filtros, colores, alCambiar, alLimpiar, hayFiltros }) {
-  const [abiertos, setAbiertos] = useState(false); // en el celular arrancan plegados
+  const [abiertos, setAbiertos] = useState(false);
   return (
     <div className="filtros">
       <button type="button" className="filtros-plegar" aria-expanded={abiertos} onClick={() => setAbiertos((a) => !a)}>
-        {abiertos ? 'Ocultar filtros' : hayFiltros ? 'Filtros y orden (con filtros aplicados)' : 'Filtros y orden'}
+        {abiertos ? 'Ocultar filtros' : hayFiltros ? 'Filtros (aplicados)' : 'Filtros'}
       </button>
       <div className={`filtros-campos${abiertos ? ' abiertos' : ''}`} role="group" aria-label="Filtros">
-      <label className="campo">
-        <span>Talle</span>
-        <select value={filtros.talle} onChange={(e) => alCambiar('talle', e.target.value)}>
-          <option value="">Todos</option>
-          {TALLES.map((t) => <option key={t} value={t}>{t === 'U' ? 'Único' : t}</option>)}
-        </select>
-      </label>
-      <label className="campo">
-        <span>Color</span>
-        <select value={filtros.color} onChange={(e) => alCambiar('color', e.target.value)}>
-          <option value="">Todos</option>
-          {[...new Set([...colores, filtros.color].filter(Boolean))].sort().map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-      </label>
-      <CampoPrecio etiqueta="Desde" valor={filtros.precioMin} alCambiar={(v) => alCambiar('precioMin', v)} />
-      <CampoPrecio etiqueta="Hasta" valor={filtros.precioMax} alCambiar={(v) => alCambiar('precioMax', v)} />
-      <label className="campo campo-orden">
-        <span>Ordenar por</span>
-        <select value={filtros.orden || 'nuevos'} onChange={(e) => alCambiar('orden', e.target.value)}>
-          {ORDENES.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
-        </select>
-      </label>
-      {hayFiltros && <button type="button" className="boton-texto" onClick={alLimpiar}>Limpiar filtros</button>}
+        <p className="filtros-titulo">Filtrar</p>
+        <label className="campo">
+          <span>Talle</span>
+          <select value={filtros.talle} onChange={(e) => alCambiar('talle', e.target.value)}>
+            <option value="">Todos</option>
+            {TALLES.map((t) => <option key={t} value={t}>{t === 'U' ? 'Único' : t}</option>)}
+          </select>
+        </label>
+        <label className="campo">
+          <span>Color</span>
+          <select value={filtros.color} onChange={(e) => alCambiar('color', e.target.value)}>
+            <option value="">Todos</option>
+            {[...new Set([...colores, filtros.color].filter(Boolean))].sort().map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        <fieldset className="filtros-precio">
+          <legend>Precio</legend>
+          <CampoPrecio etiqueta="Desde" valor={filtros.precioMin} alCambiar={(v) => alCambiar('precioMin', v)} />
+          <CampoPrecio etiqueta="Hasta" valor={filtros.precioMax} alCambiar={(v) => alCambiar('precioMax', v)} />
+        </fieldset>
+        {hayFiltros && <button type="button" className="boton-texto" onClick={alLimpiar}>Limpiar filtros</button>}
       </div>
     </div>
+  );
+}
+
+export function Orden({ valor, alCambiar }) {
+  return (
+    <label className="orden">
+      <span>Ordenar por</span>
+      <select value={valor || 'nuevos'} onChange={(e) => alCambiar(e.target.value)}>
+        {ORDENES.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
+      </select>
+    </label>
   );
 }

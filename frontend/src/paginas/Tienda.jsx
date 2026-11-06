@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { consultarDisponibilidad, ErrorApi, listarProductos } from '../api.js';
 import { nombreCategoria } from '../dominio.js';
-import Filtros from '../componentes/Filtros.jsx';
+import Filtros, { Orden } from '../componentes/Filtros.jsx';
 import TarjetaProducto from '../componentes/TarjetaProducto.jsx';
 
 const TAMANO_PAGINA = 12;
@@ -119,43 +119,51 @@ export default function Tienda() {
     <>
       <Cabecera filtros={filtros} />
       <div className="tienda" id="catalogo">
-        <Filtros filtros={filtros} colores={colores} alCambiar={cambiar} alLimpiar={limpiar} hayFiltros={hayFiltros} />
+        <aside className="tienda-filtros">
+          <Filtros filtros={filtros} colores={colores} alCambiar={cambiar} alLimpiar={limpiar} hayFiltros={hayFiltros} />
+        </aside>
 
-        {disponibilidad === null && (
-          <p className="aviso" role="status">Ahora no podemos consultar el stock. Podés seguir mirando las prendas.</p>
-        )}
-
-        {error ? (
-          <div className="estado-vacio" role="alert">
-            <h2>{invalido ? 'Revisá los filtros' : 'La tienda no está disponible en este momento'}</h2>
-            <p>{invalido ? 'Algún valor no es válido: por ejemplo, el precio mínimo no puede superar al máximo.' : 'Es un problema de nuestro lado. Probá de nuevo en un rato.'}</p>
-            {invalido
-              ? <button type="button" className="boton" onClick={limpiar}>Limpiar filtros</button>
-              : <button type="button" className="boton" onClick={() => setReintento((n) => n + 1)}>Reintentar</button>}
-          </div>
-        ) : resultado?.items.length === 0 && !cargando ? (
-          <div className="estado-vacio">
-            <h2>No encontramos prendas con esos filtros</h2>
-            <p>Probá con menos filtros o con otra búsqueda.</p>
-            <Link to="/" className="boton">Ver todo el catálogo</Link>
-          </div>
-        ) : !resultado ? (
-          <div className="grilla" aria-busy="true" aria-label="Cargando productos">
-            {Array.from({ length: 8 }, (_, i) => <div key={i} className="tarjeta-esqueleto" />)}
-          </div>
-        ) : (
-          <>
+        <section className="tienda-resultados" aria-label="Prendas">
+          <div className="tienda-barra">
             <p className="resultado-total" aria-live="polite">
-              {resultado.total} {resultado.total === 1 ? 'prenda' : 'prendas'}
+              {resultado && !error ? `${resultado.total} ${resultado.total === 1 ? 'prenda' : 'prendas'}` : ' '}
             </p>
-            <div className={`grilla${cargando ? ' grilla-cargando' : ''}`} aria-busy={cargando}>
-              {resultado.items.map((p, i) => (
-                <TarjetaProducto key={p.productoId} producto={p} disponibilidad={disponibilidad} prioridad={i < 4} />
-              ))}
+            <Orden valor={filtros.orden} alCambiar={(v) => cambiar('orden', v)} />
+          </div>
+
+          {disponibilidad === null && (
+            <p className="aviso" role="status">Ahora no podemos consultar el stock. Podés seguir mirando las prendas.</p>
+          )}
+
+          {error ? (
+            <div className="estado-vacio" role="alert">
+              <h2>{invalido ? 'Revisá los filtros' : 'La tienda no está disponible en este momento'}</h2>
+              <p>{invalido ? 'Algún valor no es válido: por ejemplo, el precio mínimo no puede superar al máximo.' : 'Es un problema de nuestro lado. Probá de nuevo en un rato.'}</p>
+              {invalido
+                ? <button type="button" className="boton" onClick={limpiar}>Limpiar filtros</button>
+                : <button type="button" className="boton" onClick={() => setReintento((n) => n + 1)}>Reintentar</button>}
             </div>
-            <Paginas pagina={resultado.pagina} paginas={resultado.paginas} alCambiar={(n) => cambiar('pagina', String(n))} />
-          </>
-        )}
+          ) : resultado?.items.length === 0 && !cargando ? (
+            <div className="estado-vacio">
+              <h2>No encontramos prendas con esos filtros</h2>
+              <p>Probá con menos filtros o con otra búsqueda.</p>
+              <Link to="/" className="boton">Ver todo el catálogo</Link>
+            </div>
+          ) : !resultado ? (
+            <div className="grilla" aria-busy="true" aria-label="Cargando productos">
+              {Array.from({ length: 8 }, (_, i) => <div key={i} className="tarjeta-esqueleto" />)}
+            </div>
+          ) : (
+            <>
+              <div className={`grilla${cargando ? ' grilla-cargando' : ''}`} aria-busy={cargando}>
+                {resultado.items.map((p, i) => (
+                  <TarjetaProducto key={p.productoId} producto={p} disponibilidad={disponibilidad} prioridad={i < 4} />
+                ))}
+              </div>
+              <Paginas pagina={resultado.pagina} paginas={resultado.paginas} alCambiar={(n) => cambiar('pagina', String(n))} />
+            </>
+          )}
+        </section>
       </div>
     </>
   );

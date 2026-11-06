@@ -65,8 +65,11 @@ export default function Marco() {
       <header className="encabezado">
         <div className="encabezado-interior">
           <Link to="/" className="marca" aria-label="FAV del universo, ir al inicio">
-            <span className="marca-fav">FAV</span>
-            <span className="marca-universo">del universo</span>
+            <img className="marca-logo" src="/logo.svg" alt="" />
+            <span className="marca-texto">
+              <span className="marca-fav">FAV</span>
+              <span className="marca-universo">del universo</span>
+            </span>
           </Link>
           <MenuCategorias />
           <Buscador />
