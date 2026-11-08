@@ -402,7 +402,9 @@ FAV deja ropa en un **gimnasio**, que la vende y se queda con una comisión. La 
 
 Fuera de la v1 **[propuesta]**: registrar las ventas que hace el gimnasio y calcular la comisión. Se liquidan por fuera del sistema.
 
-**[?]** Contrato del gimnasio: se pidió al grupo. La decisión se documenta en el ADR-009 (D9).
+Solo un rechazo definitivo del gimnasio devuelve las unidades al stock físico. El administrador ve el estado de cada reposición en el panel. Contrato: `docs/contracts/externos/gimnasio/`. La decisión se documenta en el ADR-018 (D9).
+
+**El gimnasio también consume a FAV:** ve el catálogo y la disponibilidad por variante, con su propia clave y sin hacer pedidos (`GET /v1/productos` y `GET /v1/disponibilidad`, contrato 1.1.0, ADR-008). **[?]** Confirmar con el grupo que les sirve el stock online **[propuesta]**.
 
 ## 12. Pendientes
 
@@ -423,5 +425,5 @@ Fuera de la v1 **[propuesta]**: registrar las ventas que hace el gimnasio y calc
 | Tema | Dónde se resuelve |
 |---|---|
 | Cómo se entrega y se rota la clave de cada grupo consumidor | D8 |
-| Contrato del gimnasio y cómo se identifican los productos de FAV en su sistema | D9 |
+| URL pública y clave del gimnasio, prueba conjunta y cómo se revisa una reposición en conflicto | D9 (ADR-018) |
 | Retraso máximo del índice de búsqueda | D6 |

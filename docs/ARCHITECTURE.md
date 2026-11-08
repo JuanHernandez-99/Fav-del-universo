@@ -132,7 +132,8 @@ Al iniciar sesión, Usuarios emite un JWT con `sub` (id), `email`, `role`, `iat`
 | Mercado Pago → Gateway → Ventas                          | Aviso del resultado del pago                                                                      | Procesamiento idempotente                                                           | Mercado Pago reintenta el aviso                              |
 | Ventas → proveedor de mail                               | Enviar mails                                                                                      | Envío fuera de la transacción de la venta, con reintentos **[propuesta]**           | Se registra como fallido; la venta no se afecta              |
 | Grupo de proveedores → Gateway → Catálogo y Ventas | Ver el catálogo y hacer pedidos (capacidad publicada) | Clave por grupo **[propuesta]**, clave de idempotencia, límite de pedidos por grupo | Errores definidos en el contrato |
-| Inventario → Gimnasio | Consultar su stock de FAV y registrar reposiciones (capacidad consumida) | Timeout, reintento acotado, clave de idempotencia y circuit breaker **[propuesta]** | La reposición queda pendiente y se reintenta; el panel muestra que los datos del gimnasio no están disponibles |
+| Grupo del gimnasio → Gateway → Catálogo e Inventario | Ver el catálogo y la disponibilidad (capacidad publicada, sin pedidos) | Clave propia y límite por grupo | Errores definidos en el contrato |
+| Inventario → Gimnasio | Consultar su stock de FAV y registrar reposiciones (capacidad consumida) | Timeout, reintentos con la misma clave y circuit breaker (ADR-018) | La reposición queda pendiente y se reintenta; el panel muestra que los datos del gimnasio no están disponibles |
 
 Los valores concretos de timeouts y reintentos se definen en el **ADR-005 (D5)**.
 
@@ -143,15 +144,23 @@ El grupo de proveedores ve el catálogo de FAV y le hace pedidos para sí mismo,
 | Operación | Servicio | Qué hace |
 |---|---|---|
 | `GET /v1/productos` | Catálogo | Productos publicados con sus variantes y el precio vigente. No informa stock. |
+| `GET /v1/disponibilidad` | Inventario | Unidades online sin reservar por variante **[propuesta]**. También para el grupo del gimnasio, con su clave (contrato 1.1.0). |
 | `POST /v1/pedidos` | Ventas | Pide el precio a Catálogo, aparta el stock online en Inventario por 48 horas (todo o nada) y registra la venta *Pendiente de pago* por transferencia. Desde ahí sigue como una compra por transferencia (CU-02). |
 
 Contrato: [`catalogo-pedidos-v1.openapi.yaml`](contracts/catalogo-pedidos-v1.openapi.yaml). Uso, errores y ejemplos en [`contracts/README.md`](contracts/README.md). Se justifica en el **ADR-008 (D8)**.
 
 ### Capacidad consumida: venta en consignación en un gimnasio
 
-El gimnasio vende ropa de FAV y se queda con una comisión. **Inventario** llama a su API para consultar cuánto stock de FAV le queda y para registrar reposiciones. Al reponer, Inventario descuenta el stock físico y guarda una *reposición pendiente* en la misma transacción (con outbox); un proceso la envía al gimnasio con una clave de idempotencia y la reintenta si falla. Si el gimnasio la rechaza, las unidades vuelven al stock físico.
+La integración con el gimnasio va en los dos sentidos:
 
-Inventario lo hace con un adaptador de salida que traduce el modelo del gimnasio al de FAV. **[?]** Contrato del gimnasio, pendiente. Se justifica en el **ADR-009 (D9)**.
+```
+FAV consume:   Panel → Gateway → Inventario ──(X-API-Key)──► API de consignaciones del gimnasio
+FAV publica:   Tienda del gimnasio ──(X-API-Key)──► Gateway → Catálogo (productos) e Inventario (disponibilidad)
+```
+
+El gimnasio vende ropa de FAV y se queda con una comisión. **Inventario** llama a su API para consultar cuánto stock de FAV le queda y para registrar reposiciones. Al reponer, Inventario descuenta el stock físico y guarda una *reposición pendiente* en la misma transacción (con outbox); un proceso la envía al gimnasio con una clave de idempotencia y la reintenta si el resultado es incierto. Solo un rechazo definitivo devuelve las unidades al stock físico: un `401`, `403` o `409` no.
+
+Inventario lo hace con un adaptador de salida que traduce el modelo del gimnasio al de FAV. Contrato: [`externos/gimnasio/`](contracts/externos/gimnasio/). Se justifica en el **ADR-018 (D9)**, que reemplaza al ADR-009. **[?]** URL pública y clave del gimnasio: hasta tenerlas, se usa el mock local.
 
 ### Asíncronas (RabbitMQ, con transactional outbox)
 
@@ -325,7 +334,8 @@ services/inventario/            # hexagonal
 | [ADR-004](adr/ADR-004-consistencia-y-concurrencia.md) | D4 · Consistencia y concurrencia | Aceptada · Entrega 2 (7 pruebas de integración)      |
 | [ADR-006](adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | **Propuesta** · Entrega 2 (sin implementar)          |
 | [ADR-007](adr/ADR-007-cache.md)                    | D7 · Caché                        | **Propuesta** · Entrega 2 (sin implementar)          |
-| [ADR-009](adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Aceptada con contrato supuesto · Entrega 2           |
+| [ADR-009](adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018                              |
+| [ADR-018](adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada · Presentación grupal |
 | [ADR-010](adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada · Entrega 2                                 |
 | [ADR-011](adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada (primera versión) · Entrega 2               |
 | [ADR-012](adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada · Entrega 2                                 |
@@ -340,7 +350,7 @@ services/inventario/            # hexagonal
 | Qué se cachea exactamente y tiempo de vencimiento                                             | D7                                        |
 | Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: **resuelto, React con Vite** (ADR-017)                | D2 / D12                                  |
 | Herramientas de observabilidad y retención de métricas                                        | D11                                       |
-| Contrato del gimnasio y cómo identifica los productos de FAV | D9 |
+| URL pública y clave del gimnasio; prueba conjunta | D9 (ADR-018) |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
 | Dónde se almacenan las fotos de los productos                                                 | D3                                        |
 | Proveedor de nube                                                                             | D13                                       |
@@ -354,7 +364,7 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 | Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote y catálogo público, sin eventos ni trazas ni métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend tiene la tienda, la compra, "Mis compras" y el panel; falta la política de cambios (ADR-017) | — |
 | Gateway único | Punto único de falla | ADR-012 |
 | Encabezados de identidad | Los servicios confían en `X-User-*`: en la nube sus puertos no pueden quedar abiertos | ADR-016 |
-| Contrato del gimnasio | Es **supuesto**; un `4xx` se trata siempre como rechazo definitivo | ADR-009 |
+| Integración con el gimnasio | Contrato real aplicado, pero probada solo contra el mock local: falta su URL pública, su clave y la prueba conjunta. Una reposición `REQUIERE_REVISION` no se puede resolver desde el sistema | ADR-018 |
 | Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |
 | Observabilidad | Sin tablero ni alertas; Jaeger y Prometheus pierden datos al reiniciar; el gateway no crea spans | ADR-011 |
 | Búsqueda y caché | Solo diseño | ADR-006, ADR-007 |
