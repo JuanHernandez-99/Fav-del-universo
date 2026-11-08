@@ -151,7 +151,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 2. Cuando filtra por categoría, talle, color o rango de precio, entonces solo ve productos que cumplen todos los filtros aplicados.
 3. Cuando ordena por precio (ascendente o descendente) o por novedad, entonces los resultados respetan ese orden.
 4. Dados más resultados que el tamaño de página, cuando pasa de página, entonces no hay resultados repetidos ni salteados.
-5. Dado un cambio en un producto o en su stock, cuando pasa el retraso máximo definido, entonces la búsqueda lo refleja. **[?]** el retraso máximo se define en el D6.
+5. Dado un cambio en un producto, cuando pasa el retraso máximo de 10 segundos **[propuesta]**, entonces la búsqueda lo refleja (ADR-006). El stock no se indexa: se consulta a Inventario al mostrar el resultado.
 
 **HU-03 · Alta y edición de productos (admin).** Como administrador quiero cargar y editar productos con sus variantes y fotos, para mantener la tienda actualizada. *(RN-01, RN-02, RN-03, RN-17)*
 1. Dado un producto nuevo, entonces queda no publicado por defecto. **[propuesta]**
@@ -426,4 +426,3 @@ Solo un rechazo definitivo del gimnasio devuelve las unidades al stock físico. 
 |---|---|
 | Cómo se entrega y se rota la clave de cada grupo consumidor | D8 |
 | URL pública y clave del gimnasio, prueba conjunta y cómo se revisa una reposición en conflicto | D9 (ADR-018) |
-| Retraso máximo del índice de búsqueda | D6 |
