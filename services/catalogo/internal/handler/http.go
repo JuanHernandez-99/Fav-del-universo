@@ -51,6 +51,7 @@ func NuevoRouter(s *service.Servicio, opcionesRouter ...Opcion) http.Handler {
 	mux.HandleFunc("DELETE /v1/admin/productos/{id}", h.despublicarProducto)
 	mux.HandleFunc("POST /v1/admin/productos/{id}/publicar", h.publicarProducto)
 	mux.HandleFunc("POST /v1/admin/productos/{id}/variantes", h.agregarVariante)
+	mux.HandleFunc("POST /v1/admin/busqueda/reconstruir", h.reconstruirBusqueda)
 
 	// Consulta por lote: la usan Ventas (precio y datos de la variante) y el panel.
 	mux.HandleFunc("GET /v1/variantes", h.consultarVariantes)
@@ -300,6 +301,9 @@ func parsearFiltro(q url.Values) (modelo.FiltroProductos, error) {
 	}
 	if f.Orden == "" {
 		f.Orden = modelo.OrdenNuevos
+		if f.Texto != "" {
+			f.Orden = modelo.OrdenRelevancia
+		}
 	}
 
 	for _, nombre := range slices.Sorted(maps.Keys(q)) {
@@ -519,6 +523,10 @@ func escribirError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, modelo.ErrPromocionNoEncontrada):
 		p.Status, p.Codigo, p.Title = 404, "PROMOCION_NO_ENCONTRADA", "Promoción no encontrada"
 		p.Detail = "No existe la promoción " + r.PathValue("id") + "."
+	case errors.Is(err, modelo.ErrBusquedaNoDisponible):
+		w.Header().Set("Retry-After", "5")
+		p.Status, p.Codigo, p.Title = 503, "BUSQUEDA_NO_DISPONIBLE", "Búsqueda no disponible"
+		p.Detail = "La búsqueda por texto no está disponible. Se puede navegar por categoría."
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		w.Header().Set("Retry-After", "1")
 		p.Status, p.Codigo, p.Title, p.Detail = 503, "NO_DISPONIBLE", "Servicio no disponible", ""

@@ -100,7 +100,8 @@ paths:
           schema: { type: boolean }
         - name: orden
           in: query
-          schema: { type: string, enum: [nuevos, precio_asc, precio_desc, nombre], default: nuevos }
+          description: "Sin `orden`: `relevancia` si hay `q`, `nuevos` si no. En el panel, `relevancia` equivale a `nuevos`."
+          schema: { type: string, enum: [nuevos, precio_asc, precio_desc, nombre, relevancia] }
         - name: pagina
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -236,10 +237,27 @@ paths:
       description: |
         Público. Solo publicados, con los mismos filtros, orden y paginación que el listado de administración, salvo `publicado`,
         que da `400`. Filtra y ordena por precio base. Por el gateway: `/catalogo/v1/tienda/productos`, sin token.
+
+        Con `q` busca en Elasticsearch (ADR-006): tolera errores de tipeo y, sin `orden`, ordena por `relevancia`.
+        Sin `q` lee de MongoDB, y sigue funcionando aunque el motor esté caído.
       responses:
         "200":
           description: Página con `items` (`ProductoTienda`), `pagina`, `tamano`, `total` y `paginas`.
         "400": { $ref: "#/components/responses/PedidoInvalido" }
+        "503":
+          description: "`BUSQUEDA_NO_DISPONIBLE`: se pidió `q` y el motor no responde. Se puede navegar sin `q`."
+  /v1/admin/busqueda/reconstruir:
+    post:
+      tags: [Productos]
+      summary: Reconstruir el índice de búsqueda
+      description: |
+        Crea un índice nuevo desde MongoDB y cambia el alias al terminar, sin cortar la búsqueda (ADR-006). Corre en
+        segundo plano: `estado` es `INICIADA`, o `EN_CURSO` si esta réplica ya estaba reconstruyendo.
+      responses:
+        "202":
+          description: Reconstrucción iniciada.
+        "503":
+          description: "`BUSQUEDA_NO_DISPONIBLE`: el servicio corre sin `ELASTICSEARCH_URL`."
   /v1/tienda/productos/{id}:
     get:
       tags: [Productos]

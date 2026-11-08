@@ -69,6 +69,7 @@ const validadorProductos = {
       creadoEn: { bsonType: "date" },
       actualizadoEn: { bsonType: "date" },
       version: { bsonType: ["int", "long"], minimum: 1 },
+      publicadoVersion: { bsonType: ["int", "long"], minimum: 0 }, // última versión avisada por evento (ADR-006)
     },
   },
 };

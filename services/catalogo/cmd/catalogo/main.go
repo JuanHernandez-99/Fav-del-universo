@@ -11,9 +11,12 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/busqueda"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/eventos"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/handler"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/repository"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/service"
@@ -54,7 +57,18 @@ func correr() error {
 	}
 	slog.Info("conectado a mongo")
 
-	s := service.Nuevo(repo)
+	var opcionesServicio []service.Opcion
+	urlBusqueda := os.Getenv("ELASTICSEARCH_URL")
+	if urlBusqueda != "" {
+		opcionesServicio = append(opcionesServicio, service.ConIndice(busqueda.Nuevo(urlBusqueda)))
+	} else {
+		slog.Warn("ELASTICSEARCH_URL sin definir: la búsqueda usa el texto de MongoDB")
+	}
+	s := service.Nuevo(repo, opcionesServicio...)
+	if urlBusqueda != "" {
+		cerrarEventos := iniciarIndexacion(ctx, s)
+		defer cerrarEventos()
+	}
 
 	var opcionesRouter []handler.Opcion
 	if os.Getenv("CAPACIDAD_PUBLICA_ACTIVA") == "false" {
@@ -85,6 +99,63 @@ func correr() error {
 	ctxCierre, cancelar := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelar()
 	return servidor.Shutdown(ctxCierre)
+}
+
+// iniciarIndexacion arranca en segundo plano lo que mantiene el índice (ADR-006). Corre en todas las réplicas: si
+// dos avisan o indexan lo mismo no hay daño, porque Elasticsearch no aplica una versión igual o menor. Catálogo
+// atiende aunque Elasticsearch o RabbitMQ estén caídos.
+func iniciarIndexacion(ctx context.Context, s *service.Servicio) func() {
+	go func() {
+		for ctx.Err() == nil {
+			err := s.PrepararIndice(ctx)
+			if err == nil {
+				return
+			}
+			slog.Warn("no se pudo preparar el índice de búsqueda; se reintenta", "error", err)
+			select {
+			case <-time.After(5 * time.Second):
+			case <-ctx.Done():
+			}
+		}
+	}()
+
+	urlBroker := os.Getenv("RABBITMQ_URL")
+	if urlBroker == "" {
+		slog.Warn("RABBITMQ_URL sin definir: los cambios no llegan al índice hasta reconstruirlo")
+		return func() {}
+	}
+	esperaReintento := duracion("REINTENTO_INDEXADOR_MS", 5_000)
+	publicador := eventos.NuevoPublicador(urlBroker, esperaReintento)
+	go func() {
+		reloj := time.NewTicker(duracion("PUBLICADOR_CADA_MS", 1_000))
+		defer reloj.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-reloj.C:
+				if _, err := s.PublicarCambios(ctx, 100, publicador.Publicar); err != nil && ctx.Err() == nil {
+					slog.Warn("no se pudieron avisar los cambios; quedan pendientes", "error", err)
+				}
+			}
+		}
+	}()
+	consumidor := eventos.NuevoConsumidor(urlBroker, func(ctx context.Context, productoID string) error {
+		err := s.IndexarProducto(ctx, productoID)
+		if errors.Is(err, busqueda.ErrNoDisponible) {
+			return fmt.Errorf("%w: %v", eventos.ErrTransitorio, err)
+		}
+		return err
+	}, esperaReintento)
+	go consumidor.Correr(ctx)
+	return publicador.Cerrar
+}
+
+func duracion(nombre string, porDefectoMS int) time.Duration {
+	if v, err := strconv.Atoi(os.Getenv(nombre)); err == nil && v > 0 {
+		return time.Duration(v) * time.Millisecond
+	}
+	return time.Duration(porDefectoMS) * time.Millisecond
 }
 
 // uriMongo arma la URI con las variables del .env. authSource=admin es obligatorio: el usuario root

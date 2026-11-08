@@ -3,6 +3,8 @@ module github.com/JuanHernandez-99/Fav-del-universo/services/catalogo
 go 1.26.0
 
 require (
+	github.com/google/uuid v1.6.0
+	github.com/rabbitmq/amqp091-go v1.16.0
 	go.mongodb.org/mongo-driver/v2 v2.9.2
 	golang.org/x/text v0.39.0
 )

@@ -26,6 +26,15 @@ type Producto struct {
 	CreadoEn      time.Time      `bson:"creadoEn"`
 	ActualizadoEn time.Time      `bson:"actualizadoEn"`
 	Version       int            `bson:"version"`
+	// PublicadoVersion es la última versión avisada por evento (ADR-006). Va en el mismo documento: escribir un
+	// documento es atómico, así que un cambio queda pendiente de avisar sin necesitar una transacción.
+	PublicadoVersion int `bson:"publicadoVersion,omitempty"`
+}
+
+// CambioProducto es una versión de un producto que falta avisar.
+type CambioProducto struct {
+	ID      string `bson:"_id"`
+	Version int    `bson:"version"`
 }
 
 // DatosProducto son los campos que el administrador carga al crear y puede cambiar con PUT.

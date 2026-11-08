@@ -18,7 +18,18 @@ type ProductoTienda struct {
 // recibido. Si fallan las promociones no se responde con el precio base: mostraría un precio que no se cobra.
 func (s *Servicio) ListarTienda(ctx context.Context, f modelo.FiltroProductos) ([]ProductoTienda, int64, error) {
 	f.Publicado = new(true)
-	productos, total, err := s.ListarProductos(ctx, f)
+	if err := validarFiltro(f); err != nil {
+		return nil, 0, err
+	}
+	// Con texto va al motor de búsqueda. Sin texto es navegar: sale de MongoDB y funciona aunque el motor caiga (ADR-006).
+	var productos []modelo.Producto
+	var total int64
+	var err error
+	if f.Texto != "" && s.indice != nil {
+		productos, total, err = s.buscarEnTienda(ctx, f)
+	} else {
+		productos, total, err = s.repo.ListarProductos(ctx, f)
+	}
 	if err != nil {
 		return nil, 0, err
 	}

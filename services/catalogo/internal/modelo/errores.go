@@ -12,6 +12,7 @@ var (
 	ErrVarianteDuplicada     = errors.New("ya existe una variante con ese id")
 	ErrConflictoDeVersion    = errors.New("el producto cambió desde que se leyó")
 	ErrPromocionNoEncontrada = errors.New("promoción no encontrada")
+	ErrBusquedaNoDisponible  = errors.New("la búsqueda no está disponible")
 	// ErrIDProductoEnUso lo devuelve el repositorio cuando el _id ya existe; el servicio reintenta
 	// con un sufijo numérico. No llega al cliente.
 	ErrIDProductoEnUso = errors.New("el id de producto ya está en uso")

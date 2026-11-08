@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
@@ -44,14 +45,25 @@ type Repositorio interface {
 	// ReemplazarPromocion devuelve modelo.ErrPromocionNoEncontrada si no existe.
 	ReemplazarPromocion(ctx context.Context, p modelo.Promocion) error
 	ListarPromociones(ctx context.Context) ([]modelo.Promocion, error)
+	// Para la búsqueda (ADR-006).
+	ProductosSinPublicar(ctx context.Context, limite int) ([]modelo.CambioProducto, error)
+	MarcarPublicado(ctx context.Context, id string, version int) error
+	ProductosPorIDs(ctx context.Context, ids []string) ([]modelo.Producto, error)
+	ProductosModificadosDesde(ctx context.Context, desde time.Time) ([]modelo.Producto, error)
 }
 
 type Servicio struct {
-	repo Repositorio
+	repo           Repositorio
+	indice         Indice
+	reconstruyendo atomic.Bool
 }
 
-func Nuevo(repo Repositorio) *Servicio {
-	return &Servicio{repo: repo}
+func Nuevo(repo Repositorio, opciones ...Opcion) *Servicio {
+	s := &Servicio{repo: repo}
+	for _, opcion := range opciones {
+		opcion(s)
+	}
+	return s
 }
 
 // ahora en UTC y en milisegundos, que es la precisión con que Mongo guarda las fechas.
@@ -69,6 +81,13 @@ func (s *Servicio) ObtenerProducto(ctx context.Context, id string) (modelo.Produ
 // ListarProductos valida el rango de la paginación, el orden y el rango de precios. El formato
 // de cada parámetro ya lo revisó el handler.
 func (s *Servicio) ListarProductos(ctx context.Context, f modelo.FiltroProductos) ([]modelo.Producto, int64, error) {
+	if err := validarFiltro(f); err != nil {
+		return nil, 0, err
+	}
+	return s.repo.ListarProductos(ctx, f)
+}
+
+func validarFiltro(f modelo.FiltroProductos) error {
 	v := &modelo.ErrorValidacion{}
 	if f.Pagina < 1 || f.Pagina > modelo.PaginaMaxima {
 		v.Agregar("pagina", "tiene que estar entre 1 y %d", modelo.PaginaMaxima)
@@ -82,10 +101,7 @@ func (s *Servicio) ListarProductos(ctx context.Context, f modelo.FiltroProductos
 	if f.PrecioMin != nil && f.PrecioMax != nil && *f.PrecioMin > *f.PrecioMax {
 		v.Agregar("precioMin", "no puede ser mayor que precioMax")
 	}
-	if err := v.ComoError(); err != nil {
-		return nil, 0, err
-	}
-	return s.repo.ListarProductos(ctx, f)
+	return v.ComoError()
 }
 
 // ---------- Crear ----------

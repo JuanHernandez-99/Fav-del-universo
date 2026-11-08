@@ -56,6 +56,8 @@ services:
     deploy: { replicas: 2 } # ADR-012
     environment:
       MONGO_HOST: mongo-catalogo:27017
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL-http://elasticsearch:9200} # vacía: busca en MongoDB (ADR-006)
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:-cambiar}@rabbitmq:5672/
       CAPACIDAD_PUBLICA_ACTIVA: ${CAPACIDAD_PUBLICA_ACTIVA:-true}
       MONGO_DB: ${MONGO_DB:-catalogo}
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}

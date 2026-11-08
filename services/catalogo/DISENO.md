@@ -17,7 +17,7 @@ Decisiones, modelo de datos, API y supuestos del servicio. Viene del diseño hec
 | D4 | **El precio público asume transferencia** | Si no se indica `medioPago`, vale `TRANSFERENCIA`. No se implementa ninguna pasarela de pagos |
 | D5 | **Redondeo hacia abajo a 2 decimales** | Se calcula en **centavos enteros** y se trunca, para evitar errores de coma flotante (`0.29 * 100 = 28.999…`) |
 | D6 | **Un producto puede venderse en el local sin estar publicado** | Publicado solo habilita la web. La consulta por lote no filtra por `publicado` |
-| D8 | **Sin autenticación, caché, búsqueda externa ni eventos, por ahora** | La autenticación la hace el gateway. El resto está en la sección 15 |
+| D8 | **Sin autenticación ni caché, por ahora** | La autenticación la hace el gateway. La caché está en la sección 15. La búsqueda y sus eventos están en ADR-006 |
 | D12 | **El servidor genera el id de variante** | El administrador no lo escribe. Regla en 5.5. El generador de datos (`db/datos/generar.py`) aplica la misma regla. Los 3 ids del contrato ya existen y se cargan tal cual (sección 3, punto 11) |
 | D13 | **Montos en centavos enteros (`int64`)** | `precioBase.monto` se guarda en centavos, nunca como double. La API convierte a pesos con 2 decimales hacia afuera, porque el contrato define `precio` como `number` (double) en pesos |
 | D14 | **El CRUD completo va bajo `/v1/admin/productos`** | Un solo recurso para crear, obtener, actualizar, eliminar y listar. `GET /v1/productos` queda libre para la ruta pública del contrato, en la etapa FAV |
@@ -124,6 +124,7 @@ Son tres: `productos` (entidad principal), `categorias` y `promociones`.
 | `variantes` | arreglo | Sí (1+) | `id`, `talle`, `color` obligatorios. **Sin stock** |
 | `creadoEn`, `actualizadoEn` | fecha | Sí | "Novedad" se ordena por `creadoEn` |
 | `version` | entero | Sí | Empieza en 1. **Sube con todo cambio**: editar, publicar, despublicar, agregar variante |
+| `publicadoVersion` | entero | No | Última versión avisada por evento. Sin el campo cuenta como 0, así que un producto cargado por script también se avisa (ADR-006) |
 
 #### `categorias`
 
@@ -362,7 +363,6 @@ Los puntos 1, 5, 6 y 8 dependen de lo que defina el equipo de FAV. Se resolviero
 Sin cambiar lo anterior:
 
 - **Evento `VarianteCreada`** con outbox (ni se publica ni se consume hoy). Si se guarda junto con el producto en una transacción, requiere replica set.
-- **Eventos de cambio de producto** para el indexador, con la `version` ya presente, y el **motor de búsqueda** (ADR-006) en lugar del índice de texto de Mongo.
 - **Caché** con Redis (ADR-007), como capa delante del repositorio.
 - **Observabilidad**: correlation id, trazas y métricas (ADR-011).
 - **Identidad** con los encabezados `X-User-*`.

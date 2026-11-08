@@ -8,9 +8,11 @@ const (
 	OrdenPrecioAsc  Orden = "precio_asc"
 	OrdenPrecioDesc Orden = "precio_desc"
 	OrdenNombre     Orden = "nombre"
+	// OrdenRelevancia: qué tan bien coincide con el texto buscado. Por defecto al buscar por texto (ADR-006).
+	OrdenRelevancia Orden = "relevancia"
 )
 
-var Ordenes = []Orden{OrdenNuevos, OrdenPrecioAsc, OrdenPrecioDesc, OrdenNombre}
+var Ordenes = []Orden{OrdenNuevos, OrdenPrecioAsc, OrdenPrecioDesc, OrdenNombre, OrdenRelevancia}
 
 const (
 	TamanoPorDefecto = 20
