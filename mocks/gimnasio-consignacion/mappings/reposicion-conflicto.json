@@ -1,0 +1,13 @@
+{
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/api/v1/consignaciones/reposiciones",
+    "headers": { "Idempotency-Key": { "matches": "probar-conflicto-.*" } }
+  },
+  "response": {
+    "status": 409,
+    "headers": { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    "jsonBody": { "codigo": "REFERENCIA_REUTILIZADA", "mensaje": "La entrega ya fue registrada con otros datos." }
+  }
+}
