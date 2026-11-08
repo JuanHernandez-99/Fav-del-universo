@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ORDENES, TALLES } from '../dominio.js';
+import { ordenesPara, TALLES } from '../dominio.js';
 
 // Los montos se aplican al salir del campo o con Enter, para no pedir el catálogo en cada tecla.
 function CampoPrecio({ etiqueta, valor, alCambiar }) {
@@ -51,12 +51,12 @@ export default function Filtros({ filtros, colores, alCambiar, alLimpiar, hayFil
   );
 }
 
-export function Orden({ valor, alCambiar }) {
+export function Orden({ valor, hayTexto, alCambiar }) {
   return (
     <label className="orden">
       <span>Ordenar por</span>
-      <select value={valor || 'nuevos'} onChange={(e) => alCambiar(e.target.value)}>
-        {ORDENES.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
+      <select value={valor || (hayTexto ? 'relevancia' : 'nuevos')} onChange={(e) => alCambiar(e.target.value)}>
+        {ordenesPara(hayTexto).map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
       </select>
     </label>
   );

@@ -205,6 +205,57 @@ func (r *Repositorio) ProductosPublicados(ctx context.Context) ([]modelo.Product
 	return productos, nil
 }
 
+// ProductosSinPublicar es la lectura del outbox de Catálogo (ADR-006): los productos cuya versión todavía no se
+// avisó. Un producto sin publicadoVersion cuenta como 0. Compara dos campos del mismo documento, así que recorre
+// la colección; son del orden de cientos o pocos miles, y para esto no hace falta un índice.
+func (r *Repositorio) ProductosSinPublicar(ctx context.Context, limite int) ([]modelo.CambioProducto, error) {
+	cursor, err := r.productos.Find(ctx,
+		bson.D{{Key: "$expr", Value: bson.D{{Key: "$gt", Value: bson.A{"$version", bson.D{{Key: "$ifNull", Value: bson.A{"$publicadoVersion", 0}}}}}}}},
+		options.Find().SetProjection(bson.D{{Key: "version", Value: 1}}).SetLimit(int64(limite)))
+	if err != nil {
+		return nil, err
+	}
+	var cambios []modelo.CambioProducto
+	if err := cursor.All(ctx, &cambios); err != nil {
+		return nil, err
+	}
+	return cambios, nil
+}
+
+// MarcarPublicado registra la versión avisada, sin tocar version ni actualizadoEn. $max es atómico y solo sube:
+// si otra réplica ya marcó una versión mayor, no la pisa. Un cambio posterior deja el producto otra vez pendiente.
+func (r *Repositorio) MarcarPublicado(ctx context.Context, id string, version int) error {
+	_, err := r.productos.UpdateOne(ctx, bson.D{{Key: "_id", Value: id}},
+		bson.D{{Key: "$max", Value: bson.D{{Key: "publicadoVersion", Value: version}}}})
+	return err
+}
+
+// ProductosPorIDs lee los productos que encontró la búsqueda. Sin orden garantizado: lo define quien llama.
+func (r *Repositorio) ProductosPorIDs(ctx context.Context, ids []string) ([]modelo.Producto, error) {
+	cursor, err := r.productos.Find(ctx, bson.D{{Key: "_id", Value: bson.D{{Key: "$in", Value: ids}}}})
+	if err != nil {
+		return nil, err
+	}
+	var productos []modelo.Producto
+	if err := cursor.All(ctx, &productos); err != nil {
+		return nil, err
+	}
+	return productos, nil
+}
+
+// ProductosModificadosDesde incluye los despublicados: el índice también tiene que quitarlos.
+func (r *Repositorio) ProductosModificadosDesde(ctx context.Context, desde time.Time) ([]modelo.Producto, error) {
+	cursor, err := r.productos.Find(ctx, bson.D{{Key: "actualizadoEn", Value: bson.D{{Key: "$gte", Value: desde}}}})
+	if err != nil {
+		return nil, err
+	}
+	var productos []modelo.Producto
+	if err := cursor.All(ctx, &productos); err != nil {
+		return nil, err
+	}
+	return productos, nil
+}
+
 // ActualizarProducto es un PUT con control optimista de concurrencia (DISENO.md 5.9, caso
 // secundario): el filtro incluye la versión que leyó el administrador. Si otro cambio se coló, la
 // versión guardada ya es otra, el filtro no coincide y no se pisa nada. findOneAndUpdate devuelve el

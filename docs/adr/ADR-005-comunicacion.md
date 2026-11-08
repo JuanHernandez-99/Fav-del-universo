@@ -43,7 +43,7 @@ ADR-001 fija qué servicios se hablan y dejó abierto si la confirmación de la 
 | Ventas → proveedor de mail | Asíncrona dentro de Ventas | No debe bloquear la venta (punto 6). |
 | Inventario → Ventas: `ReservaVencida` | **Evento** (RabbitMQ) | El vencimiento ocurre sin que nadie lo pida; Ventas reacciona cuando puede. |
 | Catálogo → Inventario: `VarianteCreada` **[propuesta]**, sin implementar | **Evento** | Crear un producto no debe depender de que Inventario esté disponible. Hoy la variante aparece en Inventario con su primer ingreso. |
-| Catálogo e Inventario → índice de búsqueda | **Evento** **[propuesta]** | Se tolera un retraso acotado (ADR-006). |
+| Catálogo → índice de búsqueda | **Evento** | Se tolera un retraso acotado (ADR-006). |
 | Grupo de proveedores → Gateway → Catálogo y Ventas | Síncrona | Según el contrato publicado (ADR-008). |
 
 El evento de dominio que pide la consigna es **`ReservaVencida`**: lo publica Inventario y lo consume Ventas.
@@ -97,7 +97,7 @@ Al aprobarse el pago (aviso de Mercado Pago o confirmación de la transferencia 
 |---|---|---|---|---|
 | `ReservaVencida` | Inventario | Ventas | `reservaId` y la referencia que Ventas envió al reservar (Inventario no conoce las ventas) | La venta pasa a *Vencida*. Si ya no está *Pendiente de pago*, no hace nada. |
 | `VarianteCreada` **[propuesta]** | Catálogo | Inventario | `varianteId` | Crea el stock en 0 en ambos canales. Si ya existe, no hace nada. |
-| Cambios de producto y de stock **[propuesta]** | Catálogo, Inventario | Actualizador del índice | Se definen en ADR-006 | Mantienen la búsqueda sincronizada. |
+| `ProductoCambiado` | Catálogo | Catálogo (indexador) | `productoId` y `version` | Aplica al índice el estado actual del producto, si la versión es mayor (ADR-006). |
 
 ### 6. Mails sin bloquear la venta
 
@@ -144,7 +144,6 @@ Cada pedido lleva un identificador de correlación (`X-Correlation-Id`). Si no v
 ## Pendientes
 
 - **Resueltos en ADR-014:** el entorno local usa un simulador de Mercado Pago que envía el aviso firmado, y los mails van a Mailpit.
-- **Eventos del índice de búsqueda y retraso máximo:** ADR-006.
 - **`VarianteCreada`:** sin implementar. No hace falta para la consigna, que pide un evento de dominio (`ReservaVencida`), pero sí para HU-03.6.
 - **Valores de timeouts y reintentos:** se revisan con las pruebas de carga (ADR-013).
 

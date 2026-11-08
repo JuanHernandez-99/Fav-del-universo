@@ -72,6 +72,20 @@ func (h *Handler) listarTienda(w http.ResponseWriter, r *http.Request) {
 	}{items, f.Pagina, f.Tamano, total, (total + int64(f.Tamano) - 1) / int64(f.Tamano)})
 }
 
+// reconstruirBusqueda arma de cero el índice desde MongoDB, sin cortar la búsqueda (ADR-006).
+func (h *Handler) reconstruirBusqueda(w http.ResponseWriter, r *http.Request) {
+	iniciada, err := h.s.IniciarReconstruccion()
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	estado := "INICIADA"
+	if !iniciada {
+		estado = "EN_CURSO"
+	}
+	escribirJSON(w, http.StatusAccepted, map[string]string{"estado": estado})
+}
+
 func (h *Handler) obtenerDeTienda(w http.ResponseWriter, r *http.Request) {
 	p, err := h.s.ObtenerDeTienda(r.Context(), r.PathValue("id"))
 	if err != nil {

@@ -168,7 +168,7 @@ Inventario lo hace con un adaptador de salida que traduce el modelo del gimnasio
 | ---------------------------------------------- | --------------------- | ------------------------------------ | -------------------------------------------------- |
 | `ReservaVencida`                               | Inventario            | Ventas                               | Pasa la venta a _Vencida_.                         |
 | `VarianteCreada` **[propuesta]**               | Catálogo              | Inventario                           | Registra la variante con stock 0 en ambos canales. |
-| Cambios de producto y de stock **[propuesta]** | Catálogo e Inventario | Actualización del índice de búsqueda | Mantiene la búsqueda sincronizada (D6).            |
+| `ProductoCambiado` | Catálogo | Catálogo (indexador) | Actualiza el índice de búsqueda (ADR-006). |
 
 - **Consumidores idempotentes:** procesar dos veces el mismo mensaje tiene el mismo efecto que procesarlo una vez.
 - **Mensajes que no se pueden procesar:** después de agotar los reintentos van a una cola de mensajes fallidos (DLQ), donde quedan para revisarlos.
@@ -205,12 +205,12 @@ Si algo se cae, lo demás tiene que seguir funcionando y tiene que poder saberse
 | Motor de búsqueda                       | Navegar por categoría desde la base de Catálogo                                                                                          | Búsqueda por texto y filtros                                                                            | Error claro; el índice se reconstruye al volver                     |
 | La base de un servicio                  | Los demás servicios                                                                                                                      | Ese servicio                                                                                            | Una base por servicio: la falla no se propaga                       |
 
-## 9. Caché y búsqueda (propuestas, sin implementar)
+## 9. Caché y búsqueda
 
 - **Herramientas existentes, no implementaciones propias:** la caché usa Redis y la búsqueda un motor de búsqueda, ambos a través de sus bibliotecas cliente para Go. No se programa una caché ni un índice desde cero.
 - **Qué se cachea [propuesta]:** las lecturas del catálogo, como la ficha de producto y los listados por categoría. El stock para reservar y el precio para cobrar **no** se leen de la caché, sino de la fuente.
 - **Que la caché no quede mal cargada:** al cambiar un producto, un precio o una promoción, se invalida su entrada. Además, cada entrada vence por tiempo. Se mide la tasa de aciertos para comprobar que se aprovecha, comparando antes y después (**[ADR-007](adr/ADR-007-cache.md), D7**). El ADR condiciona la caché a una medición previa sin ella.
-- **Búsqueda:** índice de productos publicados actualizado por eventos, con un retraso máximo definido y la posibilidad de reconstruirlo desde cero (**[ADR-006](adr/ADR-006-busqueda.md), D6**). **[propuesta]** Elasticsearch u OpenSearch; la disponibilidad no se indexa.
+- **Búsqueda (implementada):** Elasticsearch con un índice de productos publicados, actualizado por eventos con un outbox dentro de cada producto. Retraso máximo de 10 s **[propuesta]**, medido hasta 1,9 s, y reconstrucción desde cero sin corte (**[ADR-006](adr/ADR-006-busqueda.md), D6**). La disponibilidad no se indexa: la tienda la consulta a Inventario.
 
 ## 10. Observabilidad
 
@@ -332,7 +332,7 @@ services/inventario/            # hexagonal
 | [ADR-008](adr/ADR-008-contrato-propio.md) | D8 · Contrato propio | Aceptada · Entrega 2 |
 | [ADR-002](adr/ADR-002-arquitectura-interna.md)     | D2 · Arquitectura interna         | Aceptada · Entrega 2 (implementada en Inventario)    |
 | [ADR-004](adr/ADR-004-consistencia-y-concurrencia.md) | D4 · Consistencia y concurrencia | Aceptada · Entrega 2 (7 pruebas de integración)      |
-| [ADR-006](adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | **Propuesta** · Entrega 2 (sin implementar)          |
+| [ADR-006](adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | Aceptada e implementada                              |
 | [ADR-007](adr/ADR-007-cache.md)                    | D7 · Caché                        | **Propuesta** · Entrega 2 (sin implementar)          |
 | [ADR-009](adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018                              |
 | [ADR-018](adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada · Presentación grupal |
@@ -346,7 +346,6 @@ services/inventario/            # hexagonal
 | Tema                                                                                          | Dónde se resuelve                         |
 | --------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | Justificación de los estilos internos de cada servicio                                        | D2 (ADR-002)                              |
-| Motor de búsqueda y retraso máximo del índice                                                 | D6                                        |
 | Qué se cachea exactamente y tiempo de vencimiento                                             | D7                                        |
 | Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: **resuelto, React con Vite** (ADR-017)                | D2 / D12                                  |
 | Herramientas de observabilidad y retención de métricas                                        | D11                                       |
@@ -361,13 +360,14 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote y catálogo público, sin eventos ni trazas ni métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend tiene la tienda, la compra, "Mis compras" y el panel; falta la política de cambios (ADR-017) | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote, catálogo público y búsqueda con Elasticsearch, sin trazas ni métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend tiene la tienda, la compra, "Mis compras" y el panel; falta la política de cambios (ADR-017) | — |
 | Gateway único | Punto único de falla | ADR-012 |
 | Encabezados de identidad | Los servicios confían en `X-User-*`: en la nube sus puertos no pueden quedar abiertos | ADR-016 |
 | Integración con el gimnasio | Contrato real aplicado, pero probada solo contra el mock local: falta su URL pública, su clave y la prueba conjunta. Una reposición `REQUIERE_REVISION` no se puede resolver desde el sistema | ADR-018 |
 | Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |
 | Observabilidad | Sin tablero ni alertas; Jaeger y Prometheus pierden datos al reiniciar; el gateway no crea spans | ADR-011 |
-| Búsqueda y caché | Solo diseño | ADR-006, ADR-007 |
+| Búsqueda | Sin carga real: el retraso se midió con un administrador. Sin métricas ni alerta de la cola de fallidos. Buscar pendientes recorre la colección | ADR-006 |
+| Caché | Solo diseño | ADR-007 |
 | Capacidad y costos | Guion de carga corrido una vez para validarlo, sin análisis; costos sin completar | ADR-013 |
 | Núcleo de Inventario | Sin tests unitarios de `aplicacion`; etiquetas `json` en `dominio` | ADR-002 |
 | Resiliencia comprobada | Falta `docs/POSTMORTEM.md` con una falla controlada ensayada | ADR-010 |
