@@ -75,10 +75,10 @@ func correr() error {
 	}
 
 	gim := gimnasio.NuevoCliente(gimnasio.Config{
-		URLBase:     variable("GIMNASIO_URL", "http://gimnasio-mock:8080"),
+		URLBase:     variable("GIMNASIO_BASE_URL", "http://gimnasio-mock:8080"),
 		APIKey:      os.Getenv("GIMNASIO_API_KEY"),
 		ProveedorID: variable("GIMNASIO_PROVEEDOR_ID", "fav"),
-		Timeout:     duracion("GIMNASIO_TIMEOUT_MS", 2000),
+		Timeout:     duracion("GIMNASIO_TIMEOUT_MS", 3000),
 	})
 	s := aplicacion.NuevoServicio(repo, gim)
 

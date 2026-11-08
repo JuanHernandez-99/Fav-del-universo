@@ -517,7 +517,7 @@ func (r *Repositorio) TomarReposiciones(ctx context.Context, ahora time.Time, pl
 		// SKIP LOCKED: si otra réplica está tomando las mismas filas, las saltea en lugar de esperar.
 		filas, err := tx.QueryContext(ctx,
 			`SELECT `+columnasReposicion+` FROM reposiciones
-			 WHERE estado = 'PENDIENTE' AND proximo_intento <= ?
+			 WHERE estado IN (`+estadosEnEnvio+`) AND proximo_intento <= ?
 			 ORDER BY proximo_intento LIMIT ? FOR UPDATE SKIP LOCKED`, ahora.UTC(), limite)
 		if err != nil {
 			return err
@@ -542,17 +542,18 @@ func (r *Repositorio) TomarReposiciones(ctx context.Context, ahora time.Time, pl
 	return tomadas, err
 }
 
-func (r *Repositorio) MarcarReposicionEnviada(ctx context.Context, id string, ahora time.Time) error {
+func (r *Repositorio) ConfirmarReposicion(ctx context.Context, id, idGimnasio string, ahora time.Time) error {
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE reposiciones SET estado = 'ENVIADA', intentos = intentos + 1, ultimo_error = '', actualizada_en = ?
-		 WHERE id = ? AND estado = 'PENDIENTE'`, ahora.UTC(), id)
+		`UPDATE reposiciones SET estado = 'CONFIRMADA', id_gimnasio = ?, intentos = intentos + 1, ultimo_error = '', actualizada_en = ?
+		 WHERE id = ? AND estado IN (`+estadosEnEnvio+`)`, idGimnasio, ahora.UTC(), id)
 	return err
 }
 
 func (r *Repositorio) RechazarReposicion(ctx context.Context, id, motivo string, ahora time.Time) error {
 	return r.enTransaccion(ctx, func(tx *sql.Tx) error {
 		rep, err := r.reposicion(ctx, tx, `WHERE id = ? FOR UPDATE`, id)
-		if err != nil || rep.Estado != dominio.ReposicionPendiente {
+		// Bloqueada también: si la credencial se corrigió y el gimnasio la rechaza, nunca se registró.
+		if err != nil || (rep.Estado != dominio.ReposicionPendiente && rep.Estado != dominio.ReposicionBloqueada) {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx,
@@ -569,19 +570,54 @@ func (r *Repositorio) RechazarReposicion(ctx context.Context, id, motivo string,
 }
 
 func (r *Repositorio) ReprogramarReposicion(ctx context.Context, id, motivo string, proximo time.Time) error {
+	return r.cambiarEnvio(ctx, id, dominio.ReposicionPendiente, motivo, proximo)
+}
+
+func (r *Repositorio) BloquearReposicion(ctx context.Context, id, motivo string, proximo time.Time) error {
+	return r.cambiarEnvio(ctx, id, dominio.ReposicionBloqueada, motivo, proximo)
+}
+
+func (r *Repositorio) cambiarEnvio(ctx context.Context, id string, estado dominio.EstadoReposicion, motivo string, proximo time.Time) error {
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE reposiciones SET intentos = intentos + 1, ultimo_error = ?, proximo_intento = ?, actualizada_en = NOW()
-		 WHERE id = ? AND estado = 'PENDIENTE'`, truncar(motivo, 500), proximo.UTC(), id)
+		`UPDATE reposiciones SET estado = ?, intentos = intentos + 1, ultimo_error = ?, proximo_intento = ?, actualizada_en = NOW()
+		 WHERE id = ? AND estado IN (`+estadosEnEnvio+`)`, estado, truncar(motivo, 500), proximo.UTC(), id)
 	return err
 }
 
-const columnasReposicion = `id, clave_idempotencia, variante_id, cantidad, estado, intentos, ultimo_error, proximo_intento, usuario, creada_en`
+func (r *Repositorio) MarcarReposicionARevisar(ctx context.Context, id, motivo string, ahora time.Time) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE reposiciones SET estado = 'REQUIERE_REVISION', intentos = intentos + 1, ultimo_error = ?, actualizada_en = ?
+		 WHERE id = ? AND estado IN (`+estadosEnEnvio+`)`, truncar(motivo, 500), ahora.UTC(), id)
+	return err
+}
+
+func (r *Repositorio) ListarReposiciones(ctx context.Context, limite int) ([]dominio.Reposicion, error) {
+	filas, err := r.db.QueryContext(ctx, `SELECT `+columnasReposicion+` FROM reposiciones ORDER BY creada_en DESC, id LIMIT ?`, limite)
+	if err != nil {
+		return nil, err
+	}
+	defer filas.Close()
+	reposiciones := []dominio.Reposicion{}
+	for filas.Next() {
+		rep, err := escanearReposicion(filas)
+		if err != nil {
+			return nil, err
+		}
+		reposiciones = append(reposiciones, rep)
+	}
+	return reposiciones, filas.Err()
+}
+
+// estadosEnEnvio: las reposiciones que el proceso sigue intentando enviar.
+const estadosEnEnvio = `'PENDIENTE_CONFIRMACION','BLOQUEADA_CONFIGURACION'`
+
+const columnasReposicion = `id, id_gimnasio, clave_idempotencia, variante_id, cantidad, estado, intentos, ultimo_error, proximo_intento, usuario, creada_en`
 
 type escaneable interface{ Scan(dest ...any) error }
 
 func escanearReposicion(f escaneable) (dominio.Reposicion, error) {
 	var rep dominio.Reposicion
-	err := f.Scan(&rep.ID, &rep.ClaveIdempotencia, &rep.VarianteID, &rep.Cantidad, &rep.Estado,
+	err := f.Scan(&rep.ID, &rep.IDGimnasio, &rep.ClaveIdempotencia, &rep.VarianteID, &rep.Cantidad, &rep.Estado,
 		&rep.Intentos, &rep.UltimoError, &rep.ProximoIntento, &rep.Usuario, &rep.CreadaEn)
 	return rep, err
 }

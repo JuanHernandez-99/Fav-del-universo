@@ -106,7 +106,7 @@ var (
 
 	LlamadasDependencia = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dependencia_llamadas_total",
-		Help: "Llamadas a dependencias externas, por dependencia y resultado (ok, error, rechazada, circuito_abierto).",
+		Help: "Llamadas a dependencias externas, por dependencia y resultado (ok, error, rechazada, conflicto, configuracion, contrato_incompatible, circuito_abierto).",
 	}, []string{"dependencia", "resultado"})
 
 	EstadoCircuito = promauto.NewGaugeVec(prometheus.GaugeOpts{
