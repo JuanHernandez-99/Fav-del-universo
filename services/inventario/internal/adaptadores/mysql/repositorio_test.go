@@ -357,8 +357,11 @@ func TestStockACorregir(t *testing.T) {
 	if _, ok := posicion[positiva]; ok {
 		t.Error("incluye una variante positiva")
 	}
-	if posicion[muyNegativa] != 0 || posicion[negativa] != 1 {
-		t.Errorf("orden: %v", posicion)
+	// Orden relativo: la base de los tests conserva las filas de corridas anteriores.
+	primera, hayPrimera := posicion[muyNegativa]
+	segunda, haySegunda := posicion[negativa]
+	if !hayPrimera || !haySegunda || primera >= segunda {
+		t.Errorf("orden: %d y %d", primera, segunda)
 	}
 	if s, _ := repo.StockACorregir(ctx, 1); len(s) != 1 {
 		t.Errorf("límite: %d", len(s))

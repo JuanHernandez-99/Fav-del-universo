@@ -1,5 +1,5 @@
 # API Gateway (nginx). La imagen oficial reemplaza las ${VARIABLES} al arrancar.
-# Rutea la capacidad publicada (productos a Catálogo, pedidos a Ventas), la tienda a Ventas y las rutas de
+# Rutea la capacidad publicada (productos a Catálogo, disponibilidad a Inventario, pedidos a Ventas), la tienda a Ventas y las rutas de
 # administración a Inventario, Catálogo y Ventas, con balanceo y verificación de disponibilidad (ADR-012).
 
 # Valida el token con njs (ADR-016).
@@ -49,10 +49,22 @@ map $http_x_correlation_id $correlacion {
     default $http_x_correlation_id;
 }
 
-# Clave del grupo consumidor (ADR-008). Una sola clave en la Entrega 2.
+# Una clave por grupo consumidor (ADR-008). El gimnasio ve el catálogo y la disponibilidad, pero no hace pedidos.
 map $http_x_api_key $grupo_valido {
+    default                         0;
+    "${CAPACIDAD_API_KEY}"          1;
+    "${CAPACIDAD_API_KEY_GIMNASIO}" 1;
+}
+
+map $http_x_api_key $grupo_puede_pedir {
     default                0;
     "${CAPACIDAD_API_KEY}" 1;
+}
+
+# Apaga en el gateway lo que Inventario no puede apagar: su disponibilidad también la usa la tienda (ADR-008).
+map "${CAPACIDAD_PUBLICA_ACTIVA}" $capacidad_activa {
+    default 1;
+    "false" 0;
 }
 
 # Límite por grupo: 60 pedidos por minuto, con ráfagas de hasta 20 (contrato, respuesta 429).
@@ -117,8 +129,25 @@ server {
         proxy_pass http://catalogo;
     }
 
-    location = /v1/pedidos {
+    location = /v1/disponibilidad {
         if ($grupo_valido = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        if ($capacidad_activa = 0) {
+            return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}';
+        }
+        limit_req zone=por_grupo burst=20 nodelay;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://inventario;
+    }
+
+    location = /v1/pedidos {
+        if ($grupo_puede_pedir = 0) {
             return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
         }
         limit_req zone=por_grupo burst=20 nodelay;

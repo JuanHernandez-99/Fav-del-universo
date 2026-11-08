@@ -1,14 +1,16 @@
 openapi: 3.0.3
 info:
   title: FAV · Catálogo y pedidos para otros grupos
-  version: 1.0.0
+  version: 1.1.0
   description: |
-    Capacidad que FAV, una tienda de ropa, ofrece a otro grupo.
+    Capacidad que FAV, una tienda de ropa, ofrece a otros grupos.
 
     El grupo consumidor puede:
     1. **Ver el catálogo** de FAV: productos publicados, sus variantes (talle y color) y el precio vigente.
-    2. **Hacer un pedido**: FAV aparta el stock y registra la venta, que queda **pendiente de pago por
+    2. **Consultar la disponibilidad** por variante (desde la versión 1.1.0).
+    3. **Hacer un pedido**: FAV aparta el stock y registra la venta, que queda **pendiente de pago por
        transferencia**. El pedido lo hace el grupo para sí mismo; no se envían datos de clientes finales.
+       La clave del grupo del gimnasio no habilita esta operación.
 
     **Cómo sigue un pedido después de crearlo (fuera de esta API):** el grupo transfiere el total a FAV.
     Cuando FAV verifica la transferencia, la venta pasa a pagada y el stock se descuenta definitivamente.
@@ -17,6 +19,8 @@ info:
 
     Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por FAV, sin confirmar.
 servers:
+  - url: http://localhost:8080
+    description: Servicios reales en local (`docker compose up --build`).
   - url: http://localhost:8090
     description: Mock local (`mocks/catalogo-pedidos-v1/`).
   - url: https://pendiente.example
@@ -26,6 +30,8 @@ security:
 tags:
   - name: Catálogo
     description: Productos publicados por FAV.
+  - name: Disponibilidad
+    description: Unidades de cada variante que FAV puede apartar.
   - name: Pedidos
     description: Compras del grupo consumidor a FAV.
 
@@ -41,8 +47,8 @@ paths:
         Devuelve todos los productos **publicados**, con sus variantes y el precio vigente
         (con la promoción aplicada, si hay una).
 
-        No informa stock: si una variante no alcanza, el pedido responde `409 STOCK_INSUFICIENTE`.
-        Devuelve el catálogo completo en una sola respuesta (del orden de cientos de productos).
+        No informa stock: para eso está `GET /v1/disponibilidad`. Si una variante no alcanza, el pedido
+        responde `409 STOCK_INSUFICIENTE`. Devuelve el catálogo completo en una sola respuesta (del orden de cientos de productos).
         La lista va dentro de `items` para poder sumar más adelante una paginación opcional sin romper
         el contrato: sin parámetros seguiría devolviendo todo.
       responses:
@@ -58,6 +64,74 @@ paths:
               examples:
                 catalogo:
                   $ref: '#/components/examples/Catalogo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /v1/disponibilidad:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+    get:
+      tags: [Disponibilidad]
+      operationId: consultarDisponibilidad
+      summary: Consultar la disponibilidad por variante
+      description: |
+        Devuelve, para cada `varianteId` pedido, las unidades del **stock online** de FAV que no están
+        reservadas **[propuesta]**. Son las que puede apartar un pedido. No incluye el stock físico.
+
+        Es una foto del momento: no aparta unidades, y el pedido puede responder `409 STOCK_INSUFICIENTE`
+        aunque antes figurara disponible. Una variante que no existe o que todavía no tiene stock figura
+        con `disponible: 0`, sin error. Los ids repetidos se devuelven una sola vez.
+      parameters:
+        - name: variantes
+          in: query
+          required: true
+          description: Entre 1 y 200 `varianteId` separados por coma, tal como los devuelve `GET /v1/productos`.
+          schema:
+            type: string
+            minLength: 1
+          example: var-remera-basica-blanca-m,var-jean-mom-celeste-38
+      responses:
+        '200':
+          description: Disponibilidad de cada variante pedida, en el orden pedido.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disponibilidad'
+              examples:
+                disponibilidad:
+                  value:
+                    items:
+                      - varianteId: var-remera-basica-blanca-m
+                        disponible: 12
+                      - varianteId: var-jean-mom-celeste-38
+                        disponible: 0
+        '400':
+          description: |
+            `PEDIDO_INVALIDO`: falta `variantes` o tiene más de 200 ids. `errores` indica el campo.
+            No reintentar sin corregir el pedido.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              examples:
+                sinVariantes:
+                  value:
+                    type: https://fav.example/errores/pedido-invalido
+                    title: Pedido inválido
+                    status: 400
+                    codigo: PEDIDO_INVALIDO
+                    errores:
+                      - campo: variantes
+                        mensaje: indicar entre 1 y 200 ids separados por coma
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '429':
@@ -253,6 +327,23 @@ components:
           type: number
           format: double
           description: Precio vigente por unidad, en pesos argentinos, con la promoción aplicada si hay una.
+
+    Disponibilidad:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [varianteId, disponible]
+            properties:
+              varianteId:
+                type: string
+              disponible:
+                type: integer
+                minimum: 0
+                description: Unidades del stock online que no están reservadas.
 
     PedidoNuevo:
       type: object

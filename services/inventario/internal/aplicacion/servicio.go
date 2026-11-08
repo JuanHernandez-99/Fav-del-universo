@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math/rand/v2"
 	"time"
 
 	"github.com/google/uuid"
@@ -213,25 +214,39 @@ func (s *Servicio) TomarReposiciones(ctx context.Context, limite int) ([]dominio
 	return s.repo.TomarReposiciones(ctx, s.ahora(), 30*time.Second, limite)
 }
 
-// EnviarReposicion manda una reposición al gimnasio. Si falla por algo transitorio se reprograma
-// con espera creciente; si el gimnasio la rechaza, las unidades vuelven al stock físico.
+// EnviarReposicion manda una reposición al gimnasio y decide según el resultado (ADR-018). Solo un rechazo
+// definitivo devuelve las unidades al stock físico: en los demás casos la mercadería pudo haber llegado.
 func (s *Servicio) EnviarReposicion(ctx context.Context, r dominio.Reposicion) (bool, error) {
-	err := s.gimnasio.EnviarReposicion(ctx, r)
+	idGimnasio, err := s.gimnasio.EnviarReposicion(ctx, r)
+	registro := slog.With("reposicion_id", r.ID, "referencia", r.ID, "intentos", r.Intentos+1)
 	switch {
 	case err == nil:
-		if err := s.repo.MarcarReposicionEnviada(ctx, r.ID, s.ahora()); err != nil {
+		if err := s.repo.ConfirmarReposicion(ctx, r.ID, idGimnasio, s.ahora()); err != nil {
 			return false, err
 		}
-		slog.InfoContext(ctx, "reposición enviada al gimnasio", "reposicion_id", r.ID, "intentos", r.Intentos+1)
+		registro.InfoContext(ctx, "el gimnasio confirmó la reposición", "reposicion_gimnasio_id", idGimnasio)
 		return true, nil
 	case errors.Is(err, dominio.ErrReposicionRechazada):
-		slog.WarnContext(ctx, "el gimnasio rechazó la reposición; las unidades vuelven al stock físico", "reposicion_id", r.ID, "error", err)
+		registro.WarnContext(ctx, "el gimnasio rechazó la reposición; las unidades vuelven al stock físico", "error", err)
 		return false, s.repo.RechazarReposicion(ctx, r.ID, err.Error(), s.ahora())
+	case errors.Is(err, dominio.ErrReposicionConflicto):
+		registro.ErrorContext(ctx, "conflicto con otra entrega; requiere revisión", "error", err)
+		return false, s.repo.MarcarReposicionARevisar(ctx, r.ID, err.Error(), s.ahora())
+	case errors.Is(err, dominio.ErrGimnasioConfiguracion):
+		proximo := s.ahora().Add(dominio.EsperaBloqueada)
+		registro.ErrorContext(ctx, "credencial del gimnasio rechazada; la reposición queda bloqueada", "proximo_intento", proximo, "error", err)
+		return false, s.repo.BloquearReposicion(ctx, r.ID, err.Error(), proximo)
 	default:
-		proximo := s.ahora().Add(dominio.EsperaReintento(r.Intentos + 1))
-		slog.WarnContext(ctx, "no se pudo enviar la reposición; se reintenta", "reposicion_id", r.ID, "intentos", r.Intentos+1, "proximo_intento", proximo, "error", err)
+		espera := dominio.EsperaReintento(r.Intentos + 1)
+		// La variación evita que muchas reposiciones reintenten juntas cuando vuelve el gimnasio.
+		proximo := s.ahora().Add(espera + rand.N(espera/5))
+		registro.WarnContext(ctx, "resultado incierto; se reintenta con la misma clave", "proximo_intento", proximo, "error", err)
 		return false, s.repo.ReprogramarReposicion(ctx, r.ID, err.Error(), proximo)
 	}
+}
+
+func (s *Servicio) ListarReposiciones(ctx context.Context, limite int) ([]dominio.Reposicion, error) {
+	return s.repo.ListarReposiciones(ctx, limite)
 }
 
 func (s *Servicio) StockEnGimnasio(ctx context.Context) ([]dominio.StockConsignacion, error) {

@@ -8,16 +8,27 @@ import (
 type EstadoReposicion string
 
 const (
-	ReposicionPendiente EstadoReposicion = "PENDIENTE"
-	ReposicionEnviada   EstadoReposicion = "ENVIADA"
+	// ReposicionPendiente: falta enviarla o el último resultado es incierto. Se reintenta con la misma clave.
+	ReposicionPendiente EstadoReposicion = "PENDIENTE_CONFIRMACION"
+	// ReposicionConfirmada: el gimnasio respondió 201 con el cuerpo del contrato.
+	ReposicionConfirmada EstadoReposicion = "CONFIRMADA"
+	// ReposicionRechazada: el gimnasio no la registró y las unidades volvieron al stock físico.
 	ReposicionRechazada EstadoReposicion = "RECHAZADA"
+	// ReposicionARevisar: 409 del gimnasio. Puede existir una entrega anterior: no se compensa ni se reintenta sola.
+	ReposicionARevisar EstadoReposicion = "REQUIERE_REVISION"
+	// ReposicionBloqueada: 401 o 403. Falla la credencial, no la mercadería. Se reintenta espaciado.
+	ReposicionBloqueada EstadoReposicion = "BLOQUEADA_CONFIGURACION"
 )
 
-// Reposicion es un envío de prendas al gimnasio, que las vende en consignación (capacidad consumida, ADR-009).
+// EsperaBloqueada es cada cuánto se reintenta con la credencial rechazada: al corregirla, se destraba sola.
+const EsperaBloqueada = 5 * time.Minute
+
+// Reposicion es un envío de prendas al gimnasio, que las vende en consignación (capacidad consumida, ADR-018).
 // Al crearla se descuenta el stock físico; un proceso la envía al gimnasio con reintentos.
-// Si el gimnasio la rechaza, las unidades vuelven al stock físico.
+// Solo un rechazo definitivo devuelve las unidades al stock físico.
 type Reposicion struct {
 	ID                string
+	IDGimnasio        string // reposicionId que genera el gimnasio al recibirla
 	ClaveIdempotencia string
 	VarianteID        string
 	Cantidad          int

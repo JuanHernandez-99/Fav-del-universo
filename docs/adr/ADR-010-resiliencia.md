@@ -103,8 +103,8 @@ Los errores usan el formato Problem Details con un `codigo` estable, y distingue
 - **Reintentos en dos lugares.** El gateway reintenta contra la otra réplica ante error de conexión, timeout o `502` (hasta 2 intentos), y Ventas reintenta además hasta 2 veces. Es seguro por la idempotencia, pero amplifica la carga durante una degradación. nginx no reenvía un `POST` que ya llegó a una réplica.
 - **La verificación de réplicas es pasiva.** Una réplica con la base caída sigue en el reparto porque su `503` no cuenta como falla para nginx. Se decidió así a propósito: ese `503` también lo usa Inventario para avisar que el gimnasio no está disponible, y contarlo sacaba del reparto a réplicas sanas.
 - **El circuito del gimnasio es por réplica.** Cada réplica abre el suyo con su propia muestra.
-- **Sin bulkhead para las consultas al gimnasio del panel**, que corren en el hilo del pedido (con timeout de 2 s).
-- **El rechazo definitivo ante cualquier `4xx` del gimnasio** puede devolver stock por error de configuración (ADR-009).
+- **Sin bulkhead para las consultas al gimnasio del panel**, que corren en el hilo del pedido (con timeout de 3 s).
+- ~~El rechazo definitivo ante cualquier `4xx` del gimnasio puede devolver stock por error de configuración (ADR-009).~~ Resuelto en el ADR-018.
 - **Sin cola de mensajes fallidos todavía:** llega con RabbitMQ.
 
 ## Pendientes
@@ -122,7 +122,7 @@ Provocar y observar (los pasos están en el README del servicio):
 | ---------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Caída de una réplica                           | `docker stop <réplica>` y repetir consultas                                      | Todas responden; en el log del gateway deja de aparecer su IP                                                          |
 | Caída del gimnasio                             | `docker compose stop gimnasio-mock`                                              | `503 GIMNASIO_NO_DISPONIBLE`; las reservas siguen; la reposición queda _PENDIENTE_ y se envía al volver                |
-| Gimnasio lento                                 | `fixedDelay` de 3 s en el mock                                                   | Timeout de 2 s y, tras 5 fallas, `circuit_breaker_estado = 2`                                                          |
+| Gimnasio lento                                 | `fixedDelay` de 4 s en el mock                                                   | Timeout de 3 s y, tras 5 fallas, `circuit_breaker_estado = 2`                                                          |
 | Reintento de un pedido                         | Repetir un pedido con la misma clave                                             | Misma reserva, sin descontar dos veces                                                                                 |
 | Exceso de pedidos de un grupo                  | Más de 80 pedidos en un minuto por `/v1/pedidos`                                 | `429` en el exceso                                                                                                     |
 | Caída de la base **[propuesta]**               | `docker compose stop mysql-inventario`                                           | `/readyz` responde `503`; los pedidos fallan sin dejar datos a medias; se recupera al volver. A confirmar en el ensayo |

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
-  buscarProductosAdmin, consultarStockAdmin, consultarVariantesAdmin, ErrorApi, moverStock, obtenerProductoAdmin, stockACorregir,
+  buscarProductosAdmin, consultarStockAdmin, detallesDeVariantes, ErrorApi, moverStock, obtenerProductoAdmin, stockACorregir,
 } from '../../api.js';
 import { claveDelPedido, olvidarClave } from '../../compra/compra.js';
 import { nombreCategoria } from '../../dominio.js';
@@ -10,7 +10,7 @@ import { cantidadValida, CANALES_STOCK, explicarRechazo, filasDeStock, MOTIVOS, 
 
 const talleLegible = (t) => (t === 'U' ? 'Único' : t);
 
-function Buscar({ token, alElegir }) {
+export function Buscar({ token, alElegir }) {
   const [texto, setTexto] = useState('');
   const [resultados, setResultados] = useState([]);
   useEffect(() => {
@@ -188,16 +188,7 @@ function ACorregir({ token, fallo, alCorregir }) {
     setError(false);
     try {
       const { items, hayMas: mas } = await stockACorregir(token);
-      const ids = items.map((s) => s.varianteId);
-      let detalles = [];
-      try {
-        for (let i = 0; i < ids.length; i += 200) detalles.push(...(await consultarVariantesAdmin(token, ids.slice(i, i + 200))).items);
-      } catch (e) {
-        // Catálogo rechaza el lote entero si un id no existe: se reintenta sin esos, que se muestran sin nombre.
-        if (!(e instanceof ErrorApi && e.codigo === 'VARIANTE_INEXISTENTE')) throw e;
-        const conocidas = ids.filter((id) => !e.variantes.includes(id));
-        detalles = conocidas.length ? (await consultarVariantesAdmin(token, conocidas)).items : [];
-      }
+      const detalles = await detallesDeVariantes(token, items.map((s) => s.varianteId));
       const porId = Object.fromEntries(detalles.map((d) => [d.varianteId, d]));
       setFilas(items.map((s) => ({ ...s, detalle: porId[s.varianteId] })));
       setHayMas(mas);

@@ -3,11 +3,11 @@
   "request": {
     "method": "POST",
     "urlPath": "/api/v1/consignaciones/reposiciones",
-    "bodyPatterns": [{ "matchesJsonPath": "$[?(@.unidades > 20)]" }]
+    "headers": { "Idempotency-Key": { "matches": "probar-rechazo-.*" } }
   },
   "response": {
     "status": 422,
-    "headers": { "Content-Type": "application/json" },
-    "jsonBody": { "error": "CAPACIDAD_EXCEDIDA", "mensaje": "El gimnasio no recibe más de 20 unidades por reposición." }
+    "headers": { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    "jsonBody": { "codigo": "STOCK_NO_REPRESENTABLE", "mensaje": "El saldo resultante no puede representarse de forma segura." }
   }
 }

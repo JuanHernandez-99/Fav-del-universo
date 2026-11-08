@@ -46,6 +46,7 @@ func NuevoRouter(s *aplicacion.Servicio) http.Handler {
 	mux.HandleFunc("POST /v1/descuentos-fisicos", h.descontarFisico)
 
 	mux.HandleFunc("POST /v1/reposiciones", h.reponer)
+	mux.HandleFunc("GET /v1/reposiciones", h.listarReposiciones)
 	mux.HandleFunc("GET /v1/consignacion", h.stockEnGimnasio)
 
 	return observabilidad.Middleware(mux)
@@ -312,6 +313,23 @@ func (h *Handler) reponer(w http.ResponseWriter, r *http.Request) {
 		"reposicionId": rep.ID, "varianteId": rep.VarianteID, "cantidad": rep.Cantidad,
 		"estado": rep.Estado, "creadaEn": rep.CreadaEn.UTC(),
 	})
+}
+
+// listarReposiciones muestra en el panel en qué estado está cada entrega al gimnasio (ADR-018).
+func (h *Handler) listarReposiciones(w http.ResponseWriter, r *http.Request) {
+	reposiciones, err := h.s.ListarReposiciones(r.Context(), 100)
+	if err != nil {
+		escribirError(w, r, err)
+		return
+	}
+	items := make([]map[string]any, len(reposiciones))
+	for i, rep := range reposiciones {
+		items[i] = map[string]any{
+			"reposicionId": rep.ID, "reposicionGimnasioId": rep.IDGimnasio, "varianteId": rep.VarianteID, "cantidad": rep.Cantidad,
+			"estado": rep.Estado, "intentos": rep.Intentos, "ultimoError": rep.UltimoError, "creadaEn": rep.CreadaEn.UTC(),
+		}
+	}
+	escribirJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (h *Handler) stockEnGimnasio(w http.ResponseWriter, r *http.Request) {

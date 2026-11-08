@@ -5,16 +5,19 @@
     "urlPath": "/api/v1/consignaciones/reposiciones",
     "headers": {
       "X-API-Key": { "matches": ".+" },
-      "Idempotency-Key": { "matches": ".+" }
+      "Idempotency-Key": { "matches": ".+" },
+      "Content-Type": { "contains": "application/json" }
     },
     "bodyPatterns": [
+      { "matchesJsonPath": "$[?(@.proveedorId == 'fav')]" },
       { "matchesJsonPath": "$.productoCodigo" },
-      { "matchesJsonPath": "$.unidades" }
+      { "matchesJsonPath": "$[?(@.unidades >= 1)]" },
+      { "matchesJsonPath": "$.referencia" }
     ]
   },
   "response": {
     "status": 201,
-    "headers": { "Content-Type": "application/json" },
+    "headers": { "Content-Type": "application/json", "Cache-Control": "no-store" },
     "jsonBody": { "reposicionId": "{{randomValue type='UUID'}}", "estado": "RECIBIDA" },
     "transformers": ["response-template"]
   }

@@ -47,7 +47,9 @@ Detalle, diagramas, comunicaciones y comportamiento ante fallas: [`docs/ARCHITEC
 
 Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v1.openapi.yaml). Cómo usarla, errores y ejemplos: [`docs/contracts/README.md`](docs/contracts/README.md). Mock para probarla: [`mocks/catalogo-pedidos-v1`](mocks/catalogo-pedidos-v1).
 
-**Capacidad que consumimos: gimnasio.** FAV vende ropa en consignación en un gimnasio: Inventario consulta cuánto stock nuestro les queda y les registra reposiciones. **[?]** Contrato pendiente del grupo del gimnasio.
+El grupo del gimnasio también nos consume: con su propia clave ve el catálogo y la disponibilidad (`GET /v1/disponibilidad`, Inventario), sin hacer pedidos.
+
+**Capacidad que consumimos: gimnasio.** FAV vende ropa en consignación en un gimnasio: Inventario consulta cuánto stock nuestro les queda y les registra reposiciones. Contrato: [`docs/contracts/externos/gimnasio/`](docs/contracts/externos/gimnasio/). En local se usa un mock: falta la URL pública y la clave del gimnasio ([ADR-018](docs/adr/ADR-018-consumo-del-gimnasio-contrato-real.md)).
 
 ## Decisiones de arquitectura (ADR)
 
@@ -61,7 +63,8 @@ Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v
 | [ADR-006](docs/adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | Propuesta                  |
 | [ADR-007](docs/adr/ADR-007-cache.md)                    | D7 · Caché                        | Propuesta                  |
 | [ADR-008](docs/adr/ADR-008-contrato-propio.md)          | D8 · Contrato propio              | Aceptada                   |
-| [ADR-009](docs/adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Aceptada (contrato supuesto) |
+| [ADR-009](docs/adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018 |
+| [ADR-018](docs/adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada |
 | [ADR-010](docs/adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada                   |
 | [ADR-011](docs/adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada (primera versión) |
 | [ADR-012](docs/adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada                   |

@@ -42,10 +42,17 @@ type Repositorio interface {
 	// TomarReposiciones reserva para este proceso las reposiciones listas para enviar,
 	// así dos réplicas no envían la misma a la vez.
 	TomarReposiciones(ctx context.Context, ahora time.Time, plazo time.Duration, limite int) ([]dominio.Reposicion, error)
-	MarcarReposicionEnviada(ctx context.Context, id string, ahora time.Time) error
+	// ConfirmarReposicion guarda el id que generó el gimnasio.
+	ConfirmarReposicion(ctx context.Context, id, idGimnasio string, ahora time.Time) error
 	// RechazarReposicion devuelve las unidades al stock físico.
 	RechazarReposicion(ctx context.Context, id, motivo string, ahora time.Time) error
 	ReprogramarReposicion(ctx context.Context, id, motivo string, proximo time.Time) error
+	// MarcarReposicionARevisar la saca de los reintentos, sin devolver las unidades.
+	MarcarReposicionARevisar(ctx context.Context, id, motivo string, ahora time.Time) error
+	// BloquearReposicion la deja reintentándose espaciado, sin devolver las unidades.
+	BloquearReposicion(ctx context.Context, id, motivo string, proximo time.Time) error
+	// ListarReposiciones devuelve las más recientes primero.
+	ListarReposiciones(ctx context.Context, limite int) ([]dominio.Reposicion, error)
 
 	Ping(ctx context.Context) error
 }
@@ -57,9 +64,10 @@ type PublicadorEventos interface {
 
 // Gimnasio es la capacidad consumida (ADR-009). El adaptador traduce su modelo al de FAV.
 type Gimnasio interface {
-	// EnviarReposicion devuelve dominio.ErrReposicionRechazada si el gimnasio la rechaza (definitivo)
-	// o cualquier otro error si la falla es transitoria y conviene reintentar.
-	EnviarReposicion(ctx context.Context, r dominio.Reposicion) error
+	// EnviarReposicion devuelve el id que generó el gimnasio. El error dice qué hacer con la reposición:
+	// dominio.ErrReposicionRechazada (no se registró), dominio.ErrReposicionConflicto (409) o
+	// dominio.ErrGimnasioConfiguracion (401 o 403). Cualquier otro es un resultado incierto: se reintenta igual.
+	EnviarReposicion(ctx context.Context, r dominio.Reposicion) (string, error)
 	// ConsultarStock devuelve dominio.ErrProveedorNoDisponible si el gimnasio no responde.
 	ConsultarStock(ctx context.Context) ([]dominio.StockConsignacion, error)
 }

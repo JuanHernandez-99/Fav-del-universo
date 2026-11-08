@@ -468,6 +468,12 @@ a.panel-fila:hover { background: var(--papel); }
 .stock-negativo { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-weight: 700; color: var(--coral-oscuro); }
 .stock-negativo .resultado-estado { margin: 0; padding: .1rem .5rem; font-size: .7rem; }
 .acorregir-fila { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) 6rem 6rem; }
+.gimnasio-seccion { margin-bottom: 2.4rem; }
+.gimnasio-seccion h2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; margin: 0 0 .8rem; font-size: 1.4rem; }
+.gimnasio-seccion h2 .boton-texto { font-size: .86rem; }
+.gimnasio-stock-fila { grid-template-columns: minmax(0, 2.4fr) repeat(2, minmax(0, 1fr)); }
+.gimnasio-rep-fila { grid-template-columns: minmax(0, 1.8fr) 5rem 8rem minmax(0, 1.6fr); }
+.gimnasio-ayuda { display: block; margin-top: .3rem; color: var(--tinta-suave); line-height: 1.35; }
 .stock-movimiento { margin-top: 1.6rem; padding: 1.3rem; background: #fff; border: 1px solid var(--linea); border-radius: 10px; }
 .stock-movimiento h2 { margin-bottom: .8rem; font-size: 1.35rem; }
 .stock-movimiento .local-fisico { margin: .2rem 0 1rem; }
@@ -509,6 +515,9 @@ a.panel-fila:hover { background: var(--papel); }
   .stock-fila > [data-titulo] { grid-column: auto !important; grid-row: auto !important; font-size: .9rem !important; color: var(--tinta) !important; }
   .stock-fila > :first-child { grid-column: 1 / -1 !important; color: var(--tinta) !important; }
   .acorregir-fila > :nth-child(3), .acorregir-fila > :nth-child(4) { grid-column: auto !important; grid-row: auto !important; }
+  .gimnasio-stock-fila > [data-titulo]::before, .gimnasio-rep-fila > [data-titulo]::before { content: attr(data-titulo) ': '; font-weight: 400; color: var(--tinta-suave); }
+  .gimnasio-stock-fila > [data-titulo], .gimnasio-rep-fila > [data-titulo] { grid-column: auto !important; grid-row: auto !important; font-size: .9rem !important; color: var(--tinta) !important; }
+  .gimnasio-stock-fila > :first-child, .gimnasio-rep-fila > :first-child, .gimnasio-rep-fila > :last-child { grid-column: 1 / -1 !important; color: var(--tinta) !important; }
   .promo-porcentaje { height: auto; padding: .5rem; justify-self: start; }
   .producto-foto select { margin-top: 0; }
   .panel-menu { position: static; flex-direction: row; flex-wrap: wrap; align-items: center; }

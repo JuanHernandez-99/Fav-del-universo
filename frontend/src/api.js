@@ -119,8 +119,25 @@ export function moverStock(token, ruta, cuerpo, clave) {
 
 export const stockACorregir = (token) => pedir('/inventario/v1/stock/a-corregir', { headers: conToken(token) });
 
+// Consignación en el gimnasio (ADR-018). Las reposiciones se crean con moverStock(token, 'reposiciones', ...).
+export const consultarStockGimnasio = (token, opciones) => pedir('/inventario/v1/consignacion', { headers: conToken(token), ...opciones });
+export const listarReposiciones = (token, opciones) => pedir('/inventario/v1/reposiciones', { headers: conToken(token), ...opciones });
+
 export const consultarVariantesAdmin = (token, ids) =>
   pedir(`/catalogo/v1/variantes?variantes=${ids.map(encodeURIComponent).join(',')}`, { headers: conToken(token) });
+
+// Nombre, color y talle de cada id. Catálogo rechaza el lote entero si un id no existe: se reintenta sin esos.
+export async function detallesDeVariantes(token, ids) {
+  const detalles = [];
+  try {
+    for (let i = 0; i < ids.length; i += 200) detalles.push(...(await consultarVariantesAdmin(token, ids.slice(i, i + 200))).items);
+    return detalles;
+  } catch (e) {
+    if (!(e instanceof ErrorApi && e.codigo === 'VARIANTE_INEXISTENTE')) throw e;
+    const conocidas = ids.filter((id) => !e.variantes.includes(id));
+    return conocidas.length ? (await consultarVariantesAdmin(token, conocidas)).items : [];
+  }
+}
 
 export const buscarProductosAdmin = (token, q, opciones) =>
   pedir(`/catalogo/v1/admin/productos?${new URLSearchParams({ q, tamano: 8 })}`, { ...opciones, headers: conToken(token) });

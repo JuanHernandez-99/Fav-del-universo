@@ -18,6 +18,8 @@ var (
 	ErrReservaYaConfirmada   = errors.New("la reserva ya está confirmada")
 	ErrReservaYaLiberada     = errors.New("la reserva ya fue liberada")
 	ErrReposicionRechazada   = errors.New("el gimnasio rechazó la reposición")
+	ErrReposicionConflicto   = errors.New("el gimnasio informó un conflicto con otra entrega")
+	ErrGimnasioConfiguracion = errors.New("el gimnasio no aceptó la credencial de FAV")
 	ErrProveedorNoDisponible = errors.New("el gimnasio no está disponible")
 )
 

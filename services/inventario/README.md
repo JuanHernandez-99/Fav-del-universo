@@ -2,7 +2,7 @@
 
 Cuántas unidades hay y dónde: stock por variante y canal (online y físico), reservas con vencimiento, transferencias, ingresos y consignación en el gimnasio.
 
-> Estado: **funcionando** (Entrega 2). El gimnasio sigue simulado ([`mocks/`](../../mocks)).
+> Estado: **funcionando**. Aplica el contrato real del gimnasio ([ADR-018](../../docs/adr/ADR-018-consumo-del-gimnasio-contrato-real.md)), pero en local usa un mock ([`mocks/`](../../mocks)): falta la URL pública y la clave.
 
 | | |
 |---|---|
@@ -70,6 +70,7 @@ curl localhost:8080/v1/pedidos -H "X-API-Key: clave-grupo-proveedores" -H "Idemp
 | `POST /v1/ajustes` | Panel | Suma o resta unidades de un canal con un motivo: `PERDIDA`, `FALLA` o `CORRECCION_CONTEO`, más una nota opcional (HU-08). `Idempotency-Key` obligatoria. Al restar, el online no baja de lo reservado y el físico no queda negativo (`409 STOCK_INSUFICIENTE`) |
 | `POST /v1/descuentos-fisicos` | Ventas | Baja el físico por una venta del local; puede quedar negativo (RN-25). `Idempotency-Key` obligatoria. Cuerpo: `referencia`, `items` |
 | `POST /v1/reposiciones` | Panel | Envía prendas al gimnasio (`202`) |
+| `GET /v1/reposiciones` | Panel | Las últimas 100, con su estado: `PENDIENTE_CONFIRMACION`, `CONFIRMADA`, `RECHAZADA`, `REQUIERE_REVISION` o `BLOQUEADA_CONFIGURACION` |
 | `GET /v1/consignacion` | Panel | Stock de FAV en el gimnasio (`503 GIMNASIO_NO_DISPONIBLE` si no responde) |
 | `GET /healthz`, `/readyz`, `/metrics` | Gateway, Prometheus | Vida, disponibilidad (con la base) y métricas |
 
@@ -81,7 +82,7 @@ Los errores siguen RFC 9457 (`application/problem+json`) con un `codigo` estable
 - **Sin duplicados:** la clave de idempotencia tiene restricción única (`reservas`, `operaciones`, `reposiciones`). Un reintento devuelve el resultado anterior; la misma clave con otro pedido responde `409`.
 - **Pago contra vencimiento:** confirmar y vencer bloquean la fila de la reserva (`FOR UPDATE`); gana una sola.
 - **Procesos en dos réplicas:** el vencimiento bloquea cada reserva; las reposiciones se toman con `FOR UPDATE SKIP LOCKED`.
-- **Gimnasio caído:** timeout de 2 s y circuit breaker (se abre tras 5 fallas seguidas y prueba de nuevo a los 30 s). Las reposiciones se reintentan con espera creciente (5 s a 5 min).
+- **Gimnasio caído:** timeout de 3 s y circuit breaker (se abre tras 5 fallas seguidas y prueba de nuevo a los 30 s). Las reposiciones se reintentan con espera creciente (5 s a 5 min).
 - **Evento `ReservaVencida`:** se guarda en la tabla `outbox` en la misma transacción y un proceso lo publica en el exchange `inventario.eventos`. Con RabbitMQ caído, espera en el outbox. Si ningún consumidor declaró su cola, queda en `inventario.eventos.sin-destino`.
 
 ## Observabilidad
@@ -105,7 +106,7 @@ INVENTARIO_TEST_DSN="root:cambiar@tcp(localhost:3307)/inventario_test?parseTime=
 |---|---|---|
 | `INVENTARIO_DB_HOST`, `_NAME`, `_USER`, `_PASSWORD` | `mysql-inventario:3306`, `inventario` | Conexión a MySQL |
 | `INVENTARIO_DATOS_EJEMPLO` | `false` (`true` en Compose) | Carga stock de las variantes del contrato |
-| `GIMNASIO_URL`, `GIMNASIO_API_KEY`, `GIMNASIO_PROVEEDOR_ID`, `GIMNASIO_TIMEOUT_MS` | mock, —, `fav`, `2000` | Capacidad consumida |
+| `GIMNASIO_BASE_URL`, `GIMNASIO_API_KEY`, `GIMNASIO_PROVEEDOR_ID`, `GIMNASIO_TIMEOUT_MS` | mock, —, `fav`, `3000` | Capacidad consumida |
 | `VENCIMIENTO_CADA_MS`, `REPOSICIONES_CADA_MS`, `PUBLICADOR_CADA_MS` | `10000`, `5000`, `1000` | Frecuencia de los procesos |
 | `RABBITMQ_URL` | — | Sin valor, los eventos quedan en el outbox |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Sin valor, no exporta trazas |
