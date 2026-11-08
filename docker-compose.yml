@@ -10,7 +10,7 @@
 #   8095  mock del gimnasio (admin de WireMock)      3308   MySQL de Ventas (tests)
 #   8096  simulador de Mercado Pago                  8025   Mailpit (bandeja de mails)
 #   15672 RabbitMQ (administración)                  5672   RabbitMQ (tests)
-#   3309  MySQL de Usuarios (tests)
+#   3309  MySQL de Usuarios (tests)                  9200   Elasticsearch (solo desde esta máquina)
 
 x-otel: &otel
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
@@ -92,6 +92,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Motor de búsqueda (ADR-006). Sin seguridad: es solo para desarrollo, por eso el puerto no sale de esta máquina.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ["127.0.0.1:9200:9200"]
+    volumes: [elasticsearch-data:/usr/share/elasticsearch/data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
 
   # ---------- Ventas (real) ----------
   ventas:
@@ -245,6 +260,7 @@ services:
     ports: ["9090:9090"]
 
 volumes:
+  elasticsearch-data:
   mongo-catalogo-data:
   mysql-inventario-data:
   mysql-ventas-data:
