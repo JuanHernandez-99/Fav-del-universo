@@ -15,6 +15,9 @@ export const ORDENES = [
   ['nuevos', 'Novedades'], ['precio_asc', 'Menor precio'], ['precio_desc', 'Mayor precio'], ['nombre', 'Nombre'],
 ];
 
+// Al buscar por texto, por defecto se ordena por relevancia (ADR-006). Sin texto no tiene sentido.
+export const ordenesPara = (hayTexto) => (hayTexto ? [['relevancia', 'Relevancia'], ...ORDENES] : ORDENES);
+
 // Ordena los talles de una prenda como se leen en una etiqueta, no alfabéticamente.
 export const ordenarTalles = (talles) => [...new Set(talles)].sort((a, b) => TALLES.indexOf(a) - TALLES.indexOf(b));
 

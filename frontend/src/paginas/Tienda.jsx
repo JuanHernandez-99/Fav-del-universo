@@ -114,6 +114,7 @@ export default function Tienda() {
 
   const hayFiltros = ['categoria', 'talle', 'color', 'precioMin', 'precioMax'].some((n) => filtros[n]);
   const invalido = error instanceof ErrorApi && error.estado === 400;
+  const sinBusqueda = error instanceof ErrorApi && error.codigo === 'BUSQUEDA_NO_DISPONIBLE';
 
   return (
     <>
@@ -128,7 +129,7 @@ export default function Tienda() {
             <p className="resultado-total" aria-live="polite">
               {resultado && !error ? `${resultado.total} ${resultado.total === 1 ? 'prenda' : 'prendas'}` : ' '}
             </p>
-            <Orden valor={filtros.orden} alCambiar={(v) => cambiar('orden', v)} />
+            <Orden valor={filtros.orden} hayTexto={Boolean(filtros.q)} alCambiar={(v) => cambiar('orden', v)} />
           </div>
 
           {disponibilidad === null && (
@@ -137,8 +138,8 @@ export default function Tienda() {
 
           {error ? (
             <div className="estado-vacio" role="alert">
-              <h2>{invalido ? 'Revisá los filtros' : 'La tienda no está disponible en este momento'}</h2>
-              <p>{invalido ? 'Algún valor no es válido: por ejemplo, el precio mínimo no puede superar al máximo.' : 'Es un problema de nuestro lado. Probá de nuevo en un rato.'}</p>
+              <h2>{invalido ? 'Revisá los filtros' : sinBusqueda ? 'La búsqueda no está disponible en este momento' : 'La tienda no está disponible en este momento'}</h2>
+              <p>{invalido ? 'Algún valor no es válido: por ejemplo, el precio mínimo no puede superar al máximo.' : sinBusqueda ? 'Mientras tanto, podés recorrer la tienda por categoría.' : 'Es un problema de nuestro lado. Probá de nuevo en un rato.'}</p>
               {invalido
                 ? <button type="button" className="boton" onClick={limpiar}>Limpiar filtros</button>
                 : <button type="button" className="boton" onClick={() => setReintento((n) => n + 1)}>Reintentar</button>}
