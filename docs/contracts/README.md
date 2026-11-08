@@ -1,13 +1,16 @@
 # Capacidad publicada por FAV · Catálogo y pedidos
 
-> **Versión vigente: 1.0.0** · 14/10/2026
+> **Versión vigente: 1.1.0** · 08/11/2026
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por FAV, sin confirmar.
 
-FAV es una tienda de ropa. Esta capacidad le permite a otro grupo **ver el catálogo de FAV y hacerle pedidos**, como un comprador mayorista:
+> El contrato del gimnasio, que FAV consume, está en [`externos/gimnasio/`](externos/gimnasio/) ([ADR-018](../adr/ADR-018-consumo-del-gimnasio-contrato-real.md)).
+
+FAV es una tienda de ropa. Esta capacidad le permite a otros grupos **ver el catálogo de FAV, consultar la disponibilidad y hacerle pedidos**, como un comprador mayorista:
 
 1. **Ver el catálogo:** productos publicados, sus variantes (talle y color) y el precio vigente.
-2. **Hacer un pedido:** FAV aparta el stock y registra la venta, que queda **pendiente de pago por transferencia**.
+2. **Consultar la disponibilidad:** cuántas unidades de cada variante se pueden apartar.
+3. **Hacer un pedido:** FAV aparta el stock y registra la venta, que queda **pendiente de pago por transferencia**. La clave del gimnasio no habilita esta operación.
 
 El pedido lo hace el grupo para sí mismo: no se envían datos de clientes finales.
 
@@ -24,6 +27,7 @@ El pedido lo hace el grupo para sí mismo: no se envían datos de clientes final
 | Operación | Ruta | Qué hace |
 |---|---|---|
 | Ver el catálogo | `GET /v1/productos` | Devuelve todos los productos publicados con sus variantes y el precio vigente. |
+| Consultar la disponibilidad | `GET /v1/disponibilidad?variantes=a,b` | Unidades disponibles de cada variante. No aparta nada. |
 | Hacer un pedido | `POST /v1/pedidos` | Aparta el stock y registra la venta, pendiente de pago por transferencia. Todo o nada. |
 
 ### Ver el catálogo
@@ -31,8 +35,15 @@ El pedido lo hace el grupo para sí mismo: no se envían datos de clientes final
 - Devuelve solo productos **publicados**, dentro de `items`.
 - Por producto: `productoId`, `nombre`, `categoria` y `variantes`. `descripcion` y `fotoUrl` son opcionales: pueden no venir.
 - Por variante: `varianteId` (el que se usa en el pedido), `talle`, `color` y `precio` (precio vigente por unidad, en pesos, con la promoción aplicada si hay una).
-- **No informa stock.** Si una variante no alcanza, el pedido responde `409 STOCK_INSUFICIENTE`.
+- **No informa stock:** para eso está la disponibilidad. Si una variante no alcanza, el pedido responde `409 STOCK_INSUFICIENTE`.
 - Devuelve el catálogo completo en una sola respuesta (del orden de cientos de productos). Si el consumidor quiere mostrarlo por páginas, lo hace de su lado.
+
+### Consultar la disponibilidad
+
+- `variantes`: entre 1 y 200 `varianteId` separados por coma. Por fuera de ese rango: `400 PEDIDO_INVALIDO`.
+- Responde `items` con `varianteId` y `disponible`: unidades del **stock online [propuesta]** que no están reservadas. No incluye el stock físico.
+- Una variante que no existe o que no tiene stock figura con `disponible: 0`, sin error.
+- Es una foto del momento: no aparta unidades. Un pedido posterior puede responder `409 STOCK_INSUFICIENTE`.
 
 ### Hacer un pedido
 
@@ -68,7 +79,7 @@ Consultar el estado de un pedido no está en la v1. Para saber si se acreditó u
 - La misma clave con otro cuerpo devuelve `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`.
 - La clave vale 48 horas **[propuesta]**.
 
-**Límite de uso.** 60 pedidos por minuto por grupo, sumando las dos operaciones **[propuesta]**. El exceso recibe `429` con el header `Retry-After`.
+**Límite de uso.** 60 pedidos por minuto por grupo, sumando todas las operaciones **[propuesta]**. El exceso recibe `429` con el header `Retry-After`.
 
 **Correlación.** Se puede enviar `X-Correlation-Id` para seguir una operación en los logs de los dos sistemas. FAV lo devuelve siempre; si no se envía, genera uno.
 
@@ -91,14 +102,14 @@ Todos los errores usan **Problem Details** (RFC 9457) con un campo `codigo` esta
 
 | HTTP | `codigo` | Operación | Significado | ¿Reintentar? |
 |---|---|---|---|---|
-| 400 | `PEDIDO_INVALIDO` | Pedido | Falta un header obligatorio o el cuerpo no cumple el contrato. `errores` indica los campos. | No. Corregir. |
+| 400 | `PEDIDO_INVALIDO` | Pedido, disponibilidad | Falta un header obligatorio, o el cuerpo o `variantes` no cumplen el contrato. `errores` indica los campos. | No. Corregir. |
 | 400 | `VARIANTE_INEXISTENTE` | Pedido | Una variante no existe o su producto no está publicado. `variantes` indica cuáles. | No. Corregir. |
-| 401 | `NO_AUTENTICADO` | Ambas | Falta la clave o no es válida. | No. |
+| 401 | `NO_AUTENTICADO` | Todas | Falta la clave, no es válida o no habilita la operación (la del gimnasio, en un pedido). | No. |
 | 409 | `STOCK_INSUFICIENTE` | Pedido | Al menos una variante no alcanza. No se apartó nada. `faltantes` indica cuáles. | No con las mismas cantidades. |
 | 409 | `CLAVE_IDEMPOTENCIA_REUTILIZADA` | Pedido | La clave ya se usó con otro cuerpo. | No. Usar otra clave. |
-| 429 | `LIMITE_EXCEDIDO` | Ambas | Demasiados pedidos del grupo. | Sí, después de `Retry-After`. |
-| 500 | `ERROR_INTERNO` | Ambas | Error inesperado de FAV. | Sí, con la misma `Idempotency-Key`. |
-| 503 | `NO_DISPONIBLE` | Ambas | FAV o una dependencia no está disponible. | Sí, con la misma `Idempotency-Key`. |
+| 429 | `LIMITE_EXCEDIDO` | Todas | Demasiados pedidos del grupo. | Sí, después de `Retry-After`. |
+| 500 | `ERROR_INTERNO` | Todas | Error inesperado de FAV. | Sí, con la misma `Idempotency-Key` si es un pedido. |
+| 503 | `NO_DISPONIBLE` | Todas | FAV o una dependencia no está disponible. | Sí, con la misma `Idempotency-Key` si es un pedido. |
 
 **Recomendaciones para el consumidor [propuesta]:**
 - Timeout de 3 segundos por llamada.
@@ -116,6 +127,12 @@ curl http://localhost:8090/v1/productos \
 # → 200 { "items": [ { "productoId": "prod-remera-basica", "nombre": "Remera básica",
 #          "variantes": [ { "varianteId": "var-remera-basica-blanca-m", "talle": "M",
 #                           "color": "Blanco", "precio": 15000 }, … ] }, … ] }
+
+# Consultar la disponibilidad (servicios reales; clave local de prueba del gimnasio)
+curl "http://localhost:8080/v1/disponibilidad?variantes=var-remera-basica-blanca-m,var-jean-mom-celeste-38" \
+  -H "X-API-Key: clave-grupo-gimnasio"
+# → 200 { "items": [ { "varianteId": "var-remera-basica-blanca-m", "disponible": 12 },
+#                    { "varianteId": "var-jean-mom-celeste-38", "disponible": 0 } ] }
 
 # 2. Hacer un pedido
 curl -X POST http://localhost:8090/v1/pedidos \
@@ -145,14 +162,14 @@ curl -X POST http://localhost:8090/v1/pedidos \
 - **Cambios compatibles** (suben la versión menor, misma ruta): operaciones nuevas, campos opcionales nuevos en los pedidos, campos nuevos en las respuestas, valores nuevos de `codigo`. **El consumidor debe ignorar los campos que no conoce.**
 - **Cambios incompatibles** (nueva versión mayor, `/v2/...`): quitar o renombrar campos u operaciones, volver obligatorio un campo opcional, cambiar el significado de un estado o de un código.
 - Si sale una `v2`, la `v1` sigue operativa hasta el fin de la evaluación.
-- Posibles agregados compatibles a futuro: disponibilidad en el catálogo, paginación opcional (sin parámetros seguiría devolviendo el catálogo completo) y consulta del estado de un pedido.
+- Posibles agregados compatibles a futuro: paginación opcional (sin parámetros seguiría devolviendo el catálogo completo) y consulta del estado de un pedido.
 
 ## 6. Entornos
 
 | Entorno | URL | Estado |
 |---|---|---|
 | Mock local | `http://localhost:8090` | Disponible. Ver [`mocks/catalogo-pedidos-v1/`](../../mocks/catalogo-pedidos-v1). Responde ejemplos fijos. |
-| Local, con los servicios reales | `http://localhost:8080` | Disponible con `docker compose up --build`. Clave de prueba: `clave-grupo-proveedores`. |
+| Local, con los servicios reales | `http://localhost:8080` | Disponible con `docker compose up --build`. Claves de prueba: `clave-grupo-proveedores` y `clave-grupo-gimnasio`. |
 | Desplegado (nube) | **[?]** | Antes de la presentación grupal. |
 
 ## 7. Contacto
@@ -163,4 +180,5 @@ curl -X POST http://localhost:8090/v1/pedidos \
 
 | Versión | Fecha | Cambios |
 |---|---|---|
+| 1.1.0 | 08/11/2026 | Agrega `GET /v1/disponibilidad`, compatible con la 1.0.0, y una clave para el grupo del gimnasio. |
 | 1.0.0 | 14/10/2026 | Primera versión: catálogo y pedidos. Reemplaza las propuestas de la Entrega 1 (reserva de cupos y envío de emails), descartadas al asignarse el grupo consumidor (ADR-008). |

@@ -27,8 +27,9 @@ services:
       INVENTARIO_DB_USER: ${INVENTARIO_DB_USER:-inventario}
       INVENTARIO_DB_PASSWORD: ${INVENTARIO_DB_PASSWORD:-cambiar}
       INVENTARIO_DATOS_EJEMPLO: ${INVENTARIO_DATOS_EJEMPLO:-true}
-      GIMNASIO_URL: http://gimnasio-mock:8080
+      GIMNASIO_BASE_URL: ${GIMNASIO_BASE_URL:-http://gimnasio-mock:8080}
       GIMNASIO_API_KEY: ${GIMNASIO_API_KEY:-clave-de-fav-en-el-gimnasio}
+      GIMNASIO_TIMEOUT_MS: ${GIMNASIO_TIMEOUT_MS:-3000}
       RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:-cambiar}@rabbitmq:5672/
     depends_on:
       mysql-inventario: { condition: service_healthy }
@@ -215,7 +216,9 @@ services:
     image: nginx:1.28-alpine
     environment:
       CAPACIDAD_API_KEY: ${CAPACIDAD_API_KEY:-clave-grupo-proveedores}
-      NGINX_ENVSUBST_FILTER: "^CAPACIDAD_API_KEY$" # no tocar las $variables de nginx
+      CAPACIDAD_API_KEY_GIMNASIO: ${CAPACIDAD_API_KEY_GIMNASIO:-clave-grupo-gimnasio}
+      CAPACIDAD_PUBLICA_ACTIVA: ${CAPACIDAD_PUBLICA_ACTIVA:-true}
+      NGINX_ENVSUBST_FILTER: "^CAPACIDAD_" # no tocar las $variables de nginx
     volumes:
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./gateway/templates:/etc/nginx/templates:ro
