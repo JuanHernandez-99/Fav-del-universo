@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/busqueda"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/cache"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/eventos"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/handler"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/repository"
@@ -63,6 +64,15 @@ func correr() error {
 		opcionesServicio = append(opcionesServicio, service.ConIndice(busqueda.Nuevo(urlBusqueda)))
 	} else {
 		slog.Warn("ELASTICSEARCH_URL sin definir: la búsqueda usa el texto de MongoDB")
+	}
+	if direccion := os.Getenv("REDIS_ADDR"); direccion != "" && os.Getenv("CACHE_ENABLED") != "false" {
+		redis := cache.Nuevo(direccion)
+		defer func() { _ = redis.Cerrar() }()
+		opcionesServicio = append(opcionesServicio, service.ConCache(redis))
+		go service.VigilarEvicciones(ctx, redis.Evicciones)
+		slog.Info("caché activada", "redis", direccion)
+	} else {
+		slog.Info("caché apagada") // CACHE_ENABLED=false sirve para medir sin caché (ADR-007)
 	}
 	s := service.Nuevo(repo, opcionesServicio...)
 	if urlBusqueda != "" {

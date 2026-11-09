@@ -16,6 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/metricas"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/service"
 )
@@ -43,6 +46,7 @@ func NuevoRouter(s *service.Servicio, opcionesRouter ...Opcion) http.Handler {
 	// healthz: el proceso está vivo. readyz: además la base responde, así que puede recibir pedidos.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	mux.HandleFunc("GET /readyz", h.listo)
+	mux.Handle("GET /metrics", promhttp.Handler())
 
 	mux.HandleFunc("GET /v1/admin/productos", h.listarProductos)
 	mux.HandleFunc("POST /v1/admin/productos", h.crearProducto)
@@ -67,7 +71,7 @@ func NuevoRouter(s *service.Servicio, opcionesRouter ...Opcion) http.Handler {
 		mux.HandleFunc("GET /v1/productos", h.listarCatalogoPublico)
 	}
 
-	return mux
+	return metricas.Middleware(mux)
 }
 
 // ---------- Productos ----------

@@ -39,6 +39,7 @@ func (s *Servicio) CrearPromocion(ctx context.Context, d DatosPromocion) (modelo
 		if err != nil {
 			return modelo.Promocion{}, err
 		}
+		s.invalidarCache(ctx)
 		return p, nil
 	}
 	return modelo.Promocion{}, fmt.Errorf("no se encontró un id libre para %q en %d intentos", p.Nombre, intentosDeID)
@@ -55,6 +56,7 @@ func (s *Servicio) ActualizarPromocion(ctx context.Context, id string, d DatosPr
 	if err := s.repo.ReemplazarPromocion(ctx, p); err != nil {
 		return modelo.Promocion{}, err
 	}
+	s.invalidarCache(ctx)
 	return p, nil
 }
 

@@ -117,7 +117,7 @@ Solo la búsqueda **con texto** usa el motor (`GET /v1/tienda/productos?q=...`).
 
 - **Una pieza más que operar:** unos 980 MiB de memoria en reposo.
 - **Frescura eventual:** hay una ventana en la que el índice no refleja la edición.
-- **Buscar lee también Mongo.** Si Mongo cae, la búsqueda tampoco responde.
+- **Buscar lee también Mongo** o la caché (ADR-007). Si Mongo cae, lo que no esté en la caché no responde.
 - **El total puede incluir uno de más** si un producto se despublicó y todavía no salió del índice.
 - **Varios cambios seguidos pueden dar un solo evento,** con la última versión. Alcanza, porque el índice solo necesita el estado final.
 - **Buscar pendientes recorre la colección** cada segundo y por réplica: compara dos campos del mismo documento, sin índice. Es aceptable para cientos o pocos miles de productos.
