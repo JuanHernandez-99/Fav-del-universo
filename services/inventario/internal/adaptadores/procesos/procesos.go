@@ -52,6 +52,22 @@ func EnviarReposiciones(ctx context.Context, s *aplicacion.Servicio, cada time.D
 	})
 }
 
+// VigilarReposiciones publica cuántas hay en cada estado, para el tablero y las alertas (ADR-011). Las dos réplicas
+// informan lo mismo: se lee con max.
+func VigilarReposiciones(ctx context.Context, s *aplicacion.Servicio, cada time.Duration) {
+	cadaVuelta(ctx, cada, func() {
+		resumen, antiguedad, err := s.ResumirReposiciones(ctx)
+		if err != nil {
+			slog.WarnContext(ctx, "no se pudieron resumir las reposiciones", "error", err)
+			return
+		}
+		for estado, cantidad := range resumen {
+			observabilidad.ReposicionesPorEstado.WithLabelValues(string(estado)).Set(float64(cantidad))
+		}
+		observabilidad.ReposicionPendienteAntiguedad.Set(antiguedad.Seconds())
+	})
+}
+
 // PublicarEventos envía el outbox a RabbitMQ. Si el broker está caído, los eventos esperan (ADR-005).
 func PublicarEventos(ctx context.Context, s *aplicacion.Servicio, publicador puertos.PublicadorEventos, cada time.Duration) {
 	cadaVuelta(ctx, cada, func() {

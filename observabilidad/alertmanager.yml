@@ -1,0 +1,20 @@
+# Cómo se avisan las alertas (ADR-011). En local llegan por mail a Mailpit (http://localhost:8025).
+global:
+  smtp_smarthost: mailpit:1025
+  smtp_from: alertas@fav.example
+  smtp_require_tls: false
+
+route:
+  receiver: administrador
+  group_by: [alertname]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+
+receivers:
+  - name: administrador
+    email_configs:
+      - to: admin@fav.example
+        send_resolved: true
+        headers:
+          Subject: '[FAV {{ .Status }}] {{ .CommonLabels.alertname }}'

@@ -154,7 +154,6 @@ La corrida con errores coincidió con ediciones en la misma máquina, pero **la 
 
 ## Pendientes
 
-- **Panel y alerta en Grafana** con la tasa de aciertos y las invalidaciones fallidas (ADR-011).
 - **Repetir la medición con el catálogo completo y en la nube** (ADR-013).
 
 ## Validación

@@ -1,0 +1,100 @@
+# Reglas de alerta (ADR-011). Las evalúa Prometheus y las avisa Alertmanager, por mail a Mailpit en local.
+# Los umbrales son [propuesta]: salen del objetivo de servicio de ADR-011.
+groups:
+  - name: servicio
+    rules:
+      - alert: ReplicaCaidaInventario
+        expr: (count(up{job="inventario"} == 1) or vector(0)) < 2
+        for: 30s
+        labels: { severidad: alta }
+        annotations:
+          resumen: Inventario tiene menos de 2 réplicas respondiendo.
+      - alert: ReplicaCaidaCatalogo
+        expr: (count(up{job="catalogo"} == 1) or vector(0)) < 2
+        for: 30s
+        labels: { severidad: alta }
+        annotations:
+          resumen: Catálogo tiene menos de 2 réplicas respondiendo.
+      - alert: VentasCaido
+        expr: absent(up{job="ventas"} == 1)
+        for: 30s
+        labels: { severidad: critica }
+        annotations:
+          resumen: Ventas no responde. No se pueden registrar compras.
+      - alert: UsuariosCaido
+        expr: absent(up{job="usuarios"} == 1)
+        for: 30s
+        labels: { severidad: alta }
+        annotations:
+          resumen: Usuarios no responde. No se puede iniciar sesión.
+      # Objetivo de servicio: al menos 99 % de pedidos sin error del servidor.
+      - alert: ErroresDelServidor
+        expr: |
+          sum by (job) (rate(http_pedidos_total{codigo=~"5.."}[2m]))
+            / sum by (job) (rate(http_pedidos_total[2m])) > 0.05
+        for: 1m
+        labels: { severidad: critica }
+        annotations:
+          resumen: "{{ $labels.job }}: más del 5 % de los pedidos responde 5xx."
+      # Objetivo de servicio: p95 por debajo de 300 ms.
+      - alert: LatenciaAlta
+        expr: histogram_quantile(0.95, sum by (job, le) (rate(http_duracion_segundos_bucket[2m]))) > 0.3
+        for: 2m
+        labels: { severidad: alta }
+        annotations:
+          resumen: "{{ $labels.job }}: el p95 supera los 300 ms."
+
+  - name: gimnasio
+    rules:
+      - alert: CircuitoGimnasioAbierto
+        expr: max(circuit_breaker_estado{dependencia="gimnasio"}) == 2
+        for: 30s
+        labels: { severidad: alta }
+        annotations:
+          resumen: El gimnasio está fallando y el circuit breaker está abierto. Las reposiciones esperan.
+      - alert: ReposicionBloqueada
+        expr: max(reposiciones_por_estado{estado="BLOQUEADA_CONFIGURACION"}) > 0
+        keep_firing_for: 1m # al reiniciar Inventario, la métrica falta unos segundos: no es que se haya resuelto
+        labels: { severidad: critica }
+        annotations:
+          resumen: El gimnasio no acepta nuestra credencial. Hay reposiciones bloqueadas hasta corregir GIMNASIO_API_KEY.
+      - alert: ReposicionARevisar
+        expr: max(reposiciones_por_estado{estado="REQUIERE_REVISION"}) > 0
+        keep_firing_for: 1m # al reiniciar Inventario, la métrica falta unos segundos: no es que se haya resuelto
+        labels: { severidad: alta }
+        annotations:
+          resumen: Hay reposiciones en conflicto con el gimnasio. Hay que revisarlas con ellos.
+      - alert: ReposicionPendienteAntigua
+        expr: max(reposicion_pendiente_antiguedad_segundos) > 600
+        keep_firing_for: 1m # al reiniciar Inventario, la métrica falta unos segundos: no es que se haya resuelto
+        labels: { severidad: alta }
+        annotations:
+          resumen: Hay una reposición sin confirmar hace más de 10 minutos.
+
+  - name: mensajeria
+    rules:
+      - alert: MensajesEnColaDeFallidos
+        expr: sum by (queue) (rabbitmq_queue_messages_ready{queue=~".*\\.dlq"}) > 0
+        labels: { severidad: alta }
+        annotations:
+          resumen: "{{ $labels.queue }} tiene mensajes sin procesar."
+      - alert: RabbitMQCaido
+        expr: absent(up{job="rabbitmq"} == 1)
+        for: 30s
+        labels: { severidad: alta }
+        annotations:
+          resumen: RabbitMQ no responde. Los eventos esperan en los outbox.
+
+  - name: cache
+    rules:
+      - alert: CacheNoDisponible
+        expr: sum(rate(cache_operaciones_total{resultado=~"error|omitida"}[1m])) > 0
+        for: 1m
+        labels: { severidad: media }
+        annotations:
+          resumen: Redis no responde. La tienda sigue, pero toda la lectura va a MongoDB.
+      - alert: InvalidacionDeCacheFallida
+        expr: sum(increase(cache_invalidaciones_total{resultado="error"}[5m])) > 0
+        labels: { severidad: media }
+        annotations:
+          resumen: Falló una invalidación. La tienda puede mostrar datos viejos hasta 6 minutos.

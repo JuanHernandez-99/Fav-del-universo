@@ -114,6 +114,16 @@ var (
 		Help: "Estado del circuit breaker por dependencia: 0 cerrado, 1 semiabierto, 2 abierto.",
 	}, []string{"dependencia"})
 
+	ReposicionesPorEstado = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "reposiciones_por_estado",
+		Help: "Reposiciones al gimnasio en cada estado (ADR-018).",
+	}, []string{"estado"})
+
+	ReposicionPendienteAntiguedad = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "reposicion_pendiente_antiguedad_segundos",
+		Help: "Hace cuánto espera confirmación la reposición pendiente más antigua. 0 si no hay.",
+	})
+
 	ProcesosEjecutados = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "proceso_elementos_total",
 		Help: "Elementos procesados por los procesos en segundo plano (reservas vencidas, reposiciones enviadas).",

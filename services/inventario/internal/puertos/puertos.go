@@ -51,6 +51,8 @@ type Repositorio interface {
 	MarcarReposicionARevisar(ctx context.Context, id, motivo string, ahora time.Time) error
 	// BloquearReposicion la deja reintentándose espaciado, sin devolver las unidades.
 	BloquearReposicion(ctx context.Context, id, motivo string, proximo time.Time) error
+	// ResumirReposiciones cuenta por estado y da la fecha de la más antigua que falta confirmar (cero si no hay).
+	ResumirReposiciones(ctx context.Context) (map[dominio.EstadoReposicion]int, time.Time, error)
 	// ListarReposiciones devuelve las más recientes primero.
 	ListarReposiciones(ctx context.Context, limite int) ([]dominio.Reposicion, error)
 

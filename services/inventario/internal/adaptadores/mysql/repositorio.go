@@ -608,6 +608,29 @@ func (r *Repositorio) ListarReposiciones(ctx context.Context, limite int) ([]dom
 	return reposiciones, filas.Err()
 }
 
+func (r *Repositorio) ResumirReposiciones(ctx context.Context) (map[dominio.EstadoReposicion]int, time.Time, error) {
+	filas, err := r.db.QueryContext(ctx, `SELECT estado, COUNT(*), MIN(creada_en) FROM reposiciones GROUP BY estado`)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	defer filas.Close()
+	cantidades := map[dominio.EstadoReposicion]int{}
+	var masAntigua time.Time
+	for filas.Next() {
+		var estado dominio.EstadoReposicion
+		var cantidad int
+		var creada time.Time
+		if err := filas.Scan(&estado, &cantidad, &creada); err != nil {
+			return nil, time.Time{}, err
+		}
+		cantidades[estado] = cantidad
+		if estado == dominio.ReposicionPendiente && (masAntigua.IsZero() || creada.Before(masAntigua)) {
+			masAntigua = creada
+		}
+	}
+	return cantidades, masAntigua, filas.Err()
+}
+
 // estadosEnEnvio: las reposiciones que el proceso sigue intentando enviar.
 const estadosEnEnvio = `'PENDIENTE_CONFIRMACION','BLOQUEADA_CONFIGURACION'`
 

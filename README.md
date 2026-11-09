@@ -84,13 +84,15 @@ Con Docker, desde la raíz:
 docker compose up --build
 ```
 
-No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) con su MongoDB, los productos de ejemplo, Elasticsearch y Redis, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger y Prometheus.
+No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) con su MongoDB, los productos de ejemplo, Elasticsearch y Redis, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger, Prometheus, Alertmanager y Grafana.
 
 | Qué | Dónde |
 |---|---|
 | Gateway (API) | http://localhost:8080 |
 | Jaeger (trazas) | http://localhost:16686 |
 | Prometheus (métricas) | http://localhost:9090 |
+| Grafana (tablero, sin iniciar sesión) | http://localhost:3000 |
+| Alertmanager (alertas) | http://localhost:9093 |
 | Mailpit (mails) | http://localhost:8025 |
 | Simulador de Mercado Pago | http://localhost:8096 |
 | RabbitMQ (`fav` / `cambiar`) | http://localhost:15672 |
@@ -110,7 +112,7 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 ├── gateway/
 ├── frontend/
 ├── mocks/                  Mercado Pago, contrato con Prism y gimnasio
-├── observabilidad/         configuración de Prometheus
+├── observabilidad/         Prometheus, alertas, Grafana y prueba de alertas
 ├── loadtest/               guion de prueba de carga (k6)
 ├── docker-compose.yml      arranque local
 ├── .env.example            variables, sin valores secretos
@@ -124,4 +126,4 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 | 1 · Diseño y contrato con mock | README, SPEC, ARCHITECTURE, diagramas, límites de los servicios, contrato y ADR D1, D3, D5 y D8 | Entregada |
 | 2 · Dominio propio de punta a punta (23/10) | Servicios funcionando, capacidad compartida, logs y traza, más ADR | Entregada |
 | Presentación grupal (11 o 13/11) | Frontend, autenticación, tres servicios, capacidad en la nube, mensajería, búsqueda y caché | En curso. Listos: Inventario, Catálogo, Ventas, Usuarios, mensajería, búsqueda y caché |
-| Defensa individual | Tests de contrato y carga, balanceo, caída controlada, tablero y alerta | Pendiente |
+| Defensa individual | Tests de contrato y carga, balanceo, caída controlada, tablero y alerta | En curso. Listos: tablero y alertas, en local |

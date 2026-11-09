@@ -84,6 +84,7 @@ func correr() error {
 
 	go procesos.VencerReservas(ctx, s, duracion("VENCIMIENTO_CADA_MS", 10_000))
 	go procesos.EnviarReposiciones(ctx, s, duracion("REPOSICIONES_CADA_MS", 5_000))
+	go procesos.VigilarReposiciones(ctx, s, 15*time.Second)
 
 	if url := os.Getenv("RABBITMQ_URL"); url != "" {
 		publicador := rabbitmq.NuevoPublicador(url)

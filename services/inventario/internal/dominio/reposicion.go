@@ -20,6 +20,9 @@ const (
 	ReposicionBloqueada EstadoReposicion = "BLOQUEADA_CONFIGURACION"
 )
 
+// EstadosReposicion son todos: una métrica en 0 se distingue de una que no existe.
+var EstadosReposicion = []EstadoReposicion{ReposicionPendiente, ReposicionConfirmada, ReposicionRechazada, ReposicionARevisar, ReposicionBloqueada}
+
 // EsperaBloqueada es cada cuánto se reintenta con la credencial rechazada: al corregirla, se destraba sola.
 const EsperaBloqueada = 5 * time.Minute
 

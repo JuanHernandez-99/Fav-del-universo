@@ -216,7 +216,7 @@ Si algo se cae, lo demás tiene que seguir funcionando y tiene que poder saberse
 
 El estado de una operación tiene que poder entenderse sin revisar cada componente a mano (**[ADR-011](adr/ADR-011-observabilidad.md), D11**).
 
-**Implementado en Inventario, Ventas, Usuarios y el gateway (Catálogo: logs y métricas, sin trazas):** logs JSON con `servicio`, `instancia`, `correlation_id`, `trace_id` y `span_id`; log de acceso del gateway con la réplica que atendió; trazas OpenTelemetry a Jaeger (`:16686`) con trazas del flujo Ventas → Inventario → MySQL; métricas Prometheus (`:9090`) con una serie por réplica. **Falta:** tablero (Grafana), alertas cargadas, persistencia del historial y el resto de los servicios. El objetivo completo es:
+**Implementado en Inventario, Ventas, Usuarios y el gateway (Catálogo: logs y métricas, sin trazas):** logs JSON con `servicio`, `instancia`, `correlation_id`, `trace_id` y `span_id`; log de acceso del gateway con la réplica que atendió; trazas OpenTelemetry a Jaeger (`:16686`) con trazas del flujo Ventas → Inventario → MySQL; métricas Prometheus (`:9090`) con una serie por réplica y 15 días de historial; tablero en Grafana (`:3000`); 14 alertas que Alertmanager avisa por mail, a Mailpit en local. **Falta:** trazas en Catálogo y el destino real de las alertas en la nube. El objetivo completo es:
 
 
 - **Logs estructurados** en todos los servicios y en el gateway, con un identificador de correlación que viaja en cada llamada y en cada evento. Permite seguir una compra de punta a punta. El token nunca se escribe en los logs.
@@ -224,7 +224,7 @@ El estado de una operación tiene que poder entenderse sin revisar cada componen
 - **Historial:** las métricas se conservan el tiempo suficiente para responder preguntas sobre el pasado, por ejemplo cuántos errores 404 hubo la semana pasada. **[propuesta]** al menos dos semanas.
 - **Trazas distribuidas** del flujo de compra.
 - **Tablero** con el estado general del sistema y al menos una alerta.
-- **[?]** herramientas: se definen cuando se dé el teórico de observabilidad.
+- **Herramientas:** OpenTelemetry y Jaeger, Prometheus, Grafana y Alertmanager (ADR-011).
 
 ## 11. Pruebas de carga (previstas, guion validado con una corrida)
 
@@ -337,7 +337,7 @@ services/inventario/            # hexagonal
 | [ADR-009](adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018                              |
 | [ADR-018](adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada · Presentación grupal |
 | [ADR-010](adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada · Entrega 2                                 |
-| [ADR-011](adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada (primera versión) · Entrega 2               |
+| [ADR-011](adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada, con tablero y alertas                      |
 | [ADR-012](adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada · Entrega 2                                 |
 | [ADR-013](adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | **Propuesta** · Entrega 2 (sin mediciones)           |
 
@@ -347,7 +347,6 @@ services/inventario/            # hexagonal
 | --------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | Justificación de los estilos internos de cada servicio                                        | D2 (ADR-002)                              |
 | Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: **resuelto, React con Vite** (ADR-017)                | D2 / D12                                  |
-| Herramientas de observabilidad y retención de métricas                                        | D11                                       |
 | URL pública y clave del gimnasio; prueba conjunta | D9 (ADR-018) |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
 | Dónde se almacenan las fotos de los productos                                                 | D3                                        |
@@ -364,8 +363,8 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 | Encabezados de identidad | Los servicios confían en `X-User-*`: en la nube sus puertos no pueden quedar abiertos | ADR-016 |
 | Integración con el gimnasio | Contrato real aplicado, pero probada solo contra el mock local: falta su URL pública, su clave y la prueba conjunta. Una reposición `REQUIERE_REVISION` no se puede resolver desde el sistema | ADR-018 |
 | Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |
-| Observabilidad | Sin tablero ni alertas; Jaeger y Prometheus pierden datos al reiniciar; el gateway no crea spans | ADR-011 |
-| Búsqueda | Sin carga real: el retraso se midió con un administrador. Sin métricas ni alerta de la cola de fallidos. Buscar pendientes recorre la colección | ADR-006 |
+| Observabilidad | Alertas probadas solo en local, con aviso a Mailpit; una falla puede avisar varias veces; Jaeger pierde las trazas al reiniciar; Catálogo no tiene trazas y el gateway no crea spans; los logs no están centralizados | ADR-011 |
+| Búsqueda | Sin carga real: el retraso se midió con un administrador. Buscar pendientes recorre la colección | ADR-006 |
 | Caché | Medida en una sola máquina y con 19 productos: la latencia con la base sin límite no fue concluyente. Cualquier cambio vacía toda la caché | ADR-007 |
 | Capacidad y costos | Guion de carga corrido una vez para validarlo, sin análisis; costos sin completar | ADR-013 |
 | Núcleo de Inventario | Sin tests unitarios de `aplicacion`; etiquetas `json` en `dominio` | ADR-002 |
