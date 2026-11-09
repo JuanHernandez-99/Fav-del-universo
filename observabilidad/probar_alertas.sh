@@ -135,22 +135,22 @@ probar_CircuitoGimnasioAbierto() {
 
 probar_CacheNoDisponible() {
   trafico_inicio "/catalogo/v1/tienda/productos?categoria=remeras"
-  docker compose stop redis >/dev/null 2>&1
-  ciclo CacheNoDisponible 180 'docker compose start redis >/dev/null 2>&1'
+  docker compose stop memcached >/dev/null 2>&1
+  ciclo CacheNoDisponible 180 'docker compose start memcached >/dev/null 2>&1'
   trafico_fin
 }
 
-# Una sola edición con Redis caído: es el caso real, y una sola falla ya tiene que avisar.
+# Una sola edición con Memcached caído: es el caso real, y una sola falla ya tiene que avisar.
 probar_InvalidacionDeCacheFallida() {
   local id
   id=$(curl -s "$BASE/catalogo/v1/admin/productos" -H "$A" -H 'Content-Type: application/json' \
     -d "{\"nombre\":\"Remera alerta $(date +%s)\",\"categoria\":\"remeras\",\"sistemaTalles\":\"LETRAS\",\"precioBase\":{\"monto\":10000},\"variantes\":[{\"talle\":\"M\",\"color\":\"Blanco\"}]}" |
     sed -n 's/.*"productoId":"\([^"]*\)".*/\1/p')
   [ -n "$id" ] || { anotar "FALLA no se pudo crear el producto de prueba"; fallas=$((fallas + 1)); return; }
-  docker compose stop redis >/dev/null 2>&1
+  docker compose stop memcached >/dev/null 2>&1
   curl -s -o /dev/null -X POST "$BASE/catalogo/v1/admin/productos/$id/publicar" -H "$A"
   # La regla mira 5 minutos hacia atrás: se resuelve sola cuando esa falla sale de la ventana.
-  ciclo InvalidacionDeCacheFallida 90 'docker compose start redis >/dev/null 2>&1; curl -s -o /dev/null -X DELETE "$BASE/catalogo/v1/admin/productos/'"$id"'" -H "$A"' 480
+  ciclo InvalidacionDeCacheFallida 90 'docker compose start memcached >/dev/null 2>&1; curl -s -o /dev/null -X DELETE "$BASE/catalogo/v1/admin/productos/'"$id"'" -H "$A"' 480
 }
 
 probar_ReposicionBloqueada() {

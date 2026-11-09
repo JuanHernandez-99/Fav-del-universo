@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Validación de la caché (ADR-007), por el gateway y con el sistema levantado (docker compose up): invalidación al editar
-# y al cambiar una promoción, avalancha de pedidos iguales con la caché vacía y caída de Redis. Requiere curl y Docker.
+# y al cambiar una promoción, avalancha de pedidos iguales con la caché vacía y caída de Memcached. Requiere curl y Docker.
 #
 #   bash services/catalogo/pruebas/cache.sh
 set -u
@@ -33,7 +33,7 @@ metrica() { # suma de una métrica en las dos réplicas, leyendo cada una por su
 ficha() { curl -s "$BASE/catalogo/v1/tienda/productos/$ID"; }
 # El primero de la respuesta: el del producto. La promoción aplicada también tiene nombre.
 nombre() { grep -o '"nombre":"[^"]*"' | head -1 | cut -d'"' -f4; }
-vaciar() { docker compose exec -T redis redis-cli flushall >/dev/null; }
+vaciar() { docker compose exec -T memcached sh -c 'echo flush_all | nc -w 1 localhost 11211' >/dev/null; }
 
 anotar "--- Producto de prueba"
 RESPUESTA=$(curl -s "$BASE/catalogo/v1/admin/productos" -H "$A" -H 'Content-Type: application/json' \
@@ -69,23 +69,30 @@ LECTURAS=$((DESPUES - ANTES))
 anotar "100 pedidos iguales simultáneos: $LECTURAS lecturas a MongoDB"
 comprobar "Hacen muy pocas lecturas a MongoDB (a lo sumo una por réplica en cada tanda)" si "$([ "$LECTURAS" -le 10 ] && echo si || echo no)"
 
-anotar "--- Caída de Redis"
-docker compose stop redis >/dev/null 2>&1
+anotar "--- Caída de Memcached"
+docker compose stop memcached >/dev/null 2>&1
 errores=0; inicio=$(date +%s%3N)
 for i in $(seq 1 50); do
   [ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/catalogo/v1/tienda/productos/$ID")" = 200 ] || errores=$((errores + 1))
 done
-anotar "50 lecturas sin Redis en $(($(date +%s%3N) - inicio)) ms"
-comprobar "Sin Redis, ninguna lectura falla" 0 "$errores"
+anotar "50 lecturas sin Memcached en $(($(date +%s%3N) - inicio)) ms"
+comprobar "Sin Memcached, ninguna lectura falla" 0 "$errores"
 comprobar "El listado también responde" 200 "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/catalogo/v1/tienda/productos?categoria=remeras")"
 VERSION=$(curl -s "$BASE/catalogo/v1/admin/productos/$ID" -H "$A" | sed -n 's/.*"version":\([0-9]*\).*/\1/p')
-comprobar "Se puede editar sin Redis" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$BASE/catalogo/v1/admin/productos/$ID" -H "$A" -H 'Content-Type: application/json' \
-  -d "{\"nombre\":\"Remera sin redis $SUFIJO\",\"categoria\":\"remeras\",\"precioBase\":{\"monto\":12000},\"version\":$VERSION}")"
-comprobar "Y se lee el dato nuevo" "Remera sin redis $SUFIJO" "$(ficha | nombre)"
-docker compose start redis >/dev/null 2>&1
-until [ "$(docker compose exec -T redis redis-cli ping 2>/dev/null | tr -d '\r')" = PONG ]; do sleep 1; done
-ficha >/dev/null
-comprobar "Al volver Redis, se vuelve a llenar" si "$([ "$(docker compose exec -T redis redis-cli --scan --pattern 'catalogo:*' | grep -c producto)" -ge 1 ] && echo si || echo no)"
+comprobar "Se puede editar sin Memcached" 200 "$(curl -s -o /dev/null -w '%{http_code}' -X PUT "$BASE/catalogo/v1/admin/productos/$ID" -H "$A" -H 'Content-Type: application/json' \
+  -d "{\"nombre\":\"Remera sin memcached $SUFIJO\",\"categoria\":\"remeras\",\"precioBase\":{\"monto\":12000},\"version\":$VERSION}")"
+comprobar "Y se lee el dato nuevo" "Remera sin memcached $SUFIJO" "$(ficha | nombre)"
+docker compose start memcached >/dev/null 2>&1
+until docker compose exec -T memcached sh -c 'echo version | nc -w 1 localhost 11211' 2>/dev/null | grep -q VERSION; do sleep 1; done
+# Tras un error, la réplica no usa la caché durante 5 s (ADR-019): se le da tiempo.
+lleno=no
+for i in $(seq 1 20); do
+  ficha >/dev/null
+  items=$(docker compose exec -T memcached sh -c 'echo stats | nc -w 1 localhost 11211' | tr -d '\r' | awk '$2 == "curr_items" {print $3}')
+  if [ "${items:-0}" -ge 1 ]; then lleno=si; break; fi
+  sleep 1
+done
+comprobar "Al volver Memcached, se vuelve a llenar" si "$lleno"
 
 curl -s -o /dev/null -X DELETE "$BASE/catalogo/v1/admin/productos/$ID" -H "$A"
 comprobar "Despublicar se ve enseguida" 404 "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/catalogo/v1/tienda/productos/$ID")"

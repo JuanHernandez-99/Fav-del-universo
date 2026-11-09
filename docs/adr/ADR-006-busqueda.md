@@ -27,7 +27,7 @@ El catálogo permite buscar por texto ("remera blanca"), filtrar por categoría,
 
 ### Motor
 
-**Elasticsearch 8** en un contenedor de un solo nodo. Se elige por ser el estándar para búsqueda por texto con relevancia (BM25), filtros y facetas, y por ser el que cubre el material de la cátedra.
+**Elasticsearch 8** en un contenedor de un solo nodo. Da búsqueda por texto con relevancia (BM25) y filtros, y se usa por HTTP con JSON, sin un cliente específico. La consigna pide un motor sin fijar cuál; ver la comparación con Solr en "Alternativas consideradas".
 
 ### Qué se indexa
 
@@ -100,10 +100,47 @@ Solo la búsqueda **con texto** usa el motor (`GET /v1/tienda/productos?q=...`).
 | **Comparar versiones sin RabbitMQ** (el indexador lee Mongo directo) | Más simple, y también cumple la consigna. Se prefirió respetar el diseño con eventos: desacopla la escritura del indexador y da reintentos y cola de fallidos. |
 | **Outbox en otra colección, o change streams**      | Requieren un replica set, también en la nube. Sin ganancia para este caso.                                                                                   |
 | **`LIKE` en MySQL**                                 | No ordena por relevancia, no tolera errores y no usa índices con comodín al principio. Además, el catálogo no está en MySQL.                                 |
-| **Meilisearch o Typesense**                         | Más simples de operar y buenos para este tamaño. Se prefiere Elasticsearch por el material de la cátedra.                                                    |
+| **Apache Solr** (el que se usó en clase)            | Ver "Por qué no Solr". |
+| **Meilisearch o Typesense**                         | Más simples de operar y buenos para este tamaño. No se compararon con una prueba.                                                                            |
 | **Búsqueda vectorial o híbrida**                    | Sin una necesidad observable. Aumenta el costo y la complejidad.                                                                                            |
 | **Indexar la disponibilidad**                       | Se desactualiza con cada reserva y obliga a un flujo de eventos de muy alto volumen.                                                                        |
 | **Consultar a Inventario por cada resultado**       | Multiplica la carga y acopla la búsqueda a su disponibilidad.                                                                                               |
+
+### Por qué no Solr
+
+Solr fue el motor usado en clase. Elasticsearch se definió en la Entrega 2 sin compararlo, así que se comparó el 09/11/2026 con `services/catalogo/pruebas/comparar_solr.mjs`: mismo catálogo (20 productos), mismo análisis de texto y mismas consultas.
+
+**Los dos cumplen.** Pasaron los 16 casos: plural, acentos, errores de tipeo, todas las palabras, talle y color en la misma variante, orden, paginación, relevancia, reconstrucción sin corte, evento viejo y edición de variantes.
+
+| | Elasticsearch | Solr |
+|---|---|---|
+| Error de tipeo | `fuzziness: AUTO`, incluido en la consulta | **Se arma aparte:** calcular la distancia en el cliente y agregar un campo sin raíz, porque un término difuso no pasa por el análisis |
+| Evento viejo | `version_type=external` en cada pedido | Un procesador de actualización que hay que configurar |
+| Reconstrucción sin corte | Cambio de alias | Intercambio de núcleos (`SWAP`) |
+| Memoria en reposo, heap de 512 MB | 1 GiB | **745 MiB** |
+| p95, 700 consultas seguidas | 10,2 ms | **8,1 ms** |
+
+**Solr fue algo más liviano y rápido, y Elasticsearch, más directo de usar.** Con 20 productos y una sola computadora, esas diferencias de rendimiento no alcanzan para decidir.
+
+**Por qué se mantiene Elasticsearch: resuelve de forma más directa los errores de tipeo, que son el criterio 2 de esta decisión desde la Entrega 2.** Un comprador que escribe "remra" tiene que encontrar la remera.
+
+- **En Elasticsearch** alcanza con `fuzziness: AUTO` en la consulta. El término pasa por el mismo análisis que el índice, y la regla de distancia la aplica el motor.
+- **En Solr** un término difuso no pasa por ese análisis, así que no coincide con la raíz guardada. En la comparación, la consulta difusa directa dio **0 resultados con "remra"**, y Elasticsearch, 5. Para igualarlo hizo falta calcular la distancia de cada palabra en el cliente y agregar un campo sin raíz al índice: más código y más datos que mantener alineados.
+
+Además, Solr no agrega nada a lo que pide la consigna, y migrar obligaría a reescribir `internal/busqueda` y a repetir las pruebas de lo que ya está comprobado sobre este motor:
+
+| Lo que pide la consigna | Cómo se cumple | Evidencia |
+|---|---|---|
+| Índice sincronizado, sin que un evento repetido o viejo pise un dato nuevo | Versionado externo (`version_type=external`) | `TestVersionadoExterno` y prueba por el gateway |
+| Mecanismo de reconstrucción | Índice nuevo y cambio de alias, sin cortar la búsqueda | 87 consultas durante el cambio, ninguna falló |
+| Filtros relevantes | `nested`: talle y color tienen que coincidir en la misma variante | `TestFiltros` |
+| Retraso máximo definido | 10 s **[propuesta]** | Peor caso medido: 1,9 s |
+
+**Si la cátedra lo exigiera, el cambio es acotado:** el servicio usa la interfaz `Indice`, y solo Catálogo depende del motor, en `internal/busqueda`.
+
+**Costo aceptado:** unos 260 MiB más de memoria que Solr, que pesan en el despliegue (ADR-013).
+
+**Sin probar con Solr:** carga real, retraso de indexación, y el flujo completo con RabbitMQ y el gateway.
 
 ## Consecuencias
 

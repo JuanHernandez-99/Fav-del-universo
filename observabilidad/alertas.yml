@@ -93,7 +93,7 @@ groups:
         for: 1m
         labels: { severidad: media }
         annotations:
-          resumen: Redis no responde. La tienda sigue, pero toda la lectura va a MongoDB.
+          resumen: Memcached no responde. La tienda sigue, pero toda la lectura va a MongoDB.
       - alert: InvalidacionDeCacheFallida
         expr: sum(increase(cache_invalidaciones_total{resultado="error"}[5m])) > 0
         labels: { severidad: media }

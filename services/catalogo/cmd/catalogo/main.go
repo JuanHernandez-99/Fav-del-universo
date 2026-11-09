@@ -65,12 +65,12 @@ func correr() error {
 	} else {
 		slog.Warn("ELASTICSEARCH_URL sin definir: la búsqueda usa el texto de MongoDB")
 	}
-	if direccion := os.Getenv("REDIS_ADDR"); direccion != "" && os.Getenv("CACHE_ENABLED") != "false" {
-		redis := cache.Nuevo(direccion)
-		defer func() { _ = redis.Cerrar() }()
-		opcionesServicio = append(opcionesServicio, service.ConCache(redis))
-		go service.VigilarEvicciones(ctx, redis.Evicciones)
-		slog.Info("caché activada", "redis", direccion)
+	if direccion := os.Getenv("MEMCACHED_ADDR"); direccion != "" && os.Getenv("CACHE_ENABLED") != "false" {
+		memcached := cache.Nuevo(direccion)
+		defer func() { _ = memcached.Cerrar() }()
+		opcionesServicio = append(opcionesServicio, service.ConCache(memcached))
+		go service.VigilarEvicciones(ctx, memcached.Evicciones)
+		slog.Info("caché activada", "memcached", direccion)
 	} else {
 		slog.Info("caché apagada") // CACHE_ENABLED=false sirve para medir sin caché (ADR-007)
 	}

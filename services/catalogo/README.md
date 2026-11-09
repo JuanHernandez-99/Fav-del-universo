@@ -12,7 +12,7 @@ Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, c
 | **Promociones** | `GET`, `POST /v1/promociones` y `PUT /v1/promociones/{id}`. Por el gateway, en `/catalogo/`. Se cancela editando la vigencia |
 | **Tienda** | `GET /v1/tienda/productos` y `GET /v1/tienda/productos/{id}`: solo publicados, con fotos, precio con y sin promoción, filtros y paginación. Por el gateway, en `/catalogo/v1/tienda/`, sin token. No depende de `CAPACIDAD_PUBLICA_ACTIVA` |
 | **Búsqueda** | Con `q`, la tienda busca en Elasticsearch: relevancia, tolerancia a errores de tipeo, filtros, orden y paginación. El índice se actualiza con el evento `ProductoCambiado` y se reconstruye con `POST /v1/admin/busqueda/reconstruir` ([ADR-006](../../docs/adr/ADR-006-busqueda.md)). Se prueba con `pruebas/busqueda.sh` |
-| **Caché** | Redis para las lecturas de la tienda, con `CACHE_ENABLED=false` para medir sin ella ([ADR-007](../../docs/adr/ADR-007-cache.md)). Se prueba con `pruebas/cache.sh`. Métricas en `GET /metrics` |
+| **Caché** | Memcached para las lecturas de la tienda, con `CACHE_ENABLED=false` para medir sin ella ([ADR-007](../../docs/adr/ADR-007-cache.md)). Se prueba con `pruebas/cache.sh`. Métricas en `GET /metrics` |
 | **Consulta por lote** | `GET /v1/variantes?variantes=a,b,c` (hasta 200 ids), para Ventas. Detalle en `api/openapi.yaml` |
 | **Código** | Go, en capas `handler` → `service` → `repository` (único que habla con MongoDB). Sin estado en memoria |
 | **Base** | MongoDB con tres colecciones (`productos`, `categorias`, `promociones`), índices y validación de esquema |
@@ -39,7 +39,7 @@ No sabe cuántas unidades hay: la disponibilidad es de [Inventario](../inventari
 | Ventas → Catálogo | HTTP | Precio vigente al comprar **[propuesta]** |
 | Catálogo → Inventario | Evento `VarianteCreada` **[propuesta]** | Registrar la variante con stock 0 |
 | Catálogo → índice de búsqueda | Evento `ProductoCambiado` | Mantener la búsqueda actualizada (ADR-006) |
-| Catálogo → Redis | Caché de lecturas | Ficha, listados y promociones para mostrar (ADR-007) |
+| Catálogo → Memcached | Caché de lecturas | Ficha, listados y promociones para mostrar (ADR-019) |
 
 ## Capacidad compartida: catálogo
 

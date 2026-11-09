@@ -23,7 +23,7 @@ var (
 		Buckets: []float64{.001, .0025, .005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5},
 	}, []string{"ruta", "metodo"})
 
-	// CacheOperaciones permite calcular la tasa de aciertos de la caché (ADR-007).
+	// CacheOperaciones permite calcular la tasa de aciertos de la caché (ADR-019).
 	CacheOperaciones = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "cache_operaciones_total",
 		Help: "Lecturas de la caché por recurso (ficha, listado, promociones) y resultado (acierto, fallo, error, omitida).",
@@ -43,7 +43,7 @@ var (
 
 	CacheEvicciones = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "cache_evicciones",
-		Help: "Claves que Redis expulsó por falta de memoria desde que arrancó.",
+		Help: "Claves que Memcached expulsó por falta de memoria desde que arrancó.",
 	})
 )
 

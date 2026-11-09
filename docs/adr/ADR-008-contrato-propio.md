@@ -89,6 +89,7 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 
 | Alternativa | Por qué se descartó |
 |---|---|
+| **Escribir el mock a mano** | Prism lo genera desde el OpenAPI: el mock no se puede apartar del contrato publicado, y el otro grupo pudo integrarse antes de que existiera la capacidad real. |
 | **Opción A de la Entrega 1: reserva de cupos con vencimiento** (Inventario) | Se pensó para un consumidor de otro dominio, sin ropa que comprar. El consumidor asignado sí compra ropa: necesita el catálogo y pedidos sobre stock real. |
 | **Opción B de la Entrega 1: envío de emails** (Ventas) | Mismo motivo. Además, es poco central para un consumidor que compra. |
 | **Reservar y confirmar por separado** (tres o más operaciones) | Obliga a exponer reservas y su vencimiento a otro sistema. El consumidor no lo pidió y la tienda no lo necesita: la confirmación ya existe como confirmación de la transferencia. |

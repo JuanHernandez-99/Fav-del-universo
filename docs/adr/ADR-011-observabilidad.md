@@ -100,7 +100,7 @@ Los umbrales son **[propuesta]**:
 | `ReposicionARevisar` | Hay una reposición en conflicto | Alta |
 | `ReposicionPendienteAntigua` | Una reposición espera hace más de 10 minutos | Alta |
 | `MensajesEnColaDeFallidos` | Hay mensajes en una DLQ | Alta |
-| `CacheNoDisponible` | Redis falla en las lecturas, durante 1 minuto | Media |
+| `CacheNoDisponible` | La caché falla en las lecturas, durante 1 minuto | Media |
 | `InvalidacionDeCacheFallida` | Falló una invalidación en los últimos 5 minutos | Media |
 
 **Por qué 5 % si el objetivo es 99 %:** la alerta avisa de una falla en curso. Con el objetivo exacto, unos pocos errores con poco tráfico avisarían sin que pase nada grave.
@@ -112,6 +112,7 @@ Los umbrales son **[propuesta]**:
 | **Instrumentar directo con la librería de Jaeger** (sin OpenTelemetry) | Las librerías propias de Jaeger están discontinuadas en favor de OpenTelemetry. Con OTLP se puede cambiar Jaeger por Tempo u otro backend cambiando solo la variable de entorno. |
 | **Zipkin** | Similar a Jaeger. Jaeger recibe OTLP de forma nativa y su interfaz para comparar trazas es más completa. |
 | **Grafana Tempo + Loki** (trazas y logs) | Más piezas para levantar y configurar en esta entrega. Se puede reconsiderar si se suma Grafana. |
+| **Guardar los logs en MySQL** (lo que se usó en clase) | Se podrían consultar con SQL, pero una caída de la base se llevaría los logs justo cuando hacen falta: en el [ensayo](../POSTMORTEM.md), los errores de conexión de MySQL se pudieron leer porque iban a stdout. Además, cada pedido sumaría una escritura a una base que atiende el negocio. **Costo aceptado:** los logs no quedan centralizados. |
 | **ELK / OpenSearch para logs** | Demasiado pesado para el volumen de FAV y para una máquina de desarrollo. Con JSON en stdout, los logs pueden mandarse a cualquiera de estos más adelante sin tocar el código. |
 | **Métricas por OTLP en lugar de Prometheus** | Prometheus es el estándar para métricas con historial y consultas como "errores 404 de la semana pasada". El scrape no obliga a los servicios a conocer dónde se guardan las métricas. |
 | **La interfaz de Prometheus como tablero** | Sirve para consultas sueltas, no para ver el estado general de una mirada. |

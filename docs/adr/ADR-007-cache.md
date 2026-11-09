@@ -2,7 +2,7 @@
 
 |                             |                                                                                                                                                                                  |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**                  | **Aceptada e implementada** (08/11/2026). Propuesta en la Entrega 2; ver "Cambios respecto de la propuesta".                                                                      |
+| **Estado**                  | **Reemplazada en el motor por [ADR-019](ADR-019-cache-con-memcached.md)** (09/11/2026): Memcached en lugar de Redis. Lo demás sigue vigente: qué se cachea, invalidación y comportamiento ante fallas. Lo que dice sobre Redis y sus mediciones se conserva como historia. |
 | **Fecha**                   | 23/10/2026, actualizada el 08/11/2026                                                                                                                                            |
 | **Decisión de la consigna** | D7 · Caché                                                                                                                                                                       |
 | **Relacionadas**            | [ADR-003](ADR-003-persistencia.md) (Mongo), [ADR-006](ADR-006-busqueda.md) (búsqueda), [ADR-011](ADR-011-observabilidad.md) (métricas), [ADR-013](ADR-013-capacidad-y-costos.md) (medición) |
