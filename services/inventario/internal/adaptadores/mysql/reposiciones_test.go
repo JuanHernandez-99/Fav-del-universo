@@ -226,6 +226,33 @@ func TestCaidaDelGimnasioDejaLaReposicionPendiente(t *testing.T) {
 	}
 }
 
+func TestResumenCuentaPorEstadoYDaLaPendienteMasAntigua(t *testing.T) {
+	e := nuevoEscenario(t)
+	ctx := context.Background()
+	antes, _, err := e.repo.ResumirReposiciones(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.reponer(t, 1)
+	confirmada := e.reponer(t, 1)
+	if _, err := e.servicio.EnviarReposicion(ctx, confirmada); err != nil {
+		t.Fatal(err)
+	}
+	resumen, antiguedad, err := e.servicio.ResumirReposiciones(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resumen[dominio.ReposicionPendiente] != antes[dominio.ReposicionPendiente]+1 || resumen[dominio.ReposicionConfirmada] != antes[dominio.ReposicionConfirmada]+1 {
+		t.Fatalf("antes %v, después %v", antes, resumen)
+	}
+	if _, existe := resumen[dominio.ReposicionBloqueada]; !existe {
+		t.Fatal("tiene que informar también los estados en 0")
+	}
+	if antiguedad < 0 {
+		t.Fatalf("antigüedad: %v", antiguedad)
+	}
+}
+
 func TestListarReposicionesLasMasRecientesPrimero(t *testing.T) {
 	e := nuevoEscenario(t)
 	rep := e.reponer(t, 1)

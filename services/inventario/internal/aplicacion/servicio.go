@@ -245,6 +245,22 @@ func (s *Servicio) EnviarReposicion(ctx context.Context, r dominio.Reposicion) (
 	}
 }
 
+// ResumirReposiciones cuenta por estado, con todos los estados, y dice hace cuánto espera la pendiente más antigua.
+func (s *Servicio) ResumirReposiciones(ctx context.Context) (map[dominio.EstadoReposicion]int, time.Duration, error) {
+	cantidades, masAntigua, err := s.repo.ResumirReposiciones(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	resumen := map[dominio.EstadoReposicion]int{}
+	for _, estado := range dominio.EstadosReposicion {
+		resumen[estado] = cantidades[estado]
+	}
+	if masAntigua.IsZero() {
+		return resumen, 0, nil
+	}
+	return resumen, s.ahora().Sub(masAntigua), nil
+}
+
 func (s *Servicio) ListarReposiciones(ctx context.Context, limite int) ([]dominio.Reposicion, error) {
 	return s.repo.ListarReposiciones(ctx, limite)
 }
