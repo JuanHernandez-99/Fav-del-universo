@@ -1,6 +1,6 @@
 # FAV del universo
 
-Antes de escribir código, leé lo que corresponda a la tarea: `SPEC.md`, `docs/ARCHITECTURE.md`, los ADR de `docs/adr/` y el `README.md` del servicio. Para Catálogo, además, `services/catalogo/DISENO.md`.
+Antes de escribir código, leé lo que corresponda a la tarea: `SPEC.md`, `docs/ARCHITECTURE.md`, los ADR de `docs/adr/` y el `README.md` del servicio.
 
 Reglas:
 

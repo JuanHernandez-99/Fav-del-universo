@@ -67,6 +67,10 @@ map "${CAPACIDAD_PUBLICA_ACTIVA}" $capacidad_activa {
     "false" 0;
 }
 
+# IP real del cliente cuando hay un proxy adelante (Caddy en la nube): el archivo dice en qué proxy confiar.
+# En local la carpeta no existe y no se incluye nada: la IP es la de quien se conecta.
+include /etc/nginx/proxy-confiable/*.conf;
+
 # Límite por grupo: 60 pedidos por minuto, con ráfagas de hasta 20 (contrato, respuesta 429).
 limit_req_zone $http_x_api_key zone=por_grupo:10m rate=60r/m;
 # Límite por IP en registro e inicio de sesión: frena los intentos masivos de adivinar contraseñas (ADR-015).

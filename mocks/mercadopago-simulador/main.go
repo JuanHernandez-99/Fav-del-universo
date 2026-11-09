@@ -77,10 +77,11 @@ var pagina = template.Must(template.New("checkout").Parse(`<!doctype html>
 <html lang="es"><meta charset="utf-8"><title>Simulador de Mercado Pago</title>
 <body style="font-family:sans-serif;max-width:32rem;margin:2rem auto">
 <h1>Simulador de Mercado Pago</h1>
-<p>No se cobra nada: esta página reemplaza al checkout real (ADR-014).</p>
+<p>Pago de prueba: no se cobra nada. Esta página reemplaza al checkout real (ADR-014).</p>
 <ul>{{range .Items}}<li>{{.Quantity}} x {{.Title}} — ${{.UnitPrice}}</li>{{end}}</ul>
-<form method="post" action="/checkout/{{.ID}}/aprobar"><button>Aprobar el pago</button></form>
-<form method="post" action="/checkout/{{.ID}}/rechazar"><button>Rechazar el pago</button></form>
+<form method="post" action="/checkout/{{.ID}}/aprobar"><button>Pagar</button></form>
+<p>Para probar qué pasa si Mercado Pago rechaza el pago (por ejemplo, una tarjeta sin fondos):</p>
+<form method="post" action="/checkout/{{.ID}}/rechazar"><button>Simular tarjeta rechazada</button></form>
 </body></html>`))
 
 // resultado es lo que ve quien aprieta un botón del checkout: el comprador vuelve a la tienda por su cuenta.
