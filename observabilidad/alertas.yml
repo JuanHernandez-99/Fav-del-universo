@@ -54,16 +54,19 @@ groups:
           resumen: El gimnasio está fallando y el circuit breaker está abierto. Las reposiciones esperan.
       - alert: ReposicionBloqueada
         expr: max(reposiciones_por_estado{estado="BLOQUEADA_CONFIGURACION"}) > 0
+        keep_firing_for: 1m # al reiniciar Inventario, la métrica falta unos segundos: no es que se haya resuelto
         labels: { severidad: critica }
         annotations:
           resumen: El gimnasio no acepta nuestra credencial. Hay reposiciones bloqueadas hasta corregir GIMNASIO_API_KEY.
       - alert: ReposicionARevisar
         expr: max(reposiciones_por_estado{estado="REQUIERE_REVISION"}) > 0
+        keep_firing_for: 1m # al reiniciar Inventario, la métrica falta unos segundos: no es que se haya resuelto
         labels: { severidad: alta }
         annotations:
           resumen: Hay reposiciones en conflicto con el gimnasio. Hay que revisarlas con ellos.
       - alert: ReposicionPendienteAntigua
         expr: max(reposicion_pendiente_antiguedad_segundos) > 600
+        keep_firing_for: 1m # al reiniciar Inventario, la métrica falta unos segundos: no es que se haya resuelto
         labels: { severidad: alta }
         annotations:
           resumen: Hay una reposición sin confirmar hace más de 10 minutos.
