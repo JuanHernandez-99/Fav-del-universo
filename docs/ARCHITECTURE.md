@@ -362,7 +362,7 @@ La consigna establece qué condiciones cumplir y no cómo: "las decisiones de di
 | ccache o Memcached | **Memcached** | ccache vive en cada réplica: responderían distinto y la invalidación no llegaría a todas | ADR-019 |
 | Go con Gin | Go con **`net/http`** | El router estándar ya cubre lo necesario, sin una dependencia más | ADR-002 |
 | MySQL con GORM | MySQL con **`database/sql`** | Las garantías de stock dependen de consultas exactas, y así se ve y se prueba lo que se ejecuta | ADR-003 |
-| Apache Solr | **Elasticsearch** | Se compararon en 16 casos y los dos cumplen. Solr fue algo más liviano, y Elasticsearch, más directo para errores de tipeo y versionado. Migrar no agregaría nada a la consigna y obligaría a repetir las pruebas | ADR-006 |
+| Apache Solr | **Elasticsearch** | Resuelve de forma más directa los errores de tipeo: con una opción de la consulta, mientras que Solr necesitó código en el cliente y un campo extra (sin eso, 0 resultados con "remra"). Se compararon en 16 casos: los dos cumplen, y Solr usó menos memoria | ADR-006 |
 | Logs en MySQL | **Logs JSON por stdout** | Una caída de la base se llevaría los logs justo cuando hacen falta, y cada pedido sumaría una escritura | ADR-011 |
 
 **Agregados que pide la consigna:** trazas con OpenTelemetry y Jaeger (defensa), circuit breaker (2.9), prueba de carga con k6 (2.11), test de contrato con `kin-openapi` (punto 4) y alerta con Alertmanager (defensa). El frontend, con React y Vite, se justifica en ADR-017.

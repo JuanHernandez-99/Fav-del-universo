@@ -84,7 +84,7 @@ Con Docker, desde la raíz:
 docker compose up --build
 ```
 
-No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) con su MongoDB, los productos de ejemplo, Elasticsearch y Redis, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger, Prometheus, Alertmanager y Grafana.
+No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) con su MongoDB, los productos de ejemplo, Elasticsearch y Memcached, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger, Prometheus, Alertmanager y Grafana.
 
 | Qué | Dónde |
 |---|---|

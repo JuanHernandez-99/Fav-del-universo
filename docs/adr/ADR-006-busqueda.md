@@ -122,7 +122,12 @@ Solr fue el motor usado en clase. Elasticsearch se definió en la Entrega 2 sin 
 
 **Solr fue algo más liviano y rápido, y Elasticsearch, más directo de usar.** Con 20 productos y una sola computadora, esas diferencias de rendimiento no alcanzan para decidir.
 
-**Por qué se mantiene Elasticsearch:** Solr no agrega nada a lo que pide la consigna. Migrar obligaría a reescribir `internal/busqueda` y a repetir las pruebas de lo que ya está comprobado sobre este motor:
+**Por qué se mantiene Elasticsearch: resuelve de forma más directa los errores de tipeo, que son el criterio 2 de esta decisión desde la Entrega 2.** Un comprador que escribe "remra" tiene que encontrar la remera.
+
+- **En Elasticsearch** alcanza con `fuzziness: AUTO` en la consulta. El término pasa por el mismo análisis que el índice, y la regla de distancia la aplica el motor.
+- **En Solr** un término difuso no pasa por ese análisis, así que no coincide con la raíz guardada. En la comparación, la consulta difusa directa dio **0 resultados con "remra"**, y Elasticsearch, 5. Para igualarlo hizo falta calcular la distancia de cada palabra en el cliente y agregar un campo sin raíz al índice: más código y más datos que mantener alineados.
+
+Además, Solr no agrega nada a lo que pide la consigna, y migrar obligaría a reescribir `internal/busqueda` y a repetir las pruebas de lo que ya está comprobado sobre este motor:
 
 | Lo que pide la consigna | Cómo se cumple | Evidencia |
 |---|---|---|
