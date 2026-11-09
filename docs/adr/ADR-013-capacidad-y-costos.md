@@ -76,6 +76,7 @@ Los precios se toman de la página del proveedor elegido, con fecha y enlace, **
 | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Estimar capacidad por cálculo, sin prueba**  | Sin medición no se puede defender; la consigna pide la prueba.                                              |
 | **Probar todos los servicios a la vez**        | Hoy solo Inventario es real; probar mocks no mide nada del sistema.                                         |
+| **Generar la carga con `go test` o un script propio** | k6 mantiene fija la tasa de pedidos (`constant-arrival-rate`) aunque el sistema se ponga lento. Un bucle propio esperaría cada respuesta y bajaría la carga justo al saturarse, y la medición se engañaría sola. |
 | **Escalar todo por igual**                     | Gasta donde no hace falta y no mueve el límite si el cuello es la base.                                     |
 
 ## Consecuencias

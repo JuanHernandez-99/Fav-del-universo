@@ -68,6 +68,7 @@ Pantalla **Gimnasio** del panel: el stock allá, el formulario de reposición y 
 | Alternativa | Por qué se descartó |
 |---|---|
 | **Reservar el rechazo para `409` y `422`,** como proponía el ADR-009 | El contrato dice lo contrario sobre el `409`: puede existir una entrega anterior, y no autoriza a compensar. |
+| **Probar solo contra el gimnasio real** | Su URL todavía no está publicada, y no controlamos su sistema. El mock con WireMock responde según la clave (`probar-conflicto-`, `probar-rechazo-`), lo que permite provocar cada respuesta del contrato. No reemplaza la prueba conjunta. |
 | **Reintentar el `409` con otra clave** | Es lo que el contrato pide no hacer: podría duplicar la entrega. |
 | **Dejar de reintentar la `BLOQUEADA` hasta una acción manual** | Exige una pantalla para destrabarla y no aporta: reintentar con la clave mala no causa daño, y al corregirla se resuelve sola. |
 | **Tope de intentos y descartar** | La reposición ya descontó stock: descartarla perdería la mercadería en los registros. |

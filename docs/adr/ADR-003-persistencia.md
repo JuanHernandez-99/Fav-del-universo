@@ -45,7 +45,7 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 
 | Componente        | Qué guarda                                                  | Se decide en |
 | ----------------- | ----------------------------------------------------------- | ------------ |
-| Redis (caché)     | Lecturas del catálogo                                       | ADR-007 (D7) |
+| Memcached (caché) | Lecturas del catálogo                                       | ADR-007 y ADR-019 (D7) |
 | Motor de búsqueda | Índice de productos publicados | ADR-006 (D6) |
 
 **Cómo se cumplen las garantías:**
@@ -66,8 +66,9 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 | **Ventas en MongoDB**                                                 | La venta tiene relaciones (ítems, pagos) y se consulta por estado y fecha. Las transiciones condicionales y las restricciones únicas son más simples en SQL.                                                                          |
 | **Una base compartida, con esquemas separados**                       | La prohíbe la cátedra (RNF-08). Además, la caída o la carga de la base afectaría a todos los servicios.                                                                                                                               |
 | **Una sola instancia de MySQL con tres bases lógicas**                | Ahorra recursos, pero la caída de la instancia tumba a tres servicios a la vez y rompe el aislamiento de fallas previsto (ARCHITECTURE §8).                                                                                           |
+| **MySQL con GORM** (lo que se usó en clase)                           | Las garantías de ADR-004 dependen de consultas exactas: `UPDATE … WHERE online - reservado >= ?`, `SELECT … FOR UPDATE` e `INSERT … ON DUPLICATE KEY UPDATE`. Con `database/sql` se ve y se prueba exactamente lo que se ejecuta. GORM también permite SQL directo, pero en estos casos se usaría poco lo que aporta. **Costo aceptado:** convertir las filas se escribe a mano. Reemplazarlo ahora obligaría a revisar 68 consultas y sus pruebas de concurrencia. |
 | **PostgreSQL en lugar de MySQL**                                      | Equivalente en garantías para este uso. Ver **[?]** en la decisión.                                                                                                                                                                   |
-| **Redis o el motor de búsqueda como el almacenamiento no relacional** | Son copias derivadas, no la fuente de verdad de ningún servicio. **[?]** Consultado a la cátedra.                                                                                                                                     |
+| **La caché o el motor de búsqueda como el almacenamiento no relacional** | Son copias derivadas, no la fuente de verdad de ningún servicio. **[?]** Consultado a la cátedra.                                                                                                                                     |
 
 ## Consecuencias
 

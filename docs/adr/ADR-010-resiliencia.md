@@ -83,6 +83,7 @@ Los errores usan el formato Problem Details con un `codigo` estable, y distingue
 
 | Alternativa                                                     | Por qué se descartó                                                                                                                                                      |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Escribir el circuit breaker a mano**                          | `sony/gobreaker` ya resuelve los estados y el conteo de fallas. Es lógica delicada, con carreras posibles, y no es lo que distingue a este sistema. |
 | **Reintentar en todas las capas** (gateway, Ventas, Inventario) | Multiplica los intentos (el apunte muestra 3 × 3 × 3 = 27). Se asigna un dueño del reintento: quien llama (Ventas) hacia Inventario, y Inventario hacia el gimnasio.      |
 | **Circuit breaker también en Ventas → Inventario**              | Inventario es una dependencia crítica sin alternativa: abrir el circuito solo cambiaría la espera por un error inmediato. Sigue sin aplicarse con Ventas real: los reintentos quedan acotados por los 4,5 s de cada pedido (ADR-014).             |
 | **Bulkhead por semáforo en cada operación**                     | El volumen no lo justifica; el pool de conexiones y los trabajadores secuenciales ya acotan la concurrencia.                                                              |

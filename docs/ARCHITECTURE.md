@@ -201,14 +201,14 @@ Si algo se cae, lo demás tiene que seguir funcionando y tiene que poder saberse
 | RabbitMQ                                | Todo lo síncrono                                                                                                                         | Los efectos asíncronos se demoran: paso a _Vencida_, variantes nuevas en Inventario, índice             | Outbox: los eventos se publican cuando vuelve                       |
 | Mercado Pago                            | Navegar; comprar por transferencia                                                                                                       | Pagar con Mercado Pago                                                                                  | Timeout y circuit breaker; se ofrece la transferencia               |
 | Proveedor de mail                       | Todo                                                                                                                                     | Los mails se demoran                                                                                    | Reintentos y registro de mails fallidos                             |
-| Redis (caché)                           | Todo, más lento                                                                                                                          | —                                                                                                       | Las lecturas van directo a la fuente                                |
+| Memcached (caché)                           | Todo, más lento                                                                                                                          | —                                                                                                       | Las lecturas van directo a la fuente                                |
 | Motor de búsqueda                       | Navegar por categoría desde la base de Catálogo                                                                                          | Búsqueda por texto y filtros                                                                            | Error claro; el índice se reconstruye al volver                     |
 | La base de un servicio                  | Los demás servicios                                                                                                                      | Ese servicio                                                                                            | Una base por servicio: la falla no se propaga                       |
 
 ## 9. Caché y búsqueda
 
-- **Herramientas existentes, no implementaciones propias:** la caché usa Redis y la búsqueda un motor de búsqueda, ambos a través de sus bibliotecas cliente para Go. No se programa una caché ni un índice desde cero.
-- **Caché (implementada):** Redis delante de las lecturas de la tienda: ficha, listados sin texto y promociones para mostrar. El stock y el precio para cobrar **no** se leen de la caché (**[ADR-007](adr/ADR-007-cache.md), D7**).
+- **Herramientas existentes, no implementaciones propias:** la caché usa Memcached y la búsqueda un motor de búsqueda, ambos a través de sus bibliotecas cliente para Go. No se programa una caché ni un índice desde cero.
+- **Caché (implementada):** Memcached delante de las lecturas de la tienda: ficha, listados sin texto y promociones para mostrar. El stock y el precio para cobrar **no** se leen de la caché (**[ADR-007](adr/ADR-007-cache.md) y [ADR-019](adr/ADR-019-cache-con-memcached.md), D7**).
 - **Que la caché no quede mal cargada:** al cambiar un producto o una promoción sube una generación que forma parte de cada clave, y cada entrada vence por tiempo. Con la caché, las consultas a MongoDB de estas lecturas bajan más de un 99 %; ver los resultados en el ADR-007.
 - **Búsqueda (implementada):** Elasticsearch con un índice de productos publicados, actualizado por eventos con un outbox dentro de cada producto. Retraso máximo de 10 s **[propuesta]**, medido hasta 1,9 s, y reconstrucción desde cero sin corte (**[ADR-006](adr/ADR-006-busqueda.md), D6**). La disponibilidad no se indexa: la tienda la consulta a Inventario.
 
@@ -232,9 +232,9 @@ Se simula un **pico de demanda** como los que describe el cliente (cambio de tem
 
 ## 12. Distribución de los componentes
 
-- **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Catálogo con dos réplicas), MongoDB, tres MySQL y RabbitMQ. Redis, el motor de búsqueda y las herramientas de observabilidad se suman cuando se incorporen. Los secretos van en un archivo `.env` que no se sube al repositorio, y las claves del token las genera `usuarios-init` en volúmenes de Docker (ADR-015).
+- **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Catálogo con dos réplicas), MongoDB, tres MySQL y RabbitMQ. Memcached, el motor de búsqueda y las herramientas de observabilidad se suman cuando se incorporen. Los secretos van en un archivo `.env` que no se sube al repositorio, y las claves del token las genera `usuarios-init` en volúmenes de Docker (ADR-015).
 - **Balanceo:** en la Entrega 2 el servicio replicado es **Inventario** (2 réplicas con `deploy.replicas`), detrás de un gateway nginx con round robin y verificación pasiva ([ADR-012](adr/ADR-012-balanceo.md), D12). Catálogo también tiene 2 réplicas, con el mismo mecanismo.
-- **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), Elasticsearch, Redis, Ventas y su MySQL, RabbitMQ, Mailpit, Usuarios y su MySQL (con `usuarios-init`, que genera las claves del token), simulador de Mercado Pago, mock del gimnasio, Jaeger y Prometheus.
+- **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), Elasticsearch, Memcached, Ventas y su MySQL, RabbitMQ, Mailpit, Usuarios y su MySQL (con `usuarios-init`, que genera las claves del token), simulador de Mercado Pago, mock del gimnasio, Jaeger y Prometheus.
 - **Nube:** para que el grupo de proveedores use la capacidad con una URL pública se despliegan el gateway, Catálogo, Ventas e Inventario con sus bases. **[?]** proveedor de nube.
 
 ## 13. Estructura del repositorio
@@ -333,13 +333,39 @@ services/inventario/            # hexagonal
 | [ADR-002](adr/ADR-002-arquitectura-interna.md)     | D2 · Arquitectura interna         | Aceptada · Entrega 2 (implementada en Inventario)    |
 | [ADR-004](adr/ADR-004-consistencia-y-concurrencia.md) | D4 · Consistencia y concurrencia | Aceptada · Entrega 2 (7 pruebas de integración)      |
 | [ADR-006](adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | Aceptada e implementada                              |
-| [ADR-007](adr/ADR-007-cache.md)                    | D7 · Caché                        | Aceptada e implementada                              |
+| [ADR-007](adr/ADR-007-cache.md)                    | D7 · Caché                        | Reemplazada en el motor por ADR-019                  |
+| [ADR-019](adr/ADR-019-cache-con-memcached.md)      | D7 · Caché con Memcached          | Aceptada                                             |
 | [ADR-009](adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018                              |
 | [ADR-018](adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada · Presentación grupal |
 | [ADR-010](adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada · Entrega 2                                 |
 | [ADR-011](adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada, con tablero y alertas                      |
 | [ADR-012](adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada · Entrega 2                                 |
 | [ADR-013](adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | **Propuesta** · Entrega 2 (sin mediciones)           |
+
+### Tecnologías respecto de las usadas en clase
+
+La consigna establece qué condiciones cumplir y no cómo: "las decisiones de diseño, arquitectura y tecnología serán responsabilidad de cada grupo". Esta tabla resume en qué se parece y en qué se aparta FAV de lo usado en clase, y por qué.
+
+| En clase | En FAV | Por qué | Dónde |
+|---|---|---|---|
+| Capas con repositorios, interfaces y mocks | Igual en Catálogo y Usuarios; **hexagonal** en Inventario y Ventas | La consigna pide dos estilos. Hexagonal protege las reglas de stock y aísla al gimnasio | ADR-002 |
+| Go | Igual | Los procesos en segundo plano (vencer reservas, enviar reposiciones, publicar eventos) son gorrutinas en el mismo servicio. Compila a un solo binario: una réplica de Catálogo usó unos 16 MB de memoria en reposo | — |
+| MySQL | Igual | Reservar toca varias variantes a la vez: necesita transacciones, bloqueo de filas y restricciones únicas | ADR-003 |
+| MongoDB | Igual en Catálogo | Un producto con sus variantes y atributos variables se lee y se escribe como un solo documento. Escribir un documento es atómico: el outbox de búsqueda no necesita transacciones | ADR-003, ADR-006 |
+| RabbitMQ | Igual | Con este volumen, resuelve colas, reintentos y DLQ. Kafka no justifica su costo de operación | ADR-005 |
+| NGINX | Igual | Un solo componente hace de gateway y balanceador, y descubre réplicas por el DNS de Docker. Traefik o HAProxy suman una pieza más | ADR-012 |
+| Docker Compose | Igual | La consigna pide un arranque único y automatizado, sin configuración manual. Kubernetes es un bonus opcional y sumaría operación sin una necesidad en este volumen | RNF-07 |
+| `go test` | Igual | Viene con el lenguaje. Los tests de integración corren contra la dependencia real cuando se define su variable de entorno, y se saltean si no | — |
+| Prometheus | Igual | Va a buscar las métricas de cada réplica, lo que muestra el reparto del balanceo. Guarda historial para consultar el pasado | ADR-011 |
+| Grafana | Igual | Muestra el estado general en una pantalla, y el tablero se versiona como JSON | ADR-011 |
+| Correlation ID | Igual | Permite seguir un pedido entre servicios y eventos, también en los logs del gateway, donde no hay trazas | ADR-005, ADR-011 |
+| ccache o Memcached | **Memcached** | ccache vive en cada réplica: responderían distinto y la invalidación no llegaría a todas | ADR-019 |
+| Go con Gin | Go con **`net/http`** | El router estándar ya cubre lo necesario, sin una dependencia más | ADR-002 |
+| MySQL con GORM | MySQL con **`database/sql`** | Las garantías de stock dependen de consultas exactas, y así se ve y se prueba lo que se ejecuta | ADR-003 |
+| Apache Solr | **Elasticsearch** | Se compararon en 16 casos y los dos cumplen. Solr fue algo más liviano, y Elasticsearch, más directo para errores de tipeo y versionado. Migrar no agregaría nada a la consigna y obligaría a repetir las pruebas | ADR-006 |
+| Logs en MySQL | **Logs JSON por stdout** | Una caída de la base se llevaría los logs justo cuando hacen falta, y cada pedido sumaría una escritura | ADR-011 |
+
+**Agregados que pide la consigna:** trazas con OpenTelemetry y Jaeger (defensa), circuit breaker (2.9), prueba de carga con k6 (2.11), test de contrato con `kin-openapi` (punto 4) y alerta con Alertmanager (defensa). El frontend, con React y Vite, se justifica en ADR-017.
 
 ## 15. Pendientes de arquitectura
 
@@ -358,14 +384,14 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote, catálogo público búsqueda con Elasticsearch, caché con Redis y métricas, sin trazas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend tiene la tienda, la compra, "Mis compras" y el panel; la política de cambios está publicada, sin el texto ni los contactos del cliente (ADR-017) | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote, catálogo público búsqueda con Elasticsearch, caché con Memcached y métricas, sin trazas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend tiene la tienda, la compra, "Mis compras" y el panel; la política de cambios está publicada, sin el texto ni los contactos del cliente (ADR-017) | — |
 | Gateway único | Punto único de falla | ADR-012 |
 | Encabezados de identidad | Los servicios confían en `X-User-*`: en la nube sus puertos no pueden quedar abiertos | ADR-016 |
 | Integración con el gimnasio | Contrato real aplicado, pero probada solo contra el mock local: falta su URL pública, su clave y la prueba conjunta. Una reposición `REQUIERE_REVISION` no se puede resolver desde el sistema | ADR-018 |
 | Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |
 | Observabilidad | Alertas probadas solo en local, con aviso a Mailpit; una falla puede avisar varias veces; Jaeger pierde las trazas al reiniciar; Catálogo no tiene trazas y el gateway no crea spans; los logs no están centralizados | ADR-011 |
 | Búsqueda | Sin carga real: el retraso se midió con un administrador. Buscar pendientes recorre la colección | ADR-006 |
-| Caché | Medida en una sola máquina y con 19 productos: la latencia con la base sin límite no fue concluyente. Cualquier cambio vacía toda la caché | ADR-007 |
+| Caché | Medida en una sola máquina y con 19 productos: la latencia con la base sin límite no fue concluyente. Cualquier cambio vacía toda la caché | ADR-007, ADR-019 |
 | Capacidad y costos | Guion de carga corrido una vez para validarlo, sin análisis; costos sin completar | ADR-013 |
 | Núcleo de Inventario | Sin tests unitarios de `aplicacion`; etiquetas `json` en `dominio` | ADR-002 |
 | Resiliencia comprobada | Ensayo en local de 3 caídas de dependencias de Inventario, en [`POSTMORTEM.md`](POSTMORTEM.md). Falta la jornada con el gimnasio real y probar la compra desde la tienda durante una caída | ADR-010 |
