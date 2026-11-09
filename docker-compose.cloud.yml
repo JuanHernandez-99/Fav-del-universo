@@ -98,11 +98,6 @@ services:
     <<: *reinicio
     environment:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?falta MONGO_INITDB_ROOT_PASSWORD en .env}
-    # Con el volumen vacío, Mongo arranca primero un servidor temporal solo en localhost para crear el usuario,
-    # y después se reinicia. Un ping a localhost daba "sano" en esa etapa y catalogo-init fallaba al conectarse.
-    # Por la IP de la red, responde solo cuando ya terminó.
-    healthcheck:
-      test: ["CMD-SHELL", "mongosh --quiet --host \"$$(hostname -i)\" --eval \"db.adminCommand('ping')\""]
 
   rabbitmq:
     <<: *reinicio
