@@ -66,7 +66,7 @@ POST /v1/pedidos ──► PENDIENTE_DE_PAGO ──(FAV verifica la transferenci
 
 Consultar el estado de un pedido no está en la v1. Para saber si se acreditó un pago, usar el contacto (§7).
 
-**[?]** Los datos bancarios reales los define el cliente. Los del ejemplo son ficticios.
+Los datos para transferir son los de FAV: alias `FAV.ALIAS`, titular `Cielo`.
 
 ---
 
@@ -144,7 +144,7 @@ curl -X POST http://localhost:8090/v1/pedidos \
                    { "varianteId": "var-jean-mom-celeste-38", "cantidad": 1 } ] }'
 # → 201 { "pedidoId": "7d9f2c1e-…", "estado": "PENDIENTE_DE_PAGO", "total": 87000, "moneda": "ARS",
 #         "pago": { "medio": "TRANSFERENCIA", "venceEn": "2026-10-18T15:00:00Z",
-#                   "datosTransferencia": { "alias": "FAV.EJEMPLO.ALIAS", "titular": "FAV (ejemplo)" } }, … }
+#                   "datosTransferencia": { "alias": "FAV.ALIAS", "titular": "Cielo" } }, … }
 
 # 3. Ver un error en el mock (stock insuficiente)
 curl -X POST http://localhost:8090/v1/pedidos \

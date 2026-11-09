@@ -434,7 +434,7 @@ components:
           description: Hasta cuándo queda apartado el stock esperando la transferencia (48 horas).
         datosTransferencia:
           type: object
-          description: Datos bancarios de FAV para transferir. **[?]** los define el cliente; los del ejemplo son ficticios.
+          description: Datos bancarios de FAV para transferir.
           required: [alias, titular]
           properties:
             alias:
@@ -616,6 +616,6 @@ components:
           medio: TRANSFERENCIA
           venceEn: '2026-10-18T15:00:00Z'
           datosTransferencia:
-            alias: FAV.EJEMPLO.ALIAS
-            titular: FAV (ejemplo)
+            alias: FAV.ALIAS
+            titular: Cielo
         creadoEn: '2026-10-16T15:00:00Z'
