@@ -55,7 +55,7 @@ En `.env`:
 
 3. A mano:
    - `ADMIN_EMAIL`.
-   - `CAPACIDAD_API_KEY` y `CAPACIDAD_API_KEY_GIMNASIO`: distintas entre sí. Se les pasan a los grupos por un canal privado.
+   - `CAPACIDAD_API_KEY` y `CAPACIDAD_API_KEY_GIMNASIO`: distintas entre sí. Se les pasan a los grupos por un canal privado. De 32 caracteres (`openssl rand -hex 16`): con claves más largas el gateway no arrancó (`could not build map_hash`, límite de nginx).
    - `GIMNASIO_BASE_URL` y `GIMNASIO_API_KEY`: solo cuando el gimnasio dé las reales. Sin ellas, Inventario usa el simulador.
 
 4. Guardar una copia del `.env` fuera de la VM, en un lugar privado. Sin ella, un respaldo de las bases no se puede usar con otras contraseñas.
@@ -132,4 +132,18 @@ Para probarlo:
 | Actualizar el código | `git pull && docker compose up -d --build` |
 | Apagar sin perder datos | `docker compose down` (**nunca `-v`**: borra las bases y los certificados) |
 | Dar de baja temporalmente | Desasignar la VM en Azure: deja de cobrar el cómputo; el disco y la IP siguen costando |
+| Cambiar algo y subirlo | Ver la sección 9 |
 | Limitar los logs de Docker | En `/etc/docker/daemon.json`: `{"log-driver":"json-file","log-opts":{"max-size":"10m","max-file":"3"}}` y `sudo systemctl restart docker`. Si no, crecen sin límite en el disco |
+
+## 9. Cambiar algo y subirlo a la VM
+
+Dos terminales distintas: la **PC** (prompt `PS F:\...>`) y la **VM** (prompt `azureuser@vm-fav:~/fav$`). Se entra a la VM con `ssh -i "$HOME\.ssh\<clave>.pem" azureuser@DOMINIO` y se sale con `exit`. Los comandos de `docker compose` se corren dentro de `~/fav`, porque ahí está el `.env`.
+
+| Qué cambió | PC | VM (`cd ~/fav`) |
+|---|---|---|
+| Código | `git push` | `git pull && docker compose up -d --build` |
+| Una variable del `.env` (por ejemplo `GIMNASIO_API_KEY`) | — | `nano .env` y `docker compose up -d` |
+| Ver el resultado | — | `docker compose ps` y `docker compose logs -f <servicio>` |
+
+- `up -d` recrea solo los servicios afectados. No hay que repetir `arrancar.sh`, ni las contraseñas, ni el certificado.
+- Después de cambiar el `.env` de la VM, bajar una copia a la PC: `scp -i "$HOME\.ssh\<clave>.pem" azureuser@DOMINIO:~/fav/.env "$HOME\Documents\fav-vm.env"`.

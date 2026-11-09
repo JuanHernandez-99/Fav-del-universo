@@ -1,6 +1,6 @@
 # Capacidad publicada por FAV · Catálogo y pedidos
 
-> **Versión vigente: 1.1.0** · 08/11/2026
+> **Versión vigente: 1.2.0** · 09/11/2026
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por FAV, sin confirmar.
 
@@ -72,7 +72,7 @@ Consultar el estado de un pedido no está en la v1. Para saber si se acreditó u
 
 ## 2. Autenticación, idempotencia y límites
 
-**Autenticación.** Cada grupo recibe una clave propia y la envía en el header `X-API-Key`. Sin clave o con una clave inválida: `401 NO_AUTENTICADO`. **[?]** Cómo se entrega y se rota la clave.
+**Autenticación.** Cada grupo recibe una clave propia y la envía en el header `X-API-Key`. Sin clave o con una clave inválida: `401 NO_AUTENTICADO`. FAV entrega la clave por mensaje directo a quien la pida; para rotarla, pedirla al contacto (§7).
 
 **Idempotencia.** `POST /v1/pedidos` exige el header `Idempotency-Key`: una clave única por pedido (se recomienda un UUID).
 - Ante un timeout, un `500` o un `503`, reintentar **con la misma clave y el mismo cuerpo**: se recibe la misma respuesta, sin crear otro pedido.
@@ -105,6 +105,7 @@ Todos los errores usan **Problem Details** (RFC 9457) con un campo `codigo` esta
 | 400 | `PEDIDO_INVALIDO` | Pedido, disponibilidad | Falta un header obligatorio, o el cuerpo o `variantes` no cumplen el contrato. `errores` indica los campos. | No. Corregir. |
 | 400 | `VARIANTE_INEXISTENTE` | Pedido | Una variante no existe o su producto no está publicado. `variantes` indica cuáles. | No. Corregir. |
 | 401 | `NO_AUTENTICADO` | Todas | Falta la clave, no es válida o no habilita la operación (la del gimnasio, en un pedido). | No. |
+| 404 | `NO_ENCONTRADO` | Todas | La ruta no existe, o FAV apagó temporalmente la operación (`GET /v1/disponibilidad`). | No. |
 | 409 | `STOCK_INSUFICIENTE` | Pedido | Al menos una variante no alcanza. No se apartó nada. `faltantes` indica cuáles. | No con las mismas cantidades. |
 | 409 | `CLAVE_IDEMPOTENCIA_REUTILIZADA` | Pedido | La clave ya se usó con otro cuerpo. | No. Usar otra clave. |
 | 429 | `LIMITE_EXCEDIDO` | Todas | Demasiados pedidos del grupo. | Sí, después de `Retry-After`. |
@@ -170,15 +171,16 @@ curl -X POST http://localhost:8090/v1/pedidos \
 |---|---|---|
 | Mock local | `http://localhost:8090` | Disponible. Ver [`mocks/catalogo-pedidos-v1/`](../../mocks/catalogo-pedidos-v1). Responde ejemplos fijos. |
 | Local, con los servicios reales | `http://localhost:8080` | Disponible con `docker compose up --build`. Claves de prueba: `clave-grupo-proveedores` y `clave-grupo-gimnasio`. |
-| Desplegado (nube) | **[?]** | Antes de la presentación grupal. |
+| Desplegado (nube) | `https://fav-ucc.chilecentral.cloudapp.azure.com` | Disponible. Requiere la clave del grupo en `X-API-Key`. |
 
 ## 7. Contacto
 
-**[?]** Canal para reportar problemas, pedir cambios o consultar el estado de un pago.
+Para reportar problemas, pedir cambios o consultar el estado de un pago: 2212370@ucc.edu.ar.
 
 ## 8. Historial de versiones
 
 | Versión | Fecha | Cambios |
 |---|---|---|
+| 1.2.0 | 09/11/2026 | Documenta el código `NO_ENCONTRADO` (404), que el gateway ya devolvía. Define la URL pública, el contacto y cómo se entrega la clave. Compatible con la 1.1.0. |
 | 1.1.0 | 08/11/2026 | Agrega `GET /v1/disponibilidad`, compatible con la 1.0.0, y una clave para el grupo del gimnasio. |
 | 1.0.0 | 14/10/2026 | Primera versión: catálogo y pedidos. Reemplaza las propuestas de la Entrega 1 (reserva de cupos y envío de emails), descartadas al asignarse el grupo consumidor (ADR-008). |
