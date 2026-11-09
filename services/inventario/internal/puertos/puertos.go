@@ -51,6 +51,8 @@ type Repositorio interface {
 	MarcarReposicionARevisar(ctx context.Context, id, motivo string, ahora time.Time) error
 	// BloquearReposicion la deja reintentándose espaciado, sin devolver las unidades.
 	BloquearReposicion(ctx context.Context, id, motivo string, proximo time.Time) error
+	// EsFallaDeConexion dice si err significa que no se pudo usar la base, a diferencia de una consulta que está mal.
+	EsFallaDeConexion(err error) bool
 	// ResumirReposiciones cuenta por estado y da la fecha de la más antigua que falta confirmar (cero si no hay).
 	ResumirReposiciones(ctx context.Context) (map[dominio.EstadoReposicion]int, time.Time, error)
 	// ListarReposiciones devuelve las más recientes primero.

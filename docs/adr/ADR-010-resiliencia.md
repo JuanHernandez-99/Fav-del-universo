@@ -2,7 +2,7 @@
 
 |                             |                                                                                                                                                                                                                                                                                          |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**                  | Aceptada (primera versión) · Entrega 2. Cubre Inventario y la entrada por el gateway. La caída controlada y su informe (`docs/POSTMORTEM.md`) están **pendientes**.                                                                                                                       |
+| **Estado**                  | Aceptada (primera versión) · Entrega 2. Cubre Inventario y la entrada por el gateway. Ensayo de caídas en [`docs/POSTMORTEM.md`](../POSTMORTEM.md) (09/11/2026); falta la jornada de fallas controladas.                                                                                                                       |
 | **Fecha**                   | 23/10/2026                                                                                                                                                                                                                                                                               |
 | **Decisión de la consigna** | D10 · Resiliencia                                                                                                                                                                                                                                                                        |
 | **Relacionadas**            | [ADR-004](ADR-004-consistencia-y-concurrencia.md) (idempotencia), [ADR-005](ADR-005-comunicacion.md) (timeouts y reintentos), [ADR-009](ADR-009-consumo-del-gimnasio.md) (gimnasio), [ADR-011](ADR-011-observabilidad.md) (métricas y alertas), [ADR-012](ADR-012-balanceo.md) (réplicas) |
@@ -50,6 +50,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | | Envío de reposiciones | Un trabajador secuencial por réplica, lotes de 50 | Que el gimnasio no reciba ráfagas de llamadas simultáneas |
 | **Degradación honesta (fallback)** | Panel → consignación | `503 GIMNASIO_NO_DISPONIBLE` con `Retry-After: 30`; el resto del panel sigue | No inventar el stock del gimnasio |
 | | Inventario ante pedidos que no llegan a tiempo | `503 NO_DISPONIBLE` con `Retry-After: 1` | El cliente sabe que puede reintentar |
+| | Inventario sin poder usar su base | `503 NO_DISPONIBLE` con `Retry-After: 1`. El detalle va al log | Ventas reintenta con la misma clave, y el reintento es seguro |
 | | Gateway sin réplicas de un servicio | `503 NO_DISPONIBLE` con `Retry-After: 1`, en JSON, en lugar del `502` o `504` en HTML de nginx. La página de la tienda responde `503` en HTML | El consumidor recibe lo que promete el contrato (`gateway/pruebas/errores.mjs`) |
 | **Balanceo con verificación pasiva** | Gateway → 2 réplicas de Inventario | Una réplica que falla 2 veces en 10 s sale del reparto 10 s | Que la caída de una réplica no se note (ADR-012) |
 | **Límite de pedidos (admisión)** | Gateway, capacidad publicada | 60 pedidos por minuto por grupo, ráfagas de 20; el exceso recibe `429` | Que un pico del consumidor externo no sature a FAV |
@@ -109,8 +110,7 @@ Los errores usan el formato Problem Details con un `codigo` estable, y distingue
 
 ## Pendientes
 
-- **Caída controlada y `docs/POSTMORTEM.md`.** La consigna pide una caída provocada con su informe. Plan de ensayo: (1) detener una réplica de Inventario durante carga; (2) detener el gimnasio y enviar reposiciones; (3) detener la base. Para cada una: hipótesis, métricas observadas, comportamiento real, tiempo de recuperación.
-- Alerta por circuito abierto y por reposiciones antiguas (ADR-011).
+- **Jornada de fallas controladas,** con el gimnasio real y una compra completa.
 - Mensajes fallidos (DLQ) cuando exista el consumidor de `ReservaVencida`.
 - Segunda instancia del gateway.
 
@@ -125,6 +125,6 @@ Provocar y observar (los pasos están en el README del servicio):
 | Gimnasio lento                                 | `fixedDelay` de 4 s en el mock                                                   | Timeout de 3 s y, tras 5 fallas, `circuit_breaker_estado = 2`                                                          |
 | Reintento de un pedido                         | Repetir un pedido con la misma clave                                             | Misma reserva, sin descontar dos veces                                                                                 |
 | Exceso de pedidos de un grupo                  | Más de 80 pedidos en un minuto por `/v1/pedidos`                                 | `429` en el exceso                                                                                                     |
-| Caída de la base **[propuesta]**               | `docker compose stop mysql-inventario`                                           | `/readyz` responde `503`; los pedidos fallan sin dejar datos a medias; se recupera al volver. A confirmar en el ensayo |
+| Caída de la base                               | `docker compose stop mysql-inventario`                                           | `503 NO_DISPONIBLE`, también en un pedido por Ventas; se recupera al volver. `/readyz` no se comprobó                  |
 
-Esta tabla se completa con los resultados reales en `docs/POSTMORTEM.md`.
+Los resultados de las caídas del gimnasio, una réplica y la base están en [`docs/POSTMORTEM.md`](../POSTMORTEM.md). Las demás filas no se repitieron en ese ensayo.

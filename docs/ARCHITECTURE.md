@@ -253,7 +253,7 @@ Lo que todavía no existe en el repositorio es previsto y se agrega en entregas 
 │   └── pull_request_template.md
 ├── docs/
 │   ├── ARCHITECTURE.md
-│   ├── POSTMORTEM.md           # se completa tras la caída controlada
+│   ├── POSTMORTEM.md           # ensayo de caídas controladas
 │   ├── diagrams/
 │   │   ├── contexto.drawio     # fuente editable
 │   │   ├── contexto.png        # exportado, se muestra en ARCHITECTURE.md
@@ -368,4 +368,4 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 | Caché | Medida en una sola máquina y con 19 productos: la latencia con la base sin límite no fue concluyente. Cualquier cambio vacía toda la caché | ADR-007 |
 | Capacidad y costos | Guion de carga corrido una vez para validarlo, sin análisis; costos sin completar | ADR-013 |
 | Núcleo de Inventario | Sin tests unitarios de `aplicacion`; etiquetas `json` en `dominio` | ADR-002 |
-| Resiliencia comprobada | Falta `docs/POSTMORTEM.md` con una falla controlada ensayada | ADR-010 |
+| Resiliencia comprobada | Ensayo en local de 3 caídas de dependencias de Inventario, en [`POSTMORTEM.md`](POSTMORTEM.md). Falta la jornada con el gimnasio real y probar la compra desde la tienda durante una caída | ADR-010 |

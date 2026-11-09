@@ -18,9 +18,12 @@ import (
 // repoStock responde solo la consulta de stock; el resto de la interfaz queda nil.
 type repoStock struct {
 	puertos.Repositorio
-	stocks []dominio.Stock
-	err    error
+	stocks      []dominio.Stock
+	err         error
+	sinConexion bool
 }
+
+func (r repoStock) EsFallaDeConexion(error) bool { return r.sinConexion }
 
 func (r repoStock) ConsultarStock(context.Context, []string) ([]dominio.Stock, error) {
 	return r.stocks, r.err
@@ -90,6 +93,17 @@ func TestDisponibilidadValidaLosIds(t *testing.T) {
 		if w := pedirDisponibilidad(repoStock{}, ruta); w.Code != 400 {
 			t.Errorf("%.40s: código %d", ruta, w.Code)
 		}
+	}
+}
+
+// Con la base caída se responde lo que promete el contrato, para que quien llama pueda reintentar (ADR-010).
+func TestConLaBaseCaidaRespondeNoDisponible(t *testing.T) {
+	w := pedirDisponibilidad(repoStock{err: errors.New("invalid connection"), sinConexion: true}, "/v1/disponibilidad?variantes=var-a")
+	if w.Code != 503 || w.Header().Get("Retry-After") != "1" || !strings.Contains(w.Body.String(), "NO_DISPONIBLE") {
+		t.Errorf("código %d, Retry-After %q: %s", w.Code, w.Header().Get("Retry-After"), w.Body)
+	}
+	if strings.Contains(w.Body.String(), "invalid connection") {
+		t.Errorf("el detalle de la base no va al cliente: %s", w.Body)
 	}
 }
 
