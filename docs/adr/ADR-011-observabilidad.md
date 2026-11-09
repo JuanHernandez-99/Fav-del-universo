@@ -93,7 +93,7 @@ Los umbrales son **[propuesta]**:
 | `ReplicaCaidaInventario`, `ReplicaCaidaCatalogo` | Menos de 2 réplicas responden, durante 30 s | Alta |
 | `VentasCaido` | Ventas no responde, durante 30 s | Crítica |
 | `UsuariosCaido`, `RabbitMQCaido` | No responde, durante 30 s | Alta |
-| `ErroresDelServidor` | Más del 5 % de 5xx en un servicio, durante 1 minuto | Crítica |
+| `ErroresDelServidor` | Más del 5 % de 5xx en un servicio, durante 1 minuto. No cuenta el `503` del stock del gimnasio, porque es una degradación prevista | Crítica |
 | `LatenciaAlta` | p95 de un servicio mayor a 300 ms, durante 2 minutos | Alta |
 | `CircuitoGimnasioAbierto` | Circuit breaker abierto, durante 30 s | Alta |
 | `ReposicionBloqueada` | El gimnasio rechaza nuestra credencial | Crítica |
@@ -131,7 +131,7 @@ Los umbrales son **[propuesta]**:
 
 - **Jaeger all-in-one guarda las trazas en memoria:** se pierden al reiniciar el contenedor. Alcanza para diagnosticar en el momento, no para auditoría.
 - **El historial se pierde con `docker compose down -v`,** porque borra el volumen de Prometheus.
-- **Una falla puede avisar varias veces:** con el gimnasio caído o lento también se dispararon `ErroresDelServidor` y `LatenciaAlta`. Las alertas se agrupan por nombre y no se silencian entre sí.
+- **Una falla puede avisar varias veces:** con MySQL caído avisaron `ErroresDelServidor` y, con el servicio ya recuperado, `LatenciaAlta`. Las alertas se agrupan por nombre y no se silencian entre sí.
 - **`ReposicionARevisar` no se apaga sola:** el sistema no tiene cómo resolver ese conflicto (ADR-018) y hay que corregirlo en la base.
 - **Las alertas de reposiciones tardan 1 minuto más en apagarse** (`keep_firing_for`). Así no se resuelven en falso cuando la métrica falta al reiniciar Inventario.
 - **`ReposicionBloqueada` puede tardar más de 5 minutos en resolverse** después de corregir la clave, por la espera entre reintentos (ADR-018).

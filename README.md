@@ -105,6 +105,7 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 ├── SPEC.md                 alcance funcional
 ├── docs/
 │   ├── ARCHITECTURE.md     arquitectura
+│   ├── POSTMORTEM.md       ensayo de caídas controladas
 │   ├── adr/                decisiones de arquitectura
 │   ├── contracts/          contratos OpenAPI de la capacidad compartida
 │   └── diagrams/           contexto, contenedores y estados (.drawio y .png)
