@@ -27,10 +27,11 @@ groups:
         labels: { severidad: alta }
         annotations:
           resumen: Usuarios no responde. No se puede iniciar sesión.
-      # Objetivo de servicio: al menos 99 % de pedidos sin error del servidor.
+      # Objetivo de servicio: al menos 99 % de pedidos sin error del servidor. No cuenta el 503 del stock del gimnasio:
+      # es la degradación prevista cuando el gimnasio cae, y ya la avisa CircuitoGimnasioAbierto.
       - alert: ErroresDelServidor
         expr: |
-          sum by (job) (rate(http_pedidos_total{codigo=~"5.."}[2m]))
+          sum by (job) (rate(http_pedidos_total{codigo=~"5.."}[2m]) unless rate(http_pedidos_total{codigo="503",ruta="/v1/consignacion"}[2m]))
             / sum by (job) (rate(http_pedidos_total[2m])) > 0.05
         for: 1m
         labels: { severidad: critica }
