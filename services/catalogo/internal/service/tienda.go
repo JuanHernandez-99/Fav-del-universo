@@ -28,7 +28,7 @@ func (s *Servicio) ListarTienda(ctx context.Context, f modelo.FiltroProductos) (
 	if f.Texto != "" && s.indice != nil {
 		productos, total, err = s.buscarEnTienda(ctx, f)
 	} else {
-		productos, total, err = s.repo.ListarProductos(ctx, f)
+		productos, total, err = s.listadoDeTienda(ctx, f)
 	}
 	if err != nil {
 		return nil, 0, err
@@ -43,12 +43,9 @@ func (s *Servicio) ListarTienda(ctx context.Context, f modelo.FiltroProductos) (
 // ObtenerDeTienda es la ficha del comprador. Un producto no publicado se responde igual que uno
 // inexistente (HU-01.2).
 func (s *Servicio) ObtenerDeTienda(ctx context.Context, id string) (ProductoTienda, error) {
-	p, err := s.repo.ObtenerProducto(ctx, id)
+	p, err := s.productoDeTienda(ctx, id)
 	if err != nil {
 		return ProductoTienda{}, err
-	}
-	if !p.Publicado {
-		return ProductoTienda{}, modelo.ErrProductoNoEncontrado
 	}
 	tienda, err := s.conPrecioVigente(ctx, []modelo.Producto{p})
 	if err != nil {
@@ -59,7 +56,7 @@ func (s *Servicio) ObtenerDeTienda(ctx context.Context, id string) (ProductoTien
 
 func (s *Servicio) conPrecioVigente(ctx context.Context, productos []modelo.Producto) ([]ProductoTienda, error) {
 	momento := ahora()
-	promociones, err := s.repo.PromocionesVigentes(ctx, momento)
+	promociones, err := s.promocionesParaMostrar(ctx, momento)
 	if err != nil {
 		return nil, err
 	}

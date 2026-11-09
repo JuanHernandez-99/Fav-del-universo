@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/sync/singleflight"
+
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
 )
 
@@ -56,6 +58,10 @@ type Servicio struct {
 	repo           Repositorio
 	indice         Indice
 	reconstruyendo atomic.Bool
+	cache          Cache
+	colapsar       singleflight.Group
+	// cachePausadaHasta es un instante en nanosegundos (ver pausaCache). Es de cada réplica, sin estado compartido.
+	cachePausadaHasta atomic.Int64
 }
 
 func Nuevo(repo Repositorio, opciones ...Opcion) *Servicio {
@@ -209,6 +215,7 @@ func (s *Servicio) AgregarVariante(ctx context.Context, productoID string, nv Nu
 	if err := s.repo.AgregarVariante(ctx, p.ID, variante, ahora()); err != nil {
 		return modelo.Variante{}, err
 	}
+	s.invalidarCache(ctx)
 	return variante, nil
 }
 
@@ -228,17 +235,31 @@ func (s *Servicio) ActualizarProducto(ctx context.Context, id string, version in
 	if err := v.ComoError(); err != nil {
 		return modelo.Producto{}, err
 	}
-	return s.repo.ActualizarProducto(ctx, id, version, d, ahora())
+	p, err := s.repo.ActualizarProducto(ctx, id, version, d, ahora())
+	if err != nil {
+		return modelo.Producto{}, err
+	}
+	s.invalidarCache(ctx)
+	return p, nil
 }
 
 // Publicar habilita el producto en la web (RN-04). Publicar algo ya publicado no es un error.
 func (s *Servicio) Publicar(ctx context.Context, id string) (modelo.Producto, error) {
-	return s.repo.Publicar(ctx, id, ahora())
+	p, err := s.repo.Publicar(ctx, id, ahora())
+	if err != nil {
+		return modelo.Producto{}, err
+	}
+	s.invalidarCache(ctx)
+	return p, nil
 }
 
 // Despublicar es la baja lógica (D2): el producto no se borra y su id no se reutiliza.
 func (s *Servicio) Despublicar(ctx context.Context, id string) error {
-	return s.repo.Despublicar(ctx, id, ahora())
+	if err := s.repo.Despublicar(ctx, id, ahora()); err != nil {
+		return err
+	}
+	s.invalidarCache(ctx)
+	return nil
 }
 
 // ---------- Limpieza y validación ----------
