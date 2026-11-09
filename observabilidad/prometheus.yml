@@ -2,6 +2,14 @@
 # cada réplica es un objetivo distinto, así se ve el reparto de carga del balanceo (ADR-012).
 global:
   scrape_interval: 5s
+  evaluation_interval: 15s # sin esto, las reglas se evalúan cada 1 minuto y una alerta tarda más de 2 en dispararse
+
+rule_files: [alertas.yml]
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:9093]
 
 scrape_configs:
   - job_name: inventario
@@ -31,3 +39,9 @@ scrape_configs:
         type: A
         port: 8080
         refresh_interval: 10s
+
+  # Por cola: hace falta para vigilar las de mensajes fallidos.
+  - job_name: rabbitmq
+    metrics_path: /metrics/per-object
+    static_configs:
+      - targets: [rabbitmq:15692]

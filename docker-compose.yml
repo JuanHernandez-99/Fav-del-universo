@@ -11,6 +11,7 @@
 #   8096  simulador de Mercado Pago                  8025   Mailpit (bandeja de mails)
 #   15672 RabbitMQ (administración)                  5672   RabbitMQ (tests)
 #   3309  MySQL de Usuarios (tests)                  9200   Elasticsearch (solo desde esta máquina)
+#   3000  Grafana (tablero, solo desde esta máquina) 9093   Alertmanager (solo desde esta máquina)
 
 x-otel: &otel
   OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
@@ -272,11 +273,38 @@ services:
 
   prometheus:
     image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=15d"]
     volumes:
       - ./observabilidad/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observabilidad/alertas.yml:/etc/prometheus/alertas.yml:ro
+      - prometheus-data:/prometheus # el historial sobrevive a recrear el contenedor (RNF-03)
     ports: ["9090:9090"]
 
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    volumes:
+      - ./observabilidad/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports: ["127.0.0.1:9093:9093"]
+
+  # Tablero (http://localhost:3000): se ve sin iniciar sesión. Para editar, admin y GRAFANA_ADMIN_PASSWORD.
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-cambiar}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/tableros/fav-general.json
+    volumes:
+      - ./observabilidad/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observabilidad/grafana/tableros:/var/lib/grafana/tableros:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      prometheus: { condition: service_started }
+
 volumes:
+  prometheus-data:
+  grafana-data:
   elasticsearch-data:
   mongo-catalogo-data:
   mysql-inventario-data:
