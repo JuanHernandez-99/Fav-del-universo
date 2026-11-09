@@ -1,6 +1,6 @@
 # Prueba de carga
 
-## Caché de Catálogo (ADR-007)
+## Caché de Catálogo (ADR-019)
 
 ```bash
 bash loadtest/medir_catalogo.sh 600    # una tasa: latencia, errores y consultas a MongoDB

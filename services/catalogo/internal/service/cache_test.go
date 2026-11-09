@@ -179,14 +179,14 @@ func TestLecturasSimultaneasHacenUnaSolaConsulta(t *testing.T) {
 	}
 }
 
-func TestSinRedisRespondeDesdeMongoSinError(t *testing.T) {
+func TestSinMemcachedRespondeDesdeMongoSinError(t *testing.T) {
 	repo := &repoCache{producto: remera()}
 	cache := nuevaCache()
-	cache.err = errors.New("redis caído")
+	cache.err = errors.New("memcached caído")
 	s := Nuevo(repo, ConCache(cache))
 	ctx := context.Background()
 	if _, err := s.ObtenerDeTienda(ctx, "remera"); err != nil {
-		t.Fatalf("Redis caído no puede ser un error para el comprador: %v", err)
+		t.Fatalf("Memcached caído no puede ser un error para el comprador: %v", err)
 	}
 	if _, _, err := s.ListarTienda(ctx, modelo.FiltroProductos{Orden: modelo.OrdenNuevos, Pagina: 1, Tamano: 10}); err != nil {
 		t.Fatal(err)
@@ -196,11 +196,11 @@ func TestSinRedisRespondeDesdeMongoSinError(t *testing.T) {
 	}
 }
 
-// Con Redis caído no se paga su tiempo de espera en cada lectura.
+// Con Memcached caído no se paga su tiempo de espera en cada lectura.
 func TestTrasUnErrorNoSeVuelveAIntentarPorUnRato(t *testing.T) {
 	repo := &repoCache{producto: remera()}
 	cache := nuevaCache()
-	cache.err = errors.New("redis caído")
+	cache.err = errors.New("memcached caído")
 	s := Nuevo(repo, ConCache(cache))
 	ctx := context.Background()
 	for range 5 {
@@ -209,7 +209,7 @@ func TestTrasUnErrorNoSeVuelveAIntentarPorUnRato(t *testing.T) {
 		}
 	}
 	if cache.consultas != 1 {
-		t.Fatalf("se consultó a Redis %d veces", cache.consultas)
+		t.Fatalf("se consultó a Memcached %d veces", cache.consultas)
 	}
 	// Pasada la pausa, vuelve a usarla sola.
 	cache.err = nil

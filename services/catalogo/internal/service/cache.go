@@ -15,7 +15,7 @@ import (
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
 )
 
-// Cache es lo que el servicio necesita de la caché (ADR-007). La implementa cache.Cliente.
+// Cache es lo que el servicio necesita de la caché (ADR-019). La implementa cache.Cliente.
 type Cache interface {
 	Generacion(ctx context.Context) (int64, error)
 	SubirGeneracion(ctx context.Context) error
@@ -32,7 +32,7 @@ const (
 	vencimientoCache = 5 * time.Minute
 	tiempoFuente     = 3 * time.Second
 	tiempoInvalidar  = time.Second
-	// pausaCache: tras un error de Redis no se lo vuelve a intentar por este tiempo. Sin esto, con Redis caído cada
+	// pausaCache: tras un error de Memcached no se lo vuelve a intentar por este tiempo. Sin esto, con Memcached caído cada
 	// lectura pagaría su tiempo de espera, y una caché caída empeoraría el servicio en lugar de solo no mejorarlo.
 	pausaCache = 5 * time.Second
 )
@@ -43,7 +43,7 @@ type listadoCacheado struct {
 	Total     int64
 }
 
-// leerConCache es cache-aside: busca en Redis y, si no está, lee la fuente y lo guarda. Si Redis falla, va a la fuente y
+// leerConCache es cache-aside: busca en Memcached y, si no está, lee la fuente y lo guarda. Si Memcached falla, va a la fuente y
 // no devuelve error. Cada clave lleva la generación actual: invalidar es subirla (ver invalidarCache).
 //
 // singleflight colapsa los pedidos iguales simultáneos de esta réplica en una sola lectura a MongoDB, para que un fallo
@@ -128,7 +128,7 @@ func vencimientoConVariacion() time.Duration {
 }
 
 // invalidarCache sube la generación después de escribir en MongoDB. Si alguien estaba leyendo el dato viejo, lo guarda
-// con la generación anterior, que ya nadie lee: esa es la ventaja frente a borrar la clave. Si Redis falla, el dato
+// con la generación anterior, que ya nadie lee: esa es la ventaja frente a borrar la clave. Si Memcached falla, el dato
 // puede quedar viejo hasta su vencimiento.
 func (s *Servicio) invalidarCache(ctx context.Context) {
 	if s.cache == nil {
@@ -199,7 +199,7 @@ func (s *Servicio) promocionesParaMostrar(ctx context.Context, momento time.Time
 	return vigentes, nil
 }
 
-// VigilarEvicciones publica cuántas claves expulsó Redis, cada 15 s.
+// VigilarEvicciones publica cuántas claves expulsó Memcached, cada 15 s.
 func VigilarEvicciones(ctx context.Context, leer func(context.Context) (int64, error)) {
 	reloj := time.NewTicker(15 * time.Second)
 	defer reloj.Stop()
