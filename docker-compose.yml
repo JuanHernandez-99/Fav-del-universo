@@ -93,8 +93,11 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
     volumes: [mongo-catalogo-data:/data/db]
+    # Con el volumen vacío, Mongo arranca primero un servidor temporal solo en localhost para crear el usuario,
+    # y después se reinicia. Un ping a localhost daba "sano" en esa etapa y catalogo-init fallaba al conectarse.
+    # Por la IP de la red, responde solo cuando ya terminó.
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD-SHELL", "mongosh --quiet --host \"$$(hostname -i)\" --eval \"db.adminCommand('ping')\""]
       interval: 10s
       timeout: 5s
       retries: 5

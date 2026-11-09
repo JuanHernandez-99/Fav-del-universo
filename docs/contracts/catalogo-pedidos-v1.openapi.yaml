@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: FAV · Catálogo y pedidos para otros grupos
-  version: 1.1.0
+  version: 1.2.0
   description: |
     Capacidad que FAV, una tienda de ropa, ofrece a otros grupos.
 
@@ -23,8 +23,8 @@ servers:
     description: Servicios reales en local (`docker compose up --build`).
   - url: http://localhost:8090
     description: Mock local (`mocks/catalogo-pedidos-v1/`).
-  - url: https://pendiente.example
-    description: Entorno desplegado. [?] URL pública, antes de la presentación grupal.
+  - url: https://fav-ucc.chilecentral.cloudapp.azure.com
+    description: Entorno desplegado en la nube.
 security:
   - ClaveDeGrupo: []
 tags:
@@ -244,7 +244,7 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
-      description: Clave propia del grupo consumidor, entregada por FAV. **[?]** cómo se entrega y se rota.
+      description: Clave propia del grupo consumidor, entregada por FAV por mensaje directo a quien la pida. Para rotarla, pedirla al contacto (ver README).
 
   parameters:
     IdempotencyKey:
@@ -434,7 +434,7 @@ components:
           description: Hasta cuándo queda apartado el stock esperando la transferencia (48 horas).
         datosTransferencia:
           type: object
-          description: Datos bancarios de FAV para transferir. **[?]** los define el cliente; los del ejemplo son ficticios.
+          description: Datos bancarios de FAV para transferir.
           required: [alias, titular]
           properties:
             alias:
@@ -463,6 +463,7 @@ components:
             - STOCK_INSUFICIENTE
             - CLAVE_IDEMPOTENCIA_REUTILIZADA
             - VARIANTE_INEXISTENTE
+            - NO_ENCONTRADO
             - LIMITE_EXCEDIDO
             - ERROR_INTERNO
             - NO_DISPONIBLE
@@ -615,6 +616,6 @@ components:
           medio: TRANSFERENCIA
           venceEn: '2026-10-18T15:00:00Z'
           datosTransferencia:
-            alias: FAV.EJEMPLO.ALIAS
-            titular: FAV (ejemplo)
+            alias: FAV.ALIAS
+            titular: Cielo
         creadoEn: '2026-10-16T15:00:00Z'
