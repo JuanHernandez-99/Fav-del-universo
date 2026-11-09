@@ -482,6 +482,15 @@ a.panel-fila:hover { background: var(--papel); }
 .stock-nota { grid-column: 1 / -1; }
 .stock-movimiento .acceso-error { margin-bottom: 1rem; }
 
+/* ---------- Política de cambios ---------- */
+.politica { max-width: 720px; margin: auto; padding: 3rem var(--margen) 4rem; }
+.politica h1 { margin-bottom: 1.6rem; }
+.politica section { margin-bottom: 2rem; }
+.politica h2 { margin-bottom: .6rem; font-size: 1.3rem; }
+.politica p + p { margin-top: .7rem; }
+.politica-contacto { padding: 0; list-style: none; }
+.politica-contacto li + li { margin-top: .3rem; }
+
 /* ---------- Pie ---------- */
 .pie { background: var(--noche); color: #d3e3e6; font-size: .9rem; }
 .pie-interior { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2rem; max-width: var(--ancho); margin: auto; padding: 3rem var(--margen); }
