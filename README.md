@@ -61,7 +61,7 @@ El grupo del gimnasio también nos consume: con su propia clave ve el catálogo 
 | [ADR-004](docs/adr/ADR-004-consistencia-y-concurrencia.md) | D4 · Consistencia y concurrencia | Aceptada                   |
 | [ADR-005](docs/adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) |
 | [ADR-006](docs/adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | Aceptada e implementada    |
-| [ADR-007](docs/adr/ADR-007-cache.md)                    | D7 · Caché                        | Propuesta                  |
+| [ADR-007](docs/adr/ADR-007-cache.md)                    | D7 · Caché                        | Aceptada e implementada    |
 | [ADR-008](docs/adr/ADR-008-contrato-propio.md)          | D8 · Contrato propio              | Aceptada                   |
 | [ADR-009](docs/adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018 |
 | [ADR-018](docs/adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada |
@@ -84,7 +84,7 @@ Con Docker, desde la raíz:
 docker compose up --build
 ```
 
-No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) con su MongoDB, los productos de ejemplo y Elasticsearch, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger y Prometheus.
+No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) con su MongoDB, los productos de ejemplo, Elasticsearch y Redis, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger y Prometheus.
 
 | Qué | Dónde |
 |---|---|
@@ -123,5 +123,5 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 | ------------------------------ | ----------------------------------------------------------------------------------------------- | -------- |
 | 1 · Diseño y contrato con mock | README, SPEC, ARCHITECTURE, diagramas, límites de los servicios, contrato y ADR D1, D3, D5 y D8 | Entregada |
 | 2 · Dominio propio de punta a punta (23/10) | Servicios funcionando, capacidad compartida, logs y traza, más ADR | Entregada |
-| Presentación grupal (11 o 13/11) | Frontend, autenticación, tres servicios, capacidad en la nube, mensajería, búsqueda y caché | En curso. Listos: Inventario, Catálogo, Ventas, Usuarios, mensajería y búsqueda |
+| Presentación grupal (11 o 13/11) | Frontend, autenticación, tres servicios, capacidad en la nube, mensajería, búsqueda y caché | En curso. Listos: Inventario, Catálogo, Ventas, Usuarios, mensajería, búsqueda y caché |
 | Defensa individual | Tests de contrato y carga, balanceo, caída controlada, tablero y alerta | Pendiente |
