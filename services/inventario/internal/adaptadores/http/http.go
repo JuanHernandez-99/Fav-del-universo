@@ -79,7 +79,7 @@ type itemJSON struct {
 
 func (h *Handler) reservar(w http.ResponseWriter, r *http.Request) {
 	var p pedidoReserva
-	if !leerJSON(w, r, &p) {
+	if !h.leerJSON(w, r, &p) {
 		return
 	}
 	items := make([]dominio.Item, len(p.Items))
@@ -93,7 +93,7 @@ func (h *Handler) reservar(w http.ResponseWriter, r *http.Request) {
 		Vigencia:          time.Duration(p.VigenciaMinutos) * time.Minute,
 	})
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("reserva_id", res.ID), attribute.Bool("idempotente_repetida", repetida))
@@ -105,22 +105,22 @@ func (h *Handler) reservar(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) obtenerReserva(w http.ResponseWriter, r *http.Request) {
 	res, err := h.s.ObtenerReserva(r.Context(), r.PathValue("id"))
-	responderReserva(w, r, res, err)
+	h.responderReserva(w, r, res, err)
 }
 
 func (h *Handler) confirmar(w http.ResponseWriter, r *http.Request) {
 	res, err := h.s.Confirmar(r.Context(), r.PathValue("id"))
-	responderReserva(w, r, res, err)
+	h.responderReserva(w, r, res, err)
 }
 
 func (h *Handler) liberar(w http.ResponseWriter, r *http.Request) {
 	res, err := h.s.Liberar(r.Context(), r.PathValue("id"))
-	responderReserva(w, r, res, err)
+	h.responderReserva(w, r, res, err)
 }
 
-func responderReserva(w http.ResponseWriter, r *http.Request, res dominio.Reserva, err error) {
+func (h *Handler) responderReserva(w http.ResponseWriter, r *http.Request, res dominio.Reserva, err error) {
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	escribirJSON(w, http.StatusOK, aJSON(res))
@@ -152,13 +152,13 @@ func stockAJSON(s dominio.Stock) stockJSON {
 
 // consultarStock recibe los ids separados por coma: el panel los pide por lote (ADR-001, decisión 3).
 func (h *Handler) consultarStock(w http.ResponseWriter, r *http.Request) {
-	ids, ok := idsDeVariantes(w, r)
+	ids, ok := h.idsDeVariantes(w, r)
 	if !ok {
 		return
 	}
 	stocks, err := h.s.ConsultarStock(r.Context(), ids)
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	items := make([]stockJSON, len(stocks))
@@ -173,7 +173,7 @@ func (h *Handler) consultarStock(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) stockACorregir(w http.ResponseWriter, r *http.Request) {
 	stocks, hayMas, err := h.s.StockACorregir(r.Context())
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	items := make([]stockJSON, len(stocks))
@@ -185,13 +185,13 @@ func (h *Handler) stockACorregir(w http.ResponseWriter, r *http.Request) {
 
 // consultarDisponibilidad es la ruta pública de la tienda: las unidades online disponibles, nada más (HU-01.5).
 func (h *Handler) consultarDisponibilidad(w http.ResponseWriter, r *http.Request) {
-	ids, ok := idsDeVariantes(w, r)
+	ids, ok := h.idsDeVariantes(w, r)
 	if !ok {
 		return
 	}
 	disponibilidad, err := h.s.ConsultarDisponibilidad(r.Context(), ids)
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	type disponibilidadJSON struct {
@@ -206,7 +206,7 @@ func (h *Handler) consultarDisponibilidad(w http.ResponseWriter, r *http.Request
 }
 
 // idsDeVariantes lee los ids separados por coma, sin repetidos.
-func idsDeVariantes(w http.ResponseWriter, r *http.Request) ([]string, bool) {
+func (h *Handler) idsDeVariantes(w http.ResponseWriter, r *http.Request) ([]string, bool) {
 	var ids []string
 	vistos := map[string]bool{}
 	for _, id := range strings.Split(r.URL.Query().Get("variantes"), ",") {
@@ -216,7 +216,7 @@ func idsDeVariantes(w http.ResponseWriter, r *http.Request) ([]string, bool) {
 		}
 	}
 	if len(ids) == 0 || len(ids) > 200 {
-		escribirError(w, r, &dominio.ErrorValidacion{Campos: []dominio.CampoInvalido{{Campo: "variantes", Mensaje: "indicar entre 1 y 200 ids separados por coma"}}})
+		h.escribirError(w, r, &dominio.ErrorValidacion{Campos: []dominio.CampoInvalido{{Campo: "variantes", Mensaje: "indicar entre 1 y 200 ids separados por coma"}}})
 		return nil, false
 	}
 	return ids, true
@@ -231,20 +231,20 @@ type pedidoMovimiento struct {
 
 func (h *Handler) ingresar(w http.ResponseWriter, r *http.Request) {
 	var p pedidoMovimiento
-	if !leerJSON(w, r, &p) {
+	if !h.leerJSON(w, r, &p) {
 		return
 	}
 	st, err := h.s.Ingresar(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Canal, p.Cantidad, usuario(r))
-	responderStock(w, r, st, err)
+	h.responderStock(w, r, st, err)
 }
 
 func (h *Handler) transferir(w http.ResponseWriter, r *http.Request) {
 	var p pedidoMovimiento
-	if !leerJSON(w, r, &p) {
+	if !h.leerJSON(w, r, &p) {
 		return
 	}
 	st, err := h.s.Transferir(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Origen, p.Cantidad, usuario(r))
-	responderStock(w, r, st, err)
+	h.responderStock(w, r, st, err)
 }
 
 // ajustar corrige el stock de un canal con un motivo (HU-08). La cantidad es negativa para restar.
@@ -256,17 +256,17 @@ func (h *Handler) ajustar(w http.ResponseWriter, r *http.Request) {
 		Motivo     dominio.Motivo `json:"motivo"`
 		Nota       string         `json:"nota"`
 	}
-	if !leerJSON(w, r, &p) {
+	if !h.leerJSON(w, r, &p) {
 		return
 	}
 	st, err := h.s.Ajustar(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Canal, p.Cantidad, p.Motivo, p.Nota, usuario(r))
-	responderStock(w, r, st, err)
+	h.responderStock(w, r, st, err)
 }
 
 // descontarFisico lo usa Ventas al registrar una venta del local (HU-17).
 func (h *Handler) descontarFisico(w http.ResponseWriter, r *http.Request) {
 	var p pedidoReserva
-	if !leerJSON(w, r, &p) {
+	if !h.leerJSON(w, r, &p) {
 		return
 	}
 	items := make([]dominio.Item, len(p.Items))
@@ -275,7 +275,7 @@ func (h *Handler) descontarFisico(w http.ResponseWriter, r *http.Request) {
 	}
 	stocks, err := h.s.DescontarFisico(r.Context(), r.Header.Get("Idempotency-Key"), p.Referencia, items, usuario(r))
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	respuesta := make([]stockJSON, len(stocks))
@@ -285,9 +285,9 @@ func (h *Handler) descontarFisico(w http.ResponseWriter, r *http.Request) {
 	escribirJSON(w, http.StatusOK, map[string]any{"items": respuesta})
 }
 
-func responderStock(w http.ResponseWriter, r *http.Request, st dominio.Stock, err error) {
+func (h *Handler) responderStock(w http.ResponseWriter, r *http.Request, st dominio.Stock, err error) {
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	escribirJSON(w, http.StatusOK, stockAJSON(st))
@@ -297,12 +297,12 @@ func responderStock(w http.ResponseWriter, r *http.Request, st dominio.Stock, er
 
 func (h *Handler) reponer(w http.ResponseWriter, r *http.Request) {
 	var p pedidoMovimiento
-	if !leerJSON(w, r, &p) {
+	if !h.leerJSON(w, r, &p) {
 		return
 	}
 	rep, repetida, err := h.s.Reponer(r.Context(), r.Header.Get("Idempotency-Key"), p.VarianteID, p.Cantidad, usuario(r))
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	if repetida {
@@ -319,7 +319,7 @@ func (h *Handler) reponer(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listarReposiciones(w http.ResponseWriter, r *http.Request) {
 	reposiciones, err := h.s.ListarReposiciones(r.Context(), 100)
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	items := make([]map[string]any, len(reposiciones))
@@ -335,7 +335,7 @@ func (h *Handler) listarReposiciones(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) stockEnGimnasio(w http.ResponseWriter, r *http.Request) {
 	stock, err := h.s.StockEnGimnasio(r.Context())
 	if err != nil {
-		escribirError(w, r, err)
+		h.escribirError(w, r, err)
 		return
 	}
 	items := make([]map[string]any, len(stock))
@@ -360,11 +360,11 @@ func (h *Handler) listo(w http.ResponseWriter, r *http.Request) {
 // usuario lo informa el gateway después de validar el token (ADR-001). Se usa para el registro de movimientos.
 func usuario(r *http.Request) string { return r.Header.Get("X-User-Id") }
 
-func leerJSON(w http.ResponseWriter, r *http.Request, destino any) bool {
+func (h *Handler) leerJSON(w http.ResponseWriter, r *http.Request, destino any) bool {
 	decodificador := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	decodificador.DisallowUnknownFields()
 	if err := decodificador.Decode(destino); err != nil {
-		escribirError(w, r, &dominio.ErrorValidacion{Campos: []dominio.CampoInvalido{{Campo: "cuerpo", Mensaje: "JSON inválido: " + err.Error()}}})
+		h.escribirError(w, r, &dominio.ErrorValidacion{Campos: []dominio.CampoInvalido{{Campo: "cuerpo", Mensaje: "JSON inválido: " + err.Error()}}})
 		return false
 	}
 	return true
@@ -388,7 +388,7 @@ type problema struct {
 	Variantes []string                `json:"variantes,omitempty"`
 }
 
-func escribirError(w http.ResponseWriter, r *http.Request, err error) {
+func (h *Handler) escribirError(w http.ResponseWriter, r *http.Request, err error) {
 	p := problema{Detail: err.Error()}
 	var validacion *dominio.ErrorValidacion
 	var stock *dominio.ErrorStockInsuficiente
@@ -414,6 +414,11 @@ func escribirError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, dominio.ErrProveedorNoDisponible):
 		w.Header().Set("Retry-After", "30")
 		p.Status, p.Codigo, p.Title = 503, "GIMNASIO_NO_DISPONIBLE", "El gimnasio no está disponible"
+	case h.s.BaseNoDisponible(err):
+		// El detalle va al log. Quien llama puede reintentar con la misma clave de idempotencia (ADR-010).
+		slog.WarnContext(r.Context(), "la base no está disponible", "error", err)
+		w.Header().Set("Retry-After", "1")
+		p.Status, p.Codigo, p.Title, p.Detail = 503, "NO_DISPONIBLE", "Servicio no disponible", ""
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
 		w.Header().Set("Retry-After", "1")
 		p.Status, p.Codigo, p.Title, p.Detail = 503, "NO_DISPONIBLE", "Servicio no disponible", ""

@@ -271,6 +271,9 @@ func (s *Servicio) StockEnGimnasio(ctx context.Context) ([]dominio.StockConsigna
 
 func (s *Servicio) Listo(ctx context.Context) error { return s.repo.Ping(ctx) }
 
+// BaseNoDisponible dice si err significa que no se pudo usar la base: quien llama puede reintentar.
+func (s *Servicio) BaseNoDisponible(err error) bool { return s.repo.EsFallaDeConexion(err) }
+
 func (s *Servicio) registrar(ctx context.Context, operacion string, r dominio.Reserva, err error) {
 	if err != nil {
 		slog.InfoContext(ctx, "operación sobre la reserva rechazada", "operacion", operacion, "reserva_id", r.ID, "estado", r.Estado, "motivo", err.Error())
