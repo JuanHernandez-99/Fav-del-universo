@@ -47,6 +47,12 @@ var (
 	})
 )
 
+// Las invalidaciones arrancan en 0: una serie que nace en 1 no cuenta como aumento, y la alerta no vería la primera falla.
+func init() {
+	CacheInvalidaciones.WithLabelValues("ok")
+	CacheInvalidaciones.WithLabelValues("error")
+}
+
 // Middleware registra cada pedido. El router completa Pattern con la ruta registrada: se usa esa y no la URL, para no
 // crear una serie de métricas por cada id de producto.
 func Middleware(siguiente http.Handler) http.Handler {
