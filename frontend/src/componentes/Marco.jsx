@@ -89,6 +89,7 @@ export default function Marco() {
           <div>
             <p className="pie-marca">FAV <em>del universo</em></p>
             <p>Indumentaria femenina. La entrega se acuerda con el vendedor después de la compra.</p>
+            <p><Link to="/politica-de-cambios">Cambios, devoluciones y contacto</Link></p>
           </div>
           <nav aria-label="Categorías">
             <h2>Categorías</h2>

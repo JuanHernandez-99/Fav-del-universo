@@ -24,6 +24,7 @@ import PanelPromociones from './paginas/panel/PanelPromociones.jsx';
 import PanelPromocion from './paginas/panel/PanelPromocion.jsx';
 import PanelStock from './paginas/panel/PanelStock.jsx';
 import PanelGimnasio from './paginas/panel/PanelGimnasio.jsx';
+import Politica from './paginas/Politica.jsx';
 import NoEncontrada from './paginas/NoEncontrada.jsx';
 
 createRoot(document.getElementById('raiz')).render(
@@ -39,6 +40,7 @@ createRoot(document.getElementById('raiz')).render(
               <Route path="comprar" element={<Comprar />} />
               <Route path="compra/:id" element={<CompraResultado />} />
               <Route path="mis-compras" element={<MisCompras />} />
+              <Route path="politica-de-cambios" element={<Politica />} />
               <Route path="panel" element={<Panel />}>
                 <Route index element={<Navigate to="ventas" replace />} />
                 <Route path="ventas" element={<PanelVentas />} />
