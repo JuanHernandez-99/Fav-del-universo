@@ -32,7 +32,7 @@ Fabrica tokens falsos (sin firma, firmados con otra clave, con el rol cambiado, 
 node gateway/pruebas/tienda.mjs
 ```
 
-Comprueba productos, filtros, paginación, promociones, unidades disponibles, que el resto siga protegido (también con `../`) y las caídas de Inventario y de Catálogo. Detiene y vuelve a levantar esos dos servicios, y deja datos de prueba en la base. Espera unos segundos después de reiniciar Inventario, por lo que explica [ADR-012](../docs/adr/ADR-012-balanceo.md).
+Comprueba productos, filtros, paginación, promociones, unidades disponibles, que el resto siga protegido (también con `../`) y las caídas de Inventario y de Catálogo. Detiene y vuelve a levantar esos dos servicios, y deja datos de prueba en la base. Espera unos segundos después de reiniciar Inventario, por lo que explica [ADR-012](../docs/adr/ADR-012-balanceo.md), y hasta 10 s a que la búsqueda encuentre un producto recién publicado (retraso máximo de [ADR-006](../docs/adr/ADR-006-busqueda.md)). Último resultado, el 10/11/2026: 44 de 44.
 
 ## Probar sus errores
 

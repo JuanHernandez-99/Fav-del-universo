@@ -17,7 +17,8 @@ async function http(m, url, { headers = {}, body } = {}) {
 const sinNormalizar = (method, path) => new Promise((ok, mal) => {
   request({ host: 'localhost', port: 8080, method, path }, (r) => { r.resume(); ok(r.statusCode); }).on('error', mal).end();
 });
-const esperar = async (cond) => { for (let i = 0; i < 60; i++) { try { if (await cond()) return true; } catch {} await new Promise((f) => setTimeout(f, 500)); } return false; };
+// Reintenta cada 500 ms; por defecto, hasta 30 s.
+const esperar = async (cond, intentos = 60) => { for (let i = 0; i < intentos; i++) { try { if (await cond()) return true; } catch {} await new Promise((f) => setTimeout(f, 500)); } return false; };
 
 const sesion = await http('POST', `${GW}/usuarios/v1/sesiones`, { body: { email: 'admin@fav.example', contrasena: 'cambiar-admin-local' } });
 const ADMIN = { Authorization: `Bearer ${sesion.json.token}` };
@@ -49,7 +50,10 @@ await http('POST', `${GW}/catalogo/v1/admin/productos/${id}/publicar`, { headers
 const ficha = await http('GET', `${TIENDA}/${id}`);
 check('publicado: ficha con fotos por color (HU-03.5)', ficha.status === 200 && ficha.json.fotos.length === 2 && ficha.json.fotos[1].color === 'Gris', ficha);
 check('sin promoción: mismo precio y sin promoción', ficha.json.precio === 10000 && ficha.json.precioBase === 10000 && !ficha.json.promocion, ficha.json);
-check('la búsqueda por texto lo encuentra', (await http('GET', `${TIENDA}?q=${sufijo}`)).json.items.some((p) => p.productoId === id));
+// El índice se actualiza por un evento, no al publicar: se espera hasta el retraso máximo de ADR-006 (10 s).
+const desdePublicar = Date.now();
+const encontrado = await esperar(async () => (await http('GET', `${TIENDA}?q=${sufijo}`)).json.items.some((p) => p.productoId === id), 20);
+check(`la búsqueda por texto lo encuentra en menos de 10 s (tardó ${((Date.now() - desdePublicar) / 1000).toFixed(1)} s)`, encontrado);
 
 const filtrado = await http('GET', `${TIENDA}?categoria=buzos&talle=m&color=Gris&orden=precio_asc&tamano=100`);
 check('filtros: lo incluye y todos cumplen', filtrado.json.items.some((p) => p.productoId === id) && filtrado.json.items.every((p) => p.categoria === 'buzos'), filtrado.json.total);
