@@ -1,5 +1,5 @@
 // Prueba de carga de Inventario con k6 (ADR-013).
-// ESTADO: se corrió una vez para validar el guion. Falta el escenario de pico (ver README).
+// Escenario de la Entrega 2 (solo Inventario). El pico de la tienda está en tienda.js (ver README).
 //
 // Correr (sistema levantado con `docker compose up -d`):
 //   docker run --rm -i -e BASE_URL=http://host.docker.internal:8080 grafana/k6 run - < loadtest/inventario.js

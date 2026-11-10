@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/aplicacion"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/observabilidad"
@@ -98,8 +99,11 @@ func cadaVuelta(ctx context.Context, cada time.Duration, vuelta func()) {
 // procesar abre una traza y un correlation id por elemento. Las búsquedas de trabajo no se trazan:
 // una vuelta sin nada que hacer no deja ruido en Jaeger.
 func procesar(ctx context.Context, nombre string, id attribute.KeyValue, tarea func(context.Context) (bool, error)) {
-	ctx = observabilidad.ConCorrelationID(ctx, "proceso-"+uuid.NewString())
-	ctx, span := tracer.Start(ctx, "proceso "+nombre)
+	correlacion := "proceso-" + uuid.NewString()
+	ctx = observabilidad.ConCorrelationID(ctx, correlacion)
+	// El correlation id viaja en el evento que genere la tarea (ReservaVencida). Como atributo del span, en Jaeger se
+	// busca por él y aparecen juntas esta traza y la de quien consume el evento (ADR-011).
+	ctx, span := tracer.Start(ctx, "proceso "+nombre, trace.WithAttributes(attribute.String("correlation_id", correlacion)))
 	defer span.End()
 	span.SetAttributes(id)
 

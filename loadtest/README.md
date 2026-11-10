@@ -17,13 +17,21 @@ docker compose up -d --no-deps --force-recreate mongo-catalogo
 
 Los resultados están en el ADR-007.
 
+## Pico de la tienda (ADR-013)
+
+Compradores por el gateway: fichas, listados, búsqueda, unidades disponibles y compras (`tienda.js`). El script recorre tasas de 60 s y muestra, por tasa, latencia por operación, errores, esperas por bloqueo en MySQL de Inventario y la CPU de los contenedores:
+
+```bash
+bash loadtest/pico_tienda.sh                      # 50 a 1200 pedidos por segundo, unos 9 minutos
+TASAS="600 800" bash loadtest/pico_tienda.sh
+docker run --rm -i -e TASA=100 grafana/k6 run - < loadtest/tienda.js   # una sola tasa
+```
+
+Necesita Docker y Node. Deja compras de prueba y suma stock a 10 variantes. Resultados y análisis en el ADR-013.
+
 ## Inventario
 
-Guion de k6 para medir Inventario detrás del gateway (ADR-013).
-
-> **Estado:** Una sola corrida de 60 s, para validar el guion (04/11/2026): unos 100 pedidos por segundo a Inventario, sin errores, con p95 de 21 ms y un máximo de 2,68 s. **No es el análisis de capacidad:** falta el escenario de pico, su límite principal y los costos.
-
-## Correr
+Guion de k6 para medir solo Inventario detrás del gateway. Es el escenario de la Entrega 2, cuando Inventario era el único servicio real; el pico de la tienda lo reemplaza para el análisis de capacidad.
 
 Con el sistema levantado (`docker compose up -d`):
 
