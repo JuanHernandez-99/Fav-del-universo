@@ -7,7 +7,7 @@ Juan Hernandez - 2325917
 
 Sistema de venta online y control de stock para **FAV**, una tienda de indumentaria femenina que hoy vende solo en el local y lleva el stock en un Excel. Es también el Trabajo Práctico Integrador de **Arquitectura de Software 2026**.
 
-> **Estado: rumbo a la presentación grupal.** **Inventario** funciona (2 réplicas detrás de un gateway nginx, con MySQL, logs, trazas y métricas). **Catálogo** funciona en parte (2 réplicas con MongoDB: productos, promociones, consulta por lote y catálogo público; faltan sus eventos, trazas y métricas). **Ventas** funciona (con Mercado Pago simulado y mails en Mailpit, [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). **Usuarios** emite tokens y el gateway los valida. El **frontend** muestra la tienda, el carrito, el inicio de sesión, la compra, "Mis compras", y en el panel las ventas, la venta del local, los productos, las promociones y el stock ([ADR-017](docs/adr/ADR-017-frontend.md)). Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md). Lo que dice _previsto_ se implementa en entregas siguientes.
+> **Estado: rumbo a la presentación grupal. Desplegado en Azure:** https://fav-ucc.chilecentral.cloudapp.azure.com. Los cuatro servicios funcionan detrás de un gateway nginx, con logs, trazas y métricas. **Inventario** y **Catálogo**, con 2 réplicas cada uno. **Catálogo** tiene búsqueda con Elasticsearch y caché con Memcached. **Ventas** usa Mercado Pago simulado y manda mails a Mailpit ([ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). **Usuarios** emite tokens y el gateway los valida. El **frontend** muestra la tienda, el carrito, el inicio de sesión, la compra y "Mis compras", y en el panel las ventas, la venta del local, los productos, las promociones y el stock ([ADR-017](docs/adr/ADR-017-frontend.md)). Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md).
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: parte del diseño, todavía no implementado.
 
@@ -61,20 +61,21 @@ El grupo del gimnasio también nos consume: con su propia clave ve el catálogo 
 | [ADR-004](docs/adr/ADR-004-consistencia-y-concurrencia.md) | D4 · Consistencia y concurrencia | Aceptada                   |
 | [ADR-005](docs/adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) |
 | [ADR-006](docs/adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | Aceptada e implementada    |
-| [ADR-007](docs/adr/ADR-007-cache.md)                    | D7 · Caché                        | Aceptada e implementada    |
+| [ADR-007](docs/adr/ADR-007-cache.md)                    | D7 · Caché                        | Aceptada; el motor, reemplazado por ADR-019 |
+| [ADR-019](docs/adr/ADR-019-cache-con-memcached.md)      | D7 · Caché con Memcached          | Aceptada                   |
 | [ADR-008](docs/adr/ADR-008-contrato-propio.md)          | D8 · Contrato propio              | Aceptada                   |
 | [ADR-009](docs/adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018 |
 | [ADR-018](docs/adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada |
 | [ADR-010](docs/adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada                   |
-| [ADR-011](docs/adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada (primera versión) |
+| [ADR-011](docs/adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada                   |
 | [ADR-012](docs/adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada                   |
-| [ADR-013](docs/adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | Propuesta                  |
-
+| [ADR-013](docs/adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | Aceptada con mediciones    |
 | [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md) | Adicional · Simulador de pagos, mails y orden de la compra | Aceptada |
 | [ADR-015](docs/adr/ADR-015-claves-del-token-y-cuenta-de-administrador.md) | Adicional · Claves del token, administrador y contraseñas | Aceptada |
 | [ADR-016](docs/adr/ADR-016-validacion-del-token-en-el-gateway.md) | Adicional · Validación del token en el gateway | Aceptada |
+| [ADR-017](docs/adr/ADR-017-frontend.md) | Adicional · Frontend | Aceptada |
 
-Las decisiones marcadas como _Propuesta_ (D6, D7, D13) son diseño, sin implementar ni medir. Plantilla: [`ADR-000`](docs/adr/ADR-000-plantilla.md).
+Plantilla: [`ADR-000`](docs/adr/ADR-000-plantilla.md).
 
 ## Cómo levantarlo
 
@@ -97,6 +98,16 @@ No hace falta crear un `.env`: todas las variables tienen valores por defecto pa
 | Simulador de Mercado Pago | http://localhost:8096 |
 | RabbitMQ (`fav` / `cambiar`) | http://localhost:15672 |
 
+## Sistema desplegado
+
+Una VM de Azure con el mismo Docker Compose, detrás de Caddy con HTTPS. Cómo se despliega y se actualiza: [`desplegar/README.md`](desplegar/README.md).
+
+| Qué | Dónde |
+|---|---|
+| Tienda y panel de administración | https://fav-ucc.chilecentral.cloudapp.azure.com |
+| Capacidad publicada (otros grupos) | `https://fav-ucc.chilecentral.cloudapp.azure.com/v1/…`, con la `X-API-Key` que se le pasa a cada grupo por un canal privado ([contrato](docs/contracts/README.md)) |
+| Grafana, Jaeger, Prometheus y Mailpit | No se publican: se ven desde la VM con un túnel SSH ([cómo](desplegar/README.md#6-paneles-por-túnel-ssh)) |
+
 Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/README.md). Catálogo: [`services/catalogo/README.md`](services/catalogo/README.md). Ventas: [`services/ventas/README.md`](services/ventas/README.md). Usuarios: [`services/usuarios/README.md`](services/usuarios/README.md).
 
 ## Estructura del repositorio
@@ -114,8 +125,10 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 ├── frontend/
 ├── mocks/                  Mercado Pago, contrato con Prism y gimnasio
 ├── observabilidad/         Prometheus, alertas, Grafana y prueba de alertas
-├── loadtest/               guion de prueba de carga (k6)
+├── loadtest/               pruebas de carga (k6)
+├── desplegar/              despliegue en la VM de Azure (Caddy y scripts)
 ├── docker-compose.yml      arranque local
+├── docker-compose.cloud.yml  cambios para la nube
 ├── .env.example            variables, sin valores secretos
 └── go.work                 une los módulos Go
 ```
@@ -126,5 +139,5 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 | ------------------------------ | ----------------------------------------------------------------------------------------------- | -------- |
 | 1 · Diseño y contrato con mock | README, SPEC, ARCHITECTURE, diagramas, límites de los servicios, contrato y ADR D1, D3, D5 y D8 | Entregada |
 | 2 · Dominio propio de punta a punta (23/10) | Servicios funcionando, capacidad compartida, logs y traza, más ADR | Entregada |
-| Presentación grupal (11 o 13/11) | Frontend, autenticación, tres servicios, capacidad en la nube, mensajería, búsqueda y caché | En curso. Listos: Inventario, Catálogo, Ventas, Usuarios, mensajería, búsqueda y caché |
-| Defensa individual | Tests de contrato y carga, balanceo, caída controlada, tablero y alerta | En curso. Listos: tablero y alertas, en local |
+| Presentación grupal (11 o 13/11) | Frontend, autenticación, tres servicios, capacidad en la nube, mensajería, búsqueda y caché | En curso. Listos: los cuatro servicios, mensajería, búsqueda, caché y el despliegue en Azure. Falta la integración con el gimnasio real |
+| Defensa individual | Tests de contrato y carga, balanceo, caída controlada, tablero y alerta | En curso. Listos: tablero y alertas en local, prueba de carga ([ADR-013](docs/adr/ADR-013-capacidad-y-costos.md)) y ensayo de caídas ([POSTMORTEM](docs/POSTMORTEM.md)) |
