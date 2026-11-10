@@ -94,7 +94,7 @@ Los errores siguen RFC 9457 (`application/problem+json`) con un `codigo` estable
 ## Tests
 
 ```bash
-go test ./services/inventario/...                       # dominio
+go test ./services/inventario/...                       # dominio y casos de uso (aplicacion, con dobles de los puertos)
 docker compose up -d mysql-inventario                   # integración y concurrencia contra MySQL
 INVENTARIO_TEST_DSN="root:cambiar@tcp(localhost:3307)/inventario_test?parseTime=true&loc=UTC&multiStatements=true" \
   go test ./services/inventario/...
