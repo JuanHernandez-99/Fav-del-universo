@@ -18,9 +18,15 @@ import (
 
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/observabilidad"
 )
+
+var tracer = otel.Tracer("ventas/rabbitmq")
 
 const (
 	Exchange           = "inventario.eventos"
@@ -128,7 +134,16 @@ func (c *Consumidor) atender(ctx context.Context, ch *amqp.Channel, d amqp.Deliv
 		id = "evento-" + uuid.NewString()
 	}
 	ctxMensaje := observabilidad.ConCorrelationID(ctx, id)
+	// Una traza por mensaje, con sus consultas a MySQL. La traza de Inventario no llega en el evento (sale del outbox
+	// más tarde, ADR-011): las une el correlation_id, que va como atributo en las dos.
+	ctxMensaje, span := tracer.Start(ctxMensaje, "consumir "+RoutingKey, trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(attribute.String("correlation_id", id), attribute.String("mensaje_id", e.ID),
+			attribute.String("reserva_id", e.Datos.ReservaID)))
+	defer span.End()
 	err := c.manejador(ctxMensaje, e.ID, e.Datos.ReservaID, e.Datos.Referencia)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+	}
 	if err == nil {
 		observabilidad.MensajesConsumidos.WithLabelValues("ok").Inc()
 		return d.Ack(false)
