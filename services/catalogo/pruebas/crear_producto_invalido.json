@@ -1,0 +1,12 @@
+{
+  "nombre": "Body con errores",
+  "categoria": "medias",
+  "sistemaTalles": "LETRAS",
+  "precioBase": { "monto": 0 },
+  "variantes": [
+    { "talle": "38", "color": "Negro" },
+    { "talle": "S", "color": "" },
+    { "talle": "M", "color": "Azul marino" },
+    { "talle": "M", "color": "azul-marino" }
+  ]
+}

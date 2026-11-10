@@ -1,0 +1,88 @@
+package dominio
+
+import (
+	"fmt"
+	"time"
+)
+
+type EstadoReposicion string
+
+const (
+	// ReposicionPendiente: falta enviarla o el último resultado es incierto. Se reintenta con la misma clave.
+	ReposicionPendiente EstadoReposicion = "PENDIENTE_CONFIRMACION"
+	// ReposicionConfirmada: el gimnasio respondió 201 con el cuerpo del contrato.
+	ReposicionConfirmada EstadoReposicion = "CONFIRMADA"
+	// ReposicionRechazada: el gimnasio no la registró y las unidades volvieron al stock físico.
+	ReposicionRechazada EstadoReposicion = "RECHAZADA"
+	// ReposicionARevisar: 409 del gimnasio. Puede existir una entrega anterior: no se compensa ni se reintenta sola.
+	ReposicionARevisar EstadoReposicion = "REQUIERE_REVISION"
+	// ReposicionBloqueada: 401 o 403. Falla la credencial, no la mercadería. Se reintenta espaciado.
+	ReposicionBloqueada EstadoReposicion = "BLOQUEADA_CONFIGURACION"
+)
+
+// EstadosReposicion son todos: una métrica en 0 se distingue de una que no existe.
+var EstadosReposicion = []EstadoReposicion{ReposicionPendiente, ReposicionConfirmada, ReposicionRechazada, ReposicionARevisar, ReposicionBloqueada}
+
+// EsperaBloqueada es cada cuánto se reintenta con la credencial rechazada: al corregirla, se destraba sola.
+const EsperaBloqueada = 5 * time.Minute
+
+// Reposicion es un envío de prendas al gimnasio, que las vende en consignación (capacidad consumida, ADR-018).
+// Al crearla se descuenta el stock físico; un proceso la envía al gimnasio con reintentos.
+// Solo un rechazo definitivo devuelve las unidades al stock físico.
+type Reposicion struct {
+	ID                string
+	IDGimnasio        string // reposicionId que genera el gimnasio al recibirla
+	ClaveIdempotencia string
+	VarianteID        string
+	Cantidad          int
+	Estado            EstadoReposicion
+	Intentos          int
+	UltimoError       string
+	ProximoIntento    time.Time
+	CreadaEn          time.Time
+	Usuario           string
+}
+
+func NuevaReposicion(id, clave, varianteID string, cantidad int, usuario string, ahora time.Time) (Reposicion, error) {
+	var ev ErrorValidacion
+	validarClave(&ev, clave)
+	validarVariante(&ev, varianteID)
+	if cantidad < 1 {
+		ev.agregar("cantidad", "debe ser mayor a 0")
+	}
+	if err := ev.comoError(); err != nil {
+		return Reposicion{}, err
+	}
+	ahora = ahora.UTC().Truncate(time.Second)
+	return Reposicion{
+		ID:                id,
+		ClaveIdempotencia: clave,
+		VarianteID:        varianteID,
+		Cantidad:          cantidad,
+		Estado:            ReposicionPendiente,
+		ProximoIntento:    ahora,
+		CreadaEn:          ahora,
+		Usuario:           usuario,
+	}, nil
+}
+
+func (r Reposicion) Huella() string {
+	return huella("reposicion", r.VarianteID, fmt.Sprint(r.Cantidad))
+}
+
+// EsperaReintento crece al doble en cada intento fallido, de 5 s hasta un máximo de 5 min.
+// Sin límite de intentos: la reposición ya descontó stock y tiene que llegar al gimnasio.
+func EsperaReintento(intentos int) time.Duration {
+	espera := 5 * time.Second
+	for i := 1; i < intentos && espera < 5*time.Minute; i++ {
+		espera *= 2
+	}
+	return min(espera, 5*time.Minute)
+}
+
+// StockConsignacion es lo que el gimnasio informa que le queda de una variante de FAV.
+type StockConsignacion struct {
+	VarianteID string
+	Cantidad   int
+	Vendidas   int
+}

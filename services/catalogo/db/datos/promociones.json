@@ -1,0 +1,336 @@
+[
+  {
+    "_id": "promo-efectivo-tienda",
+    "nombre": "10% pagando en efectivo",
+    "tipo": "MEDIO_PAGO",
+    "porcentaje": 10,
+    "medioPago": "EFECTIVO",
+    "vigencia": {
+      "desde": {
+        "$date": "2026-11-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-12-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-efectivo-vestidos",
+    "nombre": "15% en efectivo en vestidos",
+    "tipo": "MEDIO_PAGO",
+    "porcentaje": 15,
+    "medioPago": "EFECTIVO",
+    "vigencia": {
+      "desde": {
+        "$date": "2026-10-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2027-01-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "vestidos"
+      ]
+    }
+  },
+  {
+    "_id": "promo-semana-del-jean",
+    "nombre": "Semana del jean",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 20,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-11-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-11-16T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "PRODUCTO",
+      "ids": [
+        "prod-jean-cargo-con-dobladillo",
+        "prod-jean-cargo-con-roturas",
+        "prod-jean-mom-con-roturas",
+        "prod-jean-mom-tiro-alto",
+        "prod-jean-oxford-tiro-alto",
+        "prod-jean-recto-nevado",
+        "prod-jean-skinny-con-tachas",
+        "prod-jean-skinny-tiro-alto",
+        "prod-jean-wide-leg-elastizado"
+      ]
+    }
+  },
+  {
+    "_id": "promo-media-estacion",
+    "nombre": "Buzos y camperas de media estación",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 15,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-10-15T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-11-11T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "buzos",
+        "camperas"
+      ]
+    }
+  },
+  {
+    "_id": "promo-liquidacion",
+    "nombre": "Liquidación de productos seleccionados",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 30,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-10-20T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-11-21T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "PRODUCTO",
+      "ids": [
+        "prod-body-de-tiras-liso",
+        "prod-body-escote-cuadrado-liso",
+        "prod-body-manga-larga-liso",
+        "prod-conjunto-de-plush-de-camisa-y-bermuda",
+        "prod-conjunto-de-plush-de-remera-y-short",
+        "prod-conjunto-de-plush-de-top-y-pollera",
+        "prod-minifalda-plisada",
+        "prod-minifalda-tableada",
+        "prod-pollera-cruzada",
+        "prod-pollera-de-lino",
+        "prod-jogger-tiro-alto",
+        "prod-pantalon-palazzo-ancho",
+        "prod-pantalon-palazzo-con-cordon",
+        "prod-pantalon-palazzo-con-pinzas",
+        "prod-pantalon-palazzo-de-sastreria",
+        "prod-pantalon-recto-de-gabardina",
+        "prod-short-con-roturas",
+        "prod-short-de-lino",
+        "prod-short-holgado",
+        "prod-top-corto-acanalado",
+        "prod-top-corto-estampado",
+        "prod-top-de-lino",
+        "prod-top-strapless-acanalado",
+        "prod-solero-con-espalda-descubierta",
+        "prod-vestido-camisero-de-lino",
+        "prod-vestido-camisero-de-raso",
+        "prod-vestido-con-volados",
+        "prod-vestido-cruzado",
+        "prod-musculosa-basica",
+        "prod-musculosa-con-nudo",
+        "prod-remera-con-frase",
+        "prod-remera-cuello-v-acanalada",
+        "prod-remera-manga-larga-con-nudo",
+        "prod-remera-manga-larga-lisa",
+        "prod-jean-wide-leg-elastizado"
+      ]
+    }
+  },
+  {
+    "_id": "promo-accesorios",
+    "nombre": "Semana de accesorios",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 25,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-11-02T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-11-09T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "PRODUCTO",
+      "ids": [
+        "prod-bufanda-trenzada",
+        "prod-cinto-de-lona",
+        "prod-cinto-tejido",
+        "prod-gorra-trenzada",
+        "prod-abanico-con-encaje",
+        "prod-abanico-de-bambu"
+      ]
+    }
+  },
+  {
+    "_id": "promo-hot-sale",
+    "nombre": "Hot Sale",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 25,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-05-11T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-05-14T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-invierno-camperas",
+    "nombre": "Invierno en camperas",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 20,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-06-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-08-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "camperas"
+      ]
+    }
+  },
+  {
+    "_id": "promo-transferencia-septiembre",
+    "nombre": "10% por transferencia en septiembre",
+    "tipo": "MEDIO_PAGO",
+    "porcentaje": 10,
+    "medioPago": "TRANSFERENCIA",
+    "vigencia": {
+      "desde": {
+        "$date": "2026-09-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-10-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-dia-de-la-madre",
+    "nombre": "Día de la Madre",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 15,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-10-10T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-10-19T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "vestidos",
+        "conjuntos"
+      ]
+    }
+  },
+  {
+    "_id": "promo-black-friday",
+    "nombre": "Black Friday",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 25,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-11-27T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-12-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  },
+  {
+    "_id": "promo-verano-remeras",
+    "nombre": "Verano en remeras",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 20,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-12-01T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2027-01-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "remeras"
+      ]
+    }
+  },
+  {
+    "_id": "promo-navidad",
+    "nombre": "Navidad en vestidos y conjuntos",
+    "tipo": "PORCENTAJE",
+    "porcentaje": 15,
+    "medioPago": null,
+    "vigencia": {
+      "desde": {
+        "$date": "2026-12-15T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2026-12-25T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "CATEGORIA",
+      "ids": [
+        "vestidos",
+        "conjuntos"
+      ]
+    }
+  },
+  {
+    "_id": "promo-transferencia-enero",
+    "nombre": "10% por transferencia en enero",
+    "tipo": "MEDIO_PAGO",
+    "porcentaje": 10,
+    "medioPago": "TRANSFERENCIA",
+    "vigencia": {
+      "desde": {
+        "$date": "2027-01-02T03:00:00Z"
+      },
+      "hasta": {
+        "$date": "2027-02-01T02:59:59Z"
+      }
+    },
+    "alcance": {
+      "tipo": "TIENDA",
+      "ids": []
+    }
+  }
+]

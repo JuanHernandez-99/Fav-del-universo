@@ -1,0 +1,54 @@
+[
+  {
+    "_id": "tops",
+    "nombre": "Tops"
+  },
+  {
+    "_id": "bodys",
+    "nombre": "Bodys"
+  },
+  {
+    "_id": "remeras",
+    "nombre": "Remeras"
+  },
+  {
+    "_id": "buzos",
+    "nombre": "Buzos"
+  },
+  {
+    "_id": "camperas",
+    "nombre": "Camperas"
+  },
+  {
+    "_id": "jeans",
+    "nombre": "Jeans"
+  },
+  {
+    "_id": "pantalones",
+    "nombre": "Pantalones"
+  },
+  {
+    "_id": "polleras",
+    "nombre": "Polleras"
+  },
+  {
+    "_id": "shorts",
+    "nombre": "Shorts"
+  },
+  {
+    "_id": "vestidos",
+    "nombre": "Vestidos"
+  },
+  {
+    "_id": "conjuntos",
+    "nombre": "Conjuntos"
+  },
+  {
+    "_id": "abanicos",
+    "nombre": "Abanicos"
+  },
+  {
+    "_id": "accesorios",
+    "nombre": "Accesorios"
+  }
+]

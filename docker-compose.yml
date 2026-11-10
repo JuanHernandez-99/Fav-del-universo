@@ -1,106 +1,318 @@
-# Arranque local (previsto). En la Entrega 1 solo está la infraestructura:
-# los servicios están comentados hasta que existan su código y su Dockerfile.
-# Uso: cp .env.example .env  →  docker compose up
-# Versiones de las imágenes y puertos: [propuesta]
+# Arranque local con un solo comando:   docker compose up --build
+# Funciona sin .env (usa valores de prueba). Para cambiarlos: cp .env.example .env
+#
+# Inventario y Catálogo son servicios reales (dos réplicas cada uno, detrás del gateway), y Ventas
+# también, igual que Usuarios. Mercado Pago y el gimnasio están simulados.
+#
+# Puertos publicados:
+#   8080  gateway (capacidad publicada y panel)     16686  Jaeger (trazas)
+#   9090  Prometheus (métricas)                      3307   MySQL de Inventario (tests)
+#   8095  mock del gimnasio (admin de WireMock)      3308   MySQL de Ventas (tests)
+#   8096  simulador de Mercado Pago                  8025   Mailpit (bandeja de mails)
+#   15672 RabbitMQ (administración)                  5672   RabbitMQ (tests)
+#   3309  MySQL de Usuarios (tests)                  9200   Elasticsearch (solo desde esta máquina)
+#   3000  Grafana (tablero, solo desde esta máquina) 9093   Alertmanager (solo desde esta máquina)
+
+x-otel: &otel
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
 
 services:
-  # ---------- Bases de datos: una por servicio ----------
-  mongo-catalogo:
-    image: mongo:7
+  # ---------- Inventario (real) ----------
+  inventario:
+    build: ./services/inventario
+    deploy: { replicas: 2 } # ADR-012
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
-    volumes: [mongo-catalogo-data:/data/db]
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      <<: *otel
+      INVENTARIO_DB_HOST: mysql-inventario:3306
+      INVENTARIO_DB_NAME: ${INVENTARIO_DB_NAME:-inventario}
+      INVENTARIO_DB_USER: ${INVENTARIO_DB_USER:-inventario}
+      INVENTARIO_DB_PASSWORD: ${INVENTARIO_DB_PASSWORD:-cambiar}
+      INVENTARIO_DATOS_EJEMPLO: ${INVENTARIO_DATOS_EJEMPLO:-true}
+      GIMNASIO_BASE_URL: ${GIMNASIO_BASE_URL:-http://gimnasio-mock:8080}
+      GIMNASIO_API_KEY: ${GIMNASIO_API_KEY:-clave-de-fav-en-el-gimnasio}
+      GIMNASIO_TIMEOUT_MS: ${GIMNASIO_TIMEOUT_MS:-3000}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:-cambiar}@rabbitmq:5672/
+    depends_on:
+      mysql-inventario: { condition: service_healthy }
+    restart: unless-stopped
 
   mysql-inventario:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: ${INVENTARIO_DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${INVENTARIO_DB_NAME}
-      MYSQL_USER: ${INVENTARIO_DB_USER}
-      MYSQL_PASSWORD: ${INVENTARIO_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${INVENTARIO_DB_ROOT_PASSWORD:-cambiar}
+      MYSQL_DATABASE: ${INVENTARIO_DB_NAME:-inventario}
+      MYSQL_USER: ${INVENTARIO_DB_USER:-inventario}
+      MYSQL_PASSWORD: ${INVENTARIO_DB_PASSWORD:-cambiar}
+    ports: ["3307:3306"]
     volumes: [mysql-inventario-data:/var/lib/mysql]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ---------- Catálogo (real) ----------
+  catalogo:
+    build: ./services/catalogo
+    deploy: { replicas: 2 } # ADR-012
+    environment:
+      <<: *otel
+      MONGO_HOST: mongo-catalogo:27017
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL-http://elasticsearch:9200} # vacía: busca en MongoDB (ADR-006)
+      MEMCACHED_ADDR: ${MEMCACHED_ADDR-memcached:11211}
+      CACHE_ENABLED: ${CACHE_ENABLED:-true} # false: sin caché, para medir la diferencia (ADR-007)
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:-cambiar}@rabbitmq:5672/
+      CAPACIDAD_PUBLICA_ACTIVA: ${CAPACIDAD_PUBLICA_ACTIVA:-true}
+      MONGO_DB: ${MONGO_DB:-catalogo}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
+    depends_on:
+      mongo-catalogo: { condition: service_healthy }
+      catalogo-init: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  # Prepara la base al levantar: esquema e índices siempre; datos de ejemplo solo si está vacía.
+  # CATALOGO_CARGA=completa suma el volumen de prueba; CATALOGO_RECARGAR=true vacía y recarga.
+  catalogo-init:
+    image: mongo:7
+    entrypoint: ["sh", "/scripts/cargar.sh"]
+    environment:
+      MONGO_DB: ${MONGO_DB:-catalogo}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
+      CARGA: ${CATALOGO_CARGA:-minimo}
+      RECARGAR: ${CATALOGO_RECARGAR:-false}
+    volumes:
+      - ./services/catalogo/db/scripts:/scripts:ro
+      - ./services/catalogo/db/datos:/datos:ro
+    depends_on:
+      mongo-catalogo: { condition: service_healthy }
+
+  mongo-catalogo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-catalogo}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-cambiar}
+    volumes: [mongo-catalogo-data:/data/db]
+    # Con el volumen vacío, Mongo arranca primero un servidor temporal solo en localhost para crear el usuario,
+    # y después se reinicia. Un ping a localhost daba "sano" en esa etapa y catalogo-init fallaba al conectarse.
+    # Por la IP de la red, responde solo cuando ya terminó.
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --host \"$$(hostname -i)\" --eval \"db.adminCommand('ping')\""]
       interval: 10s
       timeout: 5s
+      retries: 5
+
+  # Caché de las lecturas de la tienda (ADR-007). Sin persistencia: se puede perder, porque los datos están en MongoDB.
+  memcached:
+    image: memcached:1.6-alpine
+    command: ["memcached", "-m", "64"] # 64 MB, sin persistencia: si se pierde, los datos están en MongoDB
+    healthcheck:
+      test: ["CMD-SHELL", "echo version | nc -w 1 localhost 11211 | grep -q VERSION"]
+      interval: 5s
+      timeout: 3s
       retries: 10
+
+  # Motor de búsqueda (ADR-006). Sin seguridad: es solo para desarrollo, por eso el puerto no sale de esta máquina.
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports: ["127.0.0.1:9200:9200"]
+    volumes: [elasticsearch-data:/usr/share/elasticsearch/data]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+
+  # ---------- Ventas (real) ----------
+  ventas:
+    build: ./services/ventas
+    environment:
+      <<: *otel
+      VENTAS_DB_HOST: mysql-ventas:3306
+      CAPACIDAD_PUBLICA_ACTIVA: ${CAPACIDAD_PUBLICA_ACTIVA:-true}
+      VENTAS_DB_NAME: ${VENTAS_DB_NAME:-ventas}
+      VENTAS_DB_USER: ${VENTAS_DB_USER:-ventas}
+      VENTAS_DB_PASSWORD: ${VENTAS_DB_PASSWORD:-cambiar}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:-cambiar}@rabbitmq:5672/
+      MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN:-token-del-simulador}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-secreto-del-simulador}
+      MAIL_FROM: ${MAIL_FROM:-ventas@fav.example}
+      MAIL_ADMIN: ${MAIL_ADMIN:-admin@fav.example}
+      TRANSFERENCIA_ALIAS: ${TRANSFERENCIA_ALIAS:-FAV.EJEMPLO.ALIAS}
+      TRANSFERENCIA_TITULAR: ${TRANSFERENCIA_TITULAR:-FAV (ejemplo)}
+    depends_on:
+      mysql-ventas: { condition: service_healthy }
+    restart: unless-stopped
 
   mysql-ventas:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: ${VENTAS_DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${VENTAS_DB_NAME}
-      MYSQL_USER: ${VENTAS_DB_USER}
-      MYSQL_PASSWORD: ${VENTAS_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${VENTAS_DB_ROOT_PASSWORD:-cambiar}
+      MYSQL_DATABASE: ${VENTAS_DB_NAME:-ventas}
+      MYSQL_USER: ${VENTAS_DB_USER:-ventas}
+      MYSQL_PASSWORD: ${VENTAS_DB_PASSWORD:-cambiar}
+    ports: ["3308:3306"]
     volumes: [mysql-ventas-data:/var/lib/mysql]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
-  mysql-usuarios:
-    image: mysql:8.4
-    environment:
-      MYSQL_ROOT_PASSWORD: ${USUARIOS_DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${USUARIOS_DB_NAME}
-      MYSQL_USER: ${USUARIOS_DB_USER}
-      MYSQL_PASSWORD: ${USUARIOS_DB_PASSWORD}
-    volumes: [mysql-usuarios-data:/var/lib/mysql]
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  # ---------- Mensajería ----------
+  # Eventos entre servicios (ADR-005). Inventario y Ventas arrancan aunque esté caído.
   rabbitmq:
     image: rabbitmq:3-management
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
-    ports:
-      - "15672:15672" # consola web
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-fav}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-cambiar}
+    ports: ["5672:5672", "15672:15672"]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  # ---------- Servicios (previstos: descomentar al crear cada Dockerfile) ----------
-  # catalogo:
-  #   build: ./services/catalogo
-  #   deploy: { replicas: 2 } # [propuesta] dos réplicas (D12)
-  #   depends_on: { mongo-catalogo: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
-  #
-  # inventario:
-  #   build: ./services/inventario
-  #   depends_on: { mysql-inventario: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
-  #
-  # ventas:
-  #   build: ./services/ventas
-  #   depends_on: { mysql-ventas: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
-  #
-  # usuarios:
-  #   build: ./services/usuarios
-  #   depends_on: { mysql-usuarios: { condition: service_healthy } }
-  #
-  # gateway:
-  #   build: ./gateway
-  #   ports: ["8080:8080"] # [propuesta]
-  #
-  # frontend:
-  #   build: ./frontend
-  #   ports: ["3000:3000"] # [propuesta]
+  # Mails de Ventas (ADR-014): se ven en http://localhost:8025 y nada sale a internet.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports: ["8025:8025"]
+
+  # ---------- Usuarios (real) ----------
+  # Genera las claves del token si no existen; después termina (ADR-015).
+  usuarios-init:
+    build: ./services/usuarios
+    command: ["generar-claves"]
+    healthcheck: { disable: true }
+    volumes:
+      - jwt-privada:/claves/privada
+      - jwt-publica:/claves/publica
+
+  usuarios:
+    build: ./services/usuarios
+    environment:
+      <<: *otel
+      USUARIOS_DB_HOST: mysql-usuarios:3306
+      USUARIOS_DB_NAME: ${USUARIOS_DB_NAME:-usuarios}
+      USUARIOS_DB_USER: ${USUARIOS_DB_USER:-usuarios}
+      USUARIOS_DB_PASSWORD: ${USUARIOS_DB_PASSWORD:-cambiar}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@fav.example}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-cambiar-admin-local}
+      JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES:-60}
+    volumes:
+      - jwt-privada:/claves/privada:ro # el gateway no monta este volumen: solo Usuarios firma
+    depends_on:
+      mysql-usuarios: { condition: service_healthy }
+      usuarios-init: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  mysql-usuarios:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${USUARIOS_DB_ROOT_PASSWORD:-cambiar}
+      MYSQL_DATABASE: ${USUARIOS_DB_NAME:-usuarios}
+      MYSQL_USER: ${USUARIOS_DB_USER:-usuarios}
+      MYSQL_PASSWORD: ${USUARIOS_DB_PASSWORD:-cambiar}
+    ports: ["3309:3306"]
+    volumes: [mysql-usuarios-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ---------- Frontend ----------
+  # Sin puerto propio: se entra por el gateway (ADR-017).
+  frontend:
+    build: ./frontend
+
+  # ---------- Gateway ----------
+  gateway:
+    image: nginx:1.28-alpine-otel # trae el módulo de OpenTelemetry: el gateway aparece en las trazas (ADR-011)
+    environment:
+      CAPACIDAD_API_KEY: ${CAPACIDAD_API_KEY:-clave-grupo-proveedores}
+      CAPACIDAD_API_KEY_GIMNASIO: ${CAPACIDAD_API_KEY_GIMNASIO:-clave-grupo-gimnasio}
+      CAPACIDAD_PUBLICA_ACTIVA: ${CAPACIDAD_PUBLICA_ACTIVA:-true}
+      NGINX_ENVSUBST_FILTER: "^CAPACIDAD_" # no tocar las $variables de nginx
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./gateway/templates:/etc/nginx/templates:ro
+      - ./gateway/njs:/etc/nginx/njs:ro
+      - ./gateway/snippets:/etc/nginx/snippets:ro
+      - jwt-publica:/claves/publica:ro # verifica el token; la privada no la monta (ADR-015)
+    ports: ["8080:8080"]
+    depends_on:
+      inventario: { condition: service_started }
+      catalogo: { condition: service_started }
+      ventas: { condition: service_started }
+      usuarios: { condition: service_started }
+      usuarios-init: { condition: service_completed_successfully }
+      frontend: { condition: service_started }
+
+  # ---------- Dependencias simuladas ----------
+  # Mercado Pago (ADR-014).
+  mercadopago-simulador:
+    build: ./mocks/mercadopago-simulador
+    environment:
+      URL_PUBLICA: http://localhost:8096
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-secreto-del-simulador}
+    ports: ["8096:8080"]
+
+  # Gimnasio: capacidad consumida, con el contrato supuesto (ADR-009).
+  gimnasio-mock:
+    image: wiremock/wiremock:3.9.1
+    command: ["--global-response-templating", "--disable-banner"]
+    volumes:
+      - ./mocks/gimnasio-consignacion/mappings:/home/wiremock/mappings:ro
+    ports: ["8095:8080"]
+
+  # ---------- Observabilidad (ADR-011) ----------
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    ports: ["16686:16686"]
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus", "--storage.tsdb.retention.time=15d"]
+    volumes:
+      - ./observabilidad/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observabilidad/alertas.yml:/etc/prometheus/alertas.yml:ro
+      - prometheus-data:/prometheus # el historial sobrevive a recrear el contenedor (RNF-03)
+    ports: ["9090:9090"]
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    volumes:
+      - ./observabilidad/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports: ["127.0.0.1:9093:9093"]
+
+  # Tablero (http://localhost:3000): se ve sin iniciar sesión. Para editar, admin y GRAFANA_ADMIN_PASSWORD.
+  grafana:
+    image: grafana/grafana:11.6.0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-cambiar}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/tableros/fav-general.json
+    volumes:
+      - ./observabilidad/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observabilidad/grafana/tableros:/var/lib/grafana/tableros:ro
+      - grafana-data:/var/lib/grafana
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      prometheus: { condition: service_started }
 
 volumes:
+  prometheus-data:
+  grafana-data:
+  elasticsearch-data:
   mongo-catalogo-data:
   mysql-inventario-data:
   mysql-ventas-data:
   mysql-usuarios-data:
+  jwt-privada:
+  jwt-publica:

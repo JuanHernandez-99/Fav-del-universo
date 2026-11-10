@@ -9,6 +9,8 @@
 
 > **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
 
+> **Actualización 04/11/2026:** [ADR-015](ADR-015-claves-del-token-y-cuenta-de-administrador.md) confirma la firma RS256 y el vencimiento de 1 hora, y define cómo se generan las claves y cómo nace la cuenta de administrador.
+
 ## Contexto
 
 FAV vende ropa en un local y empieza a vender online. El sistema tiene que unificar el stock de los dos canales, registrar todas las ventas y permitir compras online con reserva temporal de stock (SPEC §2). La consigna pide al menos tres microservicios y un API Gateway, con una base de datos por servicio.
@@ -146,11 +148,27 @@ En las dos, el consumidor externo depende de un solo servicio y la capacidad es 
 
 ## Pendientes
 
+- **Cómo valida el token el gateway:** resuelto en [ADR-016](ADR-016-validacion-del-token-en-el-gateway.md). Con Usuarios detenido, una sesión ya iniciada sigue comprando (comprobado el 04/11/2026).
 - **Qué capacidad se publica (A o B).** Se elige según el grupo consumidor que asigne la cátedra. Cambia qué servicio la expone, no los límites (ADR-008).
-- **Firma y vencimiento del token, y dónde lo guarda el frontend:** se confirman al implementar el gateway y el frontend.
+- **Dónde guarda el token el frontend:** se confirma al implementar el frontend. La firma y el vencimiento están resueltos en ADR-015.
 
 ## Validación prevista (Entrega 2)
 
 - Ningún servicio accede a la base de otro (RNF-08): se revisa en Docker Compose y en el código.
 - Una compra se completa con Usuarios detenido, usando una sesión ya iniciada.
 - Las trazas del flujo de compra muestran solo las dependencias de la tabla de relaciones.
+
+## Validación (Entrega 2)
+
+Contrastado contra el Inventario implementado (rama `feature-inventario`). Los demás servicios son mocks o no existen, por lo que **solo se valida el límite de Inventario**.
+
+| Punto del ADR                                              | Resultado                                                                                                                                                  |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventario es dueño del stock y de sus movimientos         | **Confirmado.** Tablas `stock`, `reservas`, `reserva_items`, `movimientos`, `operaciones`, `reposiciones` y `outbox` en su propia base (`mysql-inventario`).    |
+| Ningún servicio accede a la base de otro (RNF-08)          | **Confirmado para Inventario:** es el único con credenciales de su base. El Compose no las comparte. Falta repetirlo con los demás servicios cuando existan.  |
+| Inventario no conoce nombres ni precios                    | **Confirmado.** Maneja `varianteId`; los nombres se componen en el frontend (decisión 3).                                                                    |
+| Consulta de stock de varias variantes en un pedido         | **Implementado:** `GET /v1/stock?variantes=…` (en lote).                                                                                                    |
+| Relación con el gimnasio                                   | **Agregada:** Inventario consume la capacidad del gimnasio (ADR-009). Es una relación saliente nueva a reflejar en el diagrama de relaciones.                 |
+| Lista de variantes con "stock a corregir"                  | **No implementada:** hoy solo se informa un indicador por variante (`stockACorregir`).                                                                       |
+
+**Validado el 04/11/2026:** Ventas llega a Inventario y a Catálogo por la entrada interna `:8081`, y una compra se completa sin Usuarios, que todavía no existe.

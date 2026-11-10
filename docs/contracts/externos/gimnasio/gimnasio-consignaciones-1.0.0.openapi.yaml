@@ -1,0 +1,358 @@
+openapi: 3.1.1
+info:
+  title: Stock y reposiciones de la tienda del gimnasio para FAV
+  version: 1.0.0
+  description: >-
+    Contrato inicial definido con el equipo del gimnasio el 06/11/2026.
+    Endpoints implementados y verificados localmente con PostgreSQL real.
+    URL pública, aceptación de FAV y prueba conjunta pendientes. Ver
+    fav-tienda.md. Tienda administra el stock físico de una única tienda del gimnasio.
+    FAV conserva su catálogo y stock de distribuidora. productoCodigo es el
+    identificador opaco varianteId de FAV, no un nombre ni un producto genérico.
+    Las reposiciones suman unidades; las ventas registradas por ADMIN las
+    descuentan sin permitir saldo negativo. Las ventas son acumuladas, sin
+    período mensual, devoluciones o ajustes en esta versión. Esta capacidad
+    adicional no reemplaza la integración con Car Cruds.
+servers:
+  - url: http://localhost:8080
+    description: Entorno local al ejecutar npm run iniciar; puerto configurable mediante GATEWAY_PORT. URL pública pendiente.
+security:
+  - ClaveFav: []
+paths:
+  /api/v1/consignaciones/stock:
+    get:
+      operationId: consultarStockConsignado
+      summary: Consultar las existencias y ventas de FAV en el gimnasio
+      description: >-
+        La credencial identifica al proveedor autorizado; proveedorId debe
+        coincidir con ese origen. La versión inicial admite únicamente fav.
+        Devuelve las variantes que tuvieron una recepción en esta tienda,
+        incluidas las que quedaron sin unidades disponibles, ordenadas por
+        productoCodigo ascendente. No pagina ni consulta el stock de la
+        distribuidora. unidadesVendidas acumula las ventas registradas desde
+        el inicio; unidadesDisponibles es la suma recibida menos esas ventas.
+        La lectura debe ser consistente con los movimientos confirmados.
+        items vacío indica que no se recibió ninguna variante, nunca una
+        falla de almacenamiento. No modifica inventario ni membresías.
+      parameters:
+        - name: proveedorId
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [fav]
+          example: fav
+      responses:
+        '200':
+          description: Stock local consultado correctamente; no se almacena en caché HTTP.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockTienda'
+              examples:
+                tiendaConRecepciones:
+                  value:
+                    proveedorId: fav
+                    items:
+                      - productoCodigo: var-remera-basica-blanca-m
+                        unidadesDisponibles: 3
+                        unidadesVendidas: 2
+                sinRecepciones:
+                  value:
+                    proveedorId: fav
+                    items: []
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/NoAutorizado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+  /api/v1/consignaciones/reposiciones:
+    post:
+      operationId: recibirReposicionFav
+      summary: Registrar una entrega de una variante de FAV sin duplicarla
+      description: >-
+        Una solicitud representa una entrega de una variante. La primera
+        recepción incorpora su código al stock local con cero ventas previas.
+        Las siguientes suman unidades a las existencias de esa variante.
+        FAV proporciona el varianteId de su catálogo; no se importan precios
+        ni se modifica su inventario desde este endpoint.
+        Stock, entrega y resultado idempotente se confirman juntos en PostgreSQL.
+        La identidad de la entrega es proveedorId/referencia; la clave se
+        diferencia por proveedor. Repetir clave y contenido devuelve el 201
+        y cuerpo originales, sin sumar unidades. Otra clave con la misma
+        referencia y contenido también devuelve esa entrega original y
+        queda asociada al mismo resultado. Reutilizar clave o referencia
+        con contenido diferente produce 409 y no modifica el stock.
+        Se comparan los valores de los cuatro campos, ignorando el orden de
+        las propiedades JSON; las cadenas se conservan exactamente, sin
+        recortarlas ni cambiar mayúsculas. Los errores de validación no se
+        registran como entregas. Un resultado de red incierto debe repetirse
+        con la misma clave, referencia y cuerpo, nunca como una entrega nueva.
+        No existe un límite comercial de veinte unidades por reposición.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Clave opaca no vacía de esta operación; conservarla en los reintentos.
+          schema:
+            $ref: '#/components/schemas/Identificador'
+          example: reposicion-ficticia-001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReposicionEntrada'
+            example:
+              proveedorId: fav
+              productoCodigo: var-remera-basica-blanca-m
+              unidades: 5
+              referencia: entrega-ficticia-001
+      responses:
+        '201':
+          description: >-
+            Entrega recibida o resultado original de una repetición idéntica.
+            reposicionId y estado son iguales en todos sus reintentos.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReposicionRecibida'
+              example:
+                reposicionId: 2ea07178-156c-41a8-b682-c2849ff687ca
+                estado: RECIBIDA
+        '400':
+          $ref: '#/components/responses/SolicitudInvalida'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/NoAutorizado'
+        '409':
+          description: >-
+            CLAVE_REUTILIZADA o REFERENCIA_REUTILIZADA con otros datos.
+            Esta solicitud no cambia el inventario, pero puede existir una
+            entrega anterior confirmada. Requiere revisar esa operación;
+            no autoriza compensar automáticamente stock en FAV.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                claveConOtrosDatos:
+                  value:
+                    codigo: CLAVE_REUTILIZADA
+                    mensaje: La clave ya corresponde a otra solicitud.
+                referenciaConOtrosDatos:
+                  value:
+                    codigo: REFERENCIA_REUTILIZADA
+                    mensaje: La entrega ya fue registrada con otros datos.
+        '413':
+          description: El cuerpo excede 1 MiB; es un límite de transporte, no de unidades por entrega.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: SOLICITUD_DEMASIADO_GRANDE
+                mensaje: La solicitud supera el límite de transporte de 1 MiB.
+        '415':
+          description: Se requiere Content-Type application/json.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: TIPO_CONTENIDO_NO_ADMITIDO
+                mensaje: Enviar el cuerpo como application/json.
+        '422':
+          description: El saldo resultante excedería el rango entero representable; no se registra la entrega.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                codigo: STOCK_NO_REPRESENTABLE
+                mensaje: El saldo resultante no puede representarse de forma segura.
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+components:
+  securitySchemes:
+    ClaveFav:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >-
+        Credencial técnica asignada a FAV por canal privado. No es un JWT
+        de usuario ni la clave del contrato histórico de empleados.
+        Ausente o inválida produce 401; sin permiso para la operación, 403.
+  headers:
+    NoStore:
+      description: Obligatorio en todas las respuestas de esta API.
+      schema:
+        type: string
+        const: no-store
+  schemas:
+    Identificador:
+      type: string
+      minLength: 1
+      pattern: '\S'
+      description: Identificador opaco, no vacío de espacios; se conserva exactamente.
+    Cantidad:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+      description: Unidades físicas enteras en el rango seguro de JSON/JavaScript.
+    StockTienda:
+      type: object
+      additionalProperties: false
+      required: [proveedorId, items]
+      properties:
+        proveedorId:
+          type: string
+          enum: [fav]
+        items:
+          type: array
+          description: Una entrada por productoCodigo, sin duplicados.
+          items:
+            $ref: '#/components/schemas/StockVariante'
+    StockVariante:
+      type: object
+      additionalProperties: false
+      required: [productoCodigo, unidadesDisponibles, unidadesVendidas]
+      properties:
+        productoCodigo:
+          $ref: '#/components/schemas/Identificador'
+        unidadesDisponibles:
+          $ref: '#/components/schemas/Cantidad'
+        unidadesVendidas:
+          $ref: '#/components/schemas/Cantidad'
+    ReposicionEntrada:
+      type: object
+      additionalProperties: false
+      required: [proveedorId, productoCodigo, unidades, referencia]
+      properties:
+        proveedorId:
+          type: string
+          enum: [fav]
+        productoCodigo:
+          $ref: '#/components/schemas/Identificador'
+        unidades:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        referencia:
+          $ref: '#/components/schemas/Identificador'
+    ReposicionRecibida:
+      type: object
+      additionalProperties: false
+      required: [reposicionId, estado]
+      properties:
+        reposicionId:
+          type: string
+          format: uuid
+        estado:
+          type: string
+          enum: [RECIBIDA]
+    Error:
+      type: object
+      additionalProperties: false
+      required: [codigo, mensaje]
+      properties:
+        codigo:
+          type: string
+          minLength: 1
+        mensaje:
+          type: string
+          minLength: 1
+  responses:
+    SolicitudInvalida:
+      description: >-
+        SOLICITUD_INVALIDA o IDEMPOTENCIA_INVALIDA. JSON, campos, tipos,
+        parámetros o clave inválidos. No se registra una entrega.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: SOLICITUD_INVALIDA
+            mensaje: Revisar los campos y parámetros de la solicitud.
+    NoAutenticado:
+      description: Credencial X-API-Key ausente o inválida; corregir la configuración antes de volver a enviar.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: NO_AUTENTICADO
+            mensaje: Clave de consumidor ausente o inválida.
+    NoAutorizado:
+      description: La credencial no habilita esta operación o el proveedor solicitado.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: PROVEEDOR_NO_AUTORIZADO
+            mensaje: La credencial no permite esta operación para el proveedor.
+    ErrorInterno:
+      description: >-
+        Resultado técnico incierto. No deducir si el POST fue confirmado;
+        repetir con la misma clave, referencia y cuerpo, sin compensación automática.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: ERROR_INTERNO
+            mensaje: No se pudo completar la operación; conservar los datos para reintentar.
+    NoDisponible:
+      description: >-
+        Servicio o almacenamiento no disponible. No representar una falla
+        como stock cero. Si el POST tiene resultado incierto, repetir
+        exactamente la misma entrega cuando se recupere el servicio.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            codigo: SERVICIO_NO_DISPONIBLE
+            mensaje: No se puede completar la operación en este momento.

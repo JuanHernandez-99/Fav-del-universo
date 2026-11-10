@@ -1,0 +1,630 @@
+openapi: 3.0.3
+info:
+  title: Catálogo de FAV · API de administración
+  version: 1.0.0
+  description: |
+    CRUD de productos del servicio Catálogo (TP de MongoDB).
+
+    - Los montos se **reciben y devuelven en pesos** con hasta 2 decimales (`15999.90`). Adentro se guardan en centavos enteros.
+    - El producto **nace no publicado**. `DELETE` no borra: despublica (baja lógica, idempotente).
+    - Los ids (`productoId`, `varianteId`) los genera el servidor y no cambian nunca.
+    - Los errores son `application/problem+json` con un `codigo` estable.
+    - El catálogo no maneja stock: es de Inventario.
+servers:
+  - url: http://localhost:8080/catalogo
+    description: Gateway de FAV (local)
+security:
+  - TokenAdmin: []
+tags:
+  - name: Productos
+  - name: Variantes
+  - name: Promociones
+  - name: Sondas
+
+paths:
+  /v1/admin/productos:
+    post:
+      tags: [Productos]
+      summary: Crear un producto
+      description: "Nace con `publicado: false`. Exige al menos una variante. El servidor genera los ids."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductoNuevo" }
+            examples:
+              valido:
+                summary: Remera con dos variantes
+                value:
+                  nombre: Remera oversize
+                  descripcion: Remera de algodón, corte amplio.
+                  categoria: remeras
+                  sistemaTalles: LETRAS
+                  precioBase: { monto: 15999.90, moneda: ARS }
+                  atributos: { material: algodón, genero: unisex }
+                  fotos:
+                    - { url: "https://fav.example/fotos/remera-oversize.jpg", color: null }
+                  variantes:
+                    - { talle: M, color: Blanco }
+                    - { talle: L, color: Negro }
+              invalido:
+                summary: Con errores (devuelve 400 con la lista de campos)
+                value:
+                  nombre: ""
+                  categoria: inexistente
+                  sistemaTalles: LETRAS
+                  precioBase: { monto: 0, moneda: ARS }
+                  variantes: []
+      responses:
+        "201":
+          description: Creado. `Location` apunta al producto.
+          headers:
+            Location: { schema: { type: string }, example: /v1/admin/productos/prod-remera-oversize }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+    get:
+      tags: [Productos]
+      summary: Listar con filtros, orden y paginación
+      description: |
+        Filtra y ordena por **precio base**. Un parámetro desconocido da `400`.
+        El orden siempre se desempata por `_id`, así la paginación no repite ni saltea resultados.
+      parameters:
+        - name: categoria
+          in: query
+          description: "Coincidencia exacta con el id de la categoría. Ej.: remeras, jeans, buzos."
+          schema: { type: string }
+        - name: talle
+          in: query
+          description: "Se pasa a mayúscula. Junto con `color`, exige que sean la misma variante. Ej.: M."
+          schema: { type: string }
+        - name: color
+          in: query
+          description: "Distingue mayúsculas (`Negro`, no `negro`). Ej.: Negro."
+          schema: { type: string }
+        - name: precioMin
+          in: query
+          description: "Precio base mínimo, en pesos. Ej.: 10000."
+          schema: { type: number }
+        - name: precioMax
+          in: query
+          description: "Precio base máximo, en pesos. Ej.: 30000."
+          schema: { type: number }
+        - name: q
+          in: query
+          description: "Búsqueda de texto en nombre y descripción (índice de texto en español). Ej.: algodón."
+          schema: { type: string }
+        - name: publicado
+          in: query
+          schema: { type: boolean }
+        - name: orden
+          in: query
+          description: "Sin `orden`: `relevancia` si hay `q`, `nuevos` si no. En el panel, `relevancia` equivale a `nuevos`."
+          schema: { type: string, enum: [nuevos, precio_asc, precio_desc, nombre, relevancia] }
+        - name: pagina
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: tamano
+          in: query
+          description: "Máximo 100."
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Página de resultados (`items` vacío si no hay coincidencias).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Pagina" }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+
+  /v1/admin/productos/{id}:
+    parameters:
+      - { $ref: "#/components/parameters/ProductoId" }
+    get:
+      tags: [Productos]
+      summary: Obtener un producto por id
+      responses:
+        "200":
+          description: El producto con sus variantes y fotos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
+        "404": { $ref: "#/components/responses/NoEncontrado" }
+    put:
+      tags: [Productos]
+      summary: Actualizar los datos del producto
+      description: |
+        Reemplaza los datos editables: nombre, descripción, categoría, precio, atributos y fotos
+        (un opcional que no viene se quita). **No** cambia `sistemaTalles`, variantes, `publicado` ni el id.
+        Lleva la `version` que se leyó: si otro cambio se coló, responde `409 CONFLICTO_DE_VERSION`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductoActualizacion" }
+            example:
+              version: 1
+              nombre: Remera oversize
+              descripcion: Remera de algodón peinado, corte amplio.
+              categoria: remeras
+              precioBase: { monto: 17999.90, moneda: ARS }
+              atributos: { material: algodón, genero: unisex }
+              fotos: []
+      responses:
+        "200":
+          description: Producto actualizado (la `version` subió en 1).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+        "404": { $ref: "#/components/responses/NoEncontrado" }
+        "409": { $ref: "#/components/responses/ConflictoVersion" }
+    delete:
+      tags: [Productos]
+      summary: Baja lógica (despublicar)
+      description: "No borra el documento: pone `publicado: false`. Es idempotente; repetirlo no es error."
+      responses:
+        "204": { description: Despublicado (o ya lo estaba). }
+        "404": { $ref: "#/components/responses/NoEncontrado" }
+
+  /v1/admin/productos/{id}/publicar:
+    post:
+      tags: [Productos]
+      summary: Publicar un producto
+      description: Si ya estaba publicado no es error y no sube la `version`.
+      parameters:
+        - { $ref: "#/components/parameters/ProductoId" }
+      responses:
+        "200":
+          description: Producto publicado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Producto" }
+        "404": { $ref: "#/components/responses/NoEncontrado" }
+
+  /v1/admin/productos/{id}/variantes:
+    post:
+      tags: [Variantes]
+      summary: Agregar una variante
+      description: |
+        Operación **atómica sobre un documento**: la condición (que no exista ese talle y color,
+        ni ese id) va dentro del filtro del `updateOne`. Con pedidos simultáneos iguales,
+        exactamente uno recibe `201` y el resto `409`.
+      parameters:
+        - { $ref: "#/components/parameters/ProductoId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VarianteNueva" }
+            example: { talle: S, color: Blanco }
+      responses:
+        "201":
+          description: Variante agregada (el producto sube de `version`).
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Variante" }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+        "404": { $ref: "#/components/responses/NoEncontrado" }
+        "409":
+          description: El producto ya tiene una variante con ese talle y color (o con el mismo id).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+              example:
+                type: https://fav.example/errores/variante-duplicada
+                title: Variante duplicada
+                status: 409
+                detail: Ya existe una variante con ese talle y color, o con el mismo id.
+                codigo: VARIANTE_DUPLICADA
+
+  /v1/productos:
+    get:
+      tags: [Productos]
+      summary: Catálogo público (capacidad publicada)
+      description: |
+        Definido por el contrato `catalogo-pedidos-v1` (`docs/contracts/`), que es la referencia. Solo publicados, sin stock y
+        sin paginar, con el precio vigente para transferencia. Por el gateway se accede en `/v1/productos` con `X-API-Key`.
+      responses:
+        "200":
+          description: Catálogo publicado. Ver el esquema `Catalogo` del contrato.
+  /v1/tienda/productos:
+    get:
+      tags: [Productos]
+      summary: Listado del comprador
+      description: |
+        Público. Solo publicados, con los mismos filtros, orden y paginación que el listado de administración, salvo `publicado`,
+        que da `400`. Filtra y ordena por precio base. Por el gateway: `/catalogo/v1/tienda/productos`, sin token.
+
+        Con `q` busca en Elasticsearch (ADR-006): tolera errores de tipeo y, sin `orden`, ordena por `relevancia`.
+        Sin `q` lee de MongoDB, y sigue funcionando aunque el motor esté caído.
+      responses:
+        "200":
+          description: Página con `items` (`ProductoTienda`), `pagina`, `tamano`, `total` y `paginas`.
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+        "503":
+          description: "`BUSQUEDA_NO_DISPONIBLE`: se pidió `q` y el motor no responde. Se puede navegar sin `q`."
+  /v1/admin/busqueda/reconstruir:
+    post:
+      tags: [Productos]
+      summary: Reconstruir el índice de búsqueda
+      description: |
+        Crea un índice nuevo desde MongoDB y cambia el alias al terminar, sin cortar la búsqueda (ADR-006). Corre en
+        segundo plano: `estado` es `INICIADA`, o `EN_CURSO` si esta réplica ya estaba reconstruyendo.
+      responses:
+        "202":
+          description: Reconstrucción iniciada.
+        "503":
+          description: "`BUSQUEDA_NO_DISPONIBLE`: el servicio corre sin `ELASTICSEARCH_URL`."
+  /v1/tienda/productos/{id}:
+    get:
+      tags: [Productos]
+      summary: Ficha del comprador
+      description: Pública. Un producto no publicado responde igual que uno inexistente.
+      parameters:
+        - $ref: "#/components/parameters/ProductoId"
+      responses:
+        "200":
+          description: El producto.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductoTienda" }
+        "404": { $ref: "#/components/responses/NoEncontrado" }
+  /v1/promociones:
+    get:
+      tags: [Promociones]
+      summary: Listar todas, vencidas incluidas
+      responses:
+        "200":
+          description: Las más recientes primero, dentro de `items`. Sin paginar.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Promocion" } }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+    post:
+      tags: [Promociones]
+      summary: Crear una promoción
+      description: |
+        El servidor genera el id. Inicio y fin son obligatorios (HU-05.2). No se acumulan: si aplican varias, gana la de mayor porcentaje.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PromocionNueva" }
+            example:
+              nombre: Verano en remeras
+              tipo: PORCENTAJE
+              porcentaje: 20
+              medioPago: null
+              vigencia: { desde: "2026-12-01T00:00:00-03:00", hasta: "2026-12-31T23:59:59-03:00" }
+              alcance: { tipo: CATEGORIA, ids: [remeras] }
+      responses:
+        "201":
+          description: Creada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Promocion" }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+  /v1/promociones/{id}:
+    put:
+      tags: [Promociones]
+      summary: Reemplazar una promoción
+      description: Una promoción se cancela o se acorta editando su vigencia; no se borra. El id no cambia.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PromocionNueva" }
+      responses:
+        "200":
+          description: Actualizada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Promocion" }
+        "400": { $ref: "#/components/responses/PedidoInvalido" }
+        "404":
+          description: `PROMOCION_NO_ENCONTRADA`.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+  /v1/variantes:
+    get:
+      tags: [Variantes]
+      summary: Consulta por lote (Ventas y panel)
+      description: |
+        Datos de varias variantes y de su producto, con el precio que se cobra. Lo usa Ventas al crear una venta.
+
+        - De 1 a 200 ids separados por coma. Los repetidos se responden una vez, en el orden pedido.
+        - No filtra por `publicado`: cada ítem lo informa y quien llama decide. Ventas rechaza los no publicados en la compra online y en los pedidos públicos.
+        - Si algún id no existe: `400 VARIANTE_INEXISTENTE`, con la lista de los que faltan.
+        - Precios en pesos. `precio` es el que se cobra: el base con la promoción vigente de mayor porcentaje para ese medio de pago (no se acumulan). `promocion` no viene si no se aplica ninguna.
+      parameters:
+        - name: variantes
+          in: query
+          required: true
+          description: "Ids de variante separados por coma. Ej.: var-remera-basica-blanca-m,var-jean-mom-celeste-38"
+          schema: { type: string }
+        - name: medioPago
+          in: query
+          description: "Medio de pago para el precio. Por defecto TRANSFERENCIA (D4)."
+          schema: { type: string, enum: [EFECTIVO, TRANSFERENCIA, MERCADO_PAGO], default: TRANSFERENCIA }
+      responses:
+        "200":
+          description: Una entrada por variante pedida.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/DetalleVariante" } }
+              example:
+                items:
+                  - { varianteId: var-remera-basica-blanca-m, productoId: prod-remera-basica, nombre: Remera básica, categoria: remeras, talle: M, color: Blanco, publicado: true, precio: 15000, precioBase: 15000 }
+        "400":
+          description: Pedido inválido (`PEDIDO_INVALIDO`) o alguna variante no existe (`VARIANTE_INEXISTENTE`).
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problema" }
+              example:
+                type: https://fav.example/errores/variante-inexistente
+                title: Variante inexistente
+                status: 400
+                detail: No existen las variantes indicadas en variantes.
+                codigo: VARIANTE_INEXISTENTE
+                variantes: [var-nada]
+
+  /healthz:
+    get:
+      tags: [Sondas]
+      summary: El proceso está vivo
+      responses:
+        "200": { description: OK }
+  /readyz:
+    get:
+      tags: [Sondas]
+      summary: Puede recibir pedidos (verifica la conexión a MongoDB)
+      responses:
+        "200": { description: OK }
+        "503": { description: La base no responde. }
+
+components:
+  securitySchemes:
+    TokenAdmin:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token con rol administrador, de `POST /usuarios/v1/sesiones`. Lo valida el gateway (ADR-016).
+  parameters:
+    ProductoId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      example: prod-remera-basica
+  responses:
+    PedidoInvalido:
+      description: El cuerpo o los parámetros no cumplen las reglas; `errores` indica los campos.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://fav.example/errores/pedido-invalido
+            title: Pedido inválido
+            status: 400
+            detail: Revisar los campos indicados en errores.
+            codigo: PEDIDO_INVALIDO
+            errores:
+              - { campo: nombre, mensaje: es obligatorio }
+    NoEncontrado:
+      description: No existe el producto.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://fav.example/errores/producto-no-encontrado
+            title: Producto no encontrado
+            status: 404
+            detail: No existe el producto prod-inexistente.
+            codigo: PRODUCTO_NO_ENCONTRADO
+    ConflictoVersion:
+      description: La `version` enviada no es la actual.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problema" }
+          example:
+            type: https://fav.example/errores/conflicto-de-version
+            title: Conflicto de versión
+            status: 409
+            detail: El producto cambió desde que se leyó. Volver a leerlo y repetir el cambio con la versión nueva.
+            codigo: CONFLICTO_DE_VERSION
+
+  schemas:
+    ProductoTienda:
+      type: object
+      required: [productoId, nombre, categoria, precio, precioBase, fotos, variantes]
+      properties:
+        productoId: { type: string }
+        nombre: { type: string }
+        descripcion: { type: string }
+        categoria: { type: string }
+        precio: { type: number, description: "Vigente para transferencia (D4), en pesos." }
+        precioBase: { type: number, description: "Sin promoción, en pesos." }
+        promocion:
+          type: object
+          description: Solo si se aplicó una.
+          properties:
+            promocionId: { type: string }
+            nombre: { type: string }
+            porcentaje: { type: integer }
+        fotos:
+          type: array
+          items: { $ref: "#/components/schemas/Foto" }
+        variantes:
+          type: array
+          description: Sin stock. Si hay lo responde Inventario, en `GET /v1/disponibilidad`.
+          items: { $ref: "#/components/schemas/Variante" }
+    PromocionNueva:
+      type: object
+      required: [nombre, tipo, porcentaje, vigencia, alcance]
+      additionalProperties: false
+      properties:
+        nombre: { type: string }
+        tipo: { type: string, enum: [PORCENTAJE, MEDIO_PAGO] }
+        porcentaje: { type: integer, minimum: 1, maximum: 100 }
+        medioPago:
+          type: string
+          nullable: true
+          enum: [EFECTIVO, TRANSFERENCIA, MERCADO_PAGO, null]
+          description: Obligatorio con tipo MEDIO_PAGO; en otro caso, null o ausente.
+        vigencia:
+          type: object
+          required: [desde, hasta]
+          properties:
+            desde: { type: string, format: date-time }
+            hasta: { type: string, format: date-time }
+        alcance:
+          type: object
+          required: [tipo]
+          properties:
+            tipo: { type: string, enum: [PRODUCTO, CATEGORIA, TIENDA] }
+            ids:
+              type: array
+              items: { type: string }
+              description: Productos o categorías existentes. Vacío con TIENDA.
+    Promocion:
+      allOf:
+        - $ref: "#/components/schemas/PromocionNueva"
+        - type: object
+          required: [promocionId]
+          properties:
+            promocionId: { type: string }
+    Precio:
+      type: object
+      required: [monto, moneda]
+      properties:
+        monto: { type: number, description: "En pesos, mayor a 0, hasta 2 decimales.", example: 15999.9 }
+        moneda: { type: string, enum: [ARS] }
+    Foto:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string }
+        color: { type: string, nullable: true, description: Color al que corresponde la foto; null si es general. }
+    Variante:
+      type: object
+      properties:
+        varianteId: { type: string, maxLength: 100, example: var-remera-oversize-blanco-m }
+        talle: { type: string, example: M }
+        color: { type: string, example: Blanco }
+    VarianteNueva:
+      type: object
+      required: [talle, color]
+      properties:
+        talle: { type: string, description: Tiene que pertenecer al sistema de talles del producto., example: S }
+        color: { type: string, example: Blanco }
+    Datos:
+      type: object
+      description: Campos editables, comunes al alta y a la actualización.
+      required: [nombre, categoria, precioBase]
+      properties:
+        nombre: { type: string }
+        descripcion: { type: string }
+        categoria: { type: string, description: "Id de una de las 13 categorías (remeras, jeans, buzos…).", example: remeras }
+        precioBase: { $ref: "#/components/schemas/Precio" }
+        atributos: { type: object, additionalProperties: true, description: Libres; varían por categoría. }
+        fotos:
+          type: array
+          items: { $ref: "#/components/schemas/Foto" }
+    ProductoNuevo:
+      allOf:
+        - $ref: "#/components/schemas/Datos"
+        - type: object
+          required: [sistemaTalles, variantes]
+          properties:
+            sistemaTalles:
+              type: string
+              enum: [LETRAS, NUMERICO_PAR, NUMERICO_1_4, UNICO]
+            variantes:
+              type: array
+              minItems: 1
+              items: { $ref: "#/components/schemas/VarianteNueva" }
+    ProductoActualizacion:
+      allOf:
+        - $ref: "#/components/schemas/Datos"
+        - type: object
+          required: [version]
+          properties:
+            version: { type: integer, description: La que se leyó. }
+    Producto:
+      type: object
+      properties:
+        productoId: { type: string, example: prod-remera-oversize }
+        nombre: { type: string }
+        descripcion: { type: string }
+        categoria: { type: string }
+        sistemaTalles: { type: string, enum: [LETRAS, NUMERICO_PAR, NUMERICO_1_4, UNICO] }
+        precioBase: { $ref: "#/components/schemas/Precio" }
+        publicado: { type: boolean }
+        atributos: { type: object, additionalProperties: true }
+        fotos: { type: array, items: { $ref: "#/components/schemas/Foto" } }
+        variantes: { type: array, items: { $ref: "#/components/schemas/Variante" } }
+        creadoEn: { type: string, format: date-time }
+        actualizadoEn: { type: string, format: date-time }
+        version: { type: integer, description: Empieza en 1 y sube con cada cambio. }
+    DetalleVariante:
+      type: object
+      properties:
+        varianteId: { type: string, example: var-remera-basica-blanca-m }
+        productoId: { type: string, example: prod-remera-basica }
+        nombre: { type: string, example: Remera básica }
+        categoria: { type: string, example: remeras }
+        talle: { type: string, example: M }
+        color: { type: string, example: Blanco }
+        publicado: { type: boolean }
+        precio: { type: number, description: "Precio que se cobra, en pesos.", example: 13500 }
+        precioBase: { type: number, example: 15000 }
+        promocion:
+          type: object
+          description: La promoción aplicada. No viene si no hay ninguna.
+          properties:
+            promocionId: { type: string, example: promo-efectivo-tienda }
+            nombre: { type: string, example: 10% pagando en efectivo }
+            porcentaje: { type: integer, example: 10 }
+    Pagina:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Producto" } }
+        pagina: { type: integer }
+        tamano: { type: integer }
+        total: { type: integer, format: int64 }
+        paginas: { type: integer, format: int64 }
+    Problema:
+      type: object
+      description: application/problem+json (RFC 9457) con un `codigo` estable.
+      required: [type, title, status, codigo]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        codigo:
+          type: string
+          enum: [PEDIDO_INVALIDO, PRODUCTO_NO_ENCONTRADO, VARIANTE_INEXISTENTE, VARIANTE_DUPLICADA, CONFLICTO_DE_VERSION, NO_DISPONIBLE, ERROR_INTERNO]
+        errores:
+          type: array
+          items:
+            type: object
+            properties:
+              campo: { type: string }
+              mensaje: { type: string }
+        variantes:
+          type: array
+          description: Ids que no existen (solo en VARIANTE_INEXISTENTE).
+          items: { type: string }

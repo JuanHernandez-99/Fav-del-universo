@@ -1,8 +1,14 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.8** · 14/10/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.11** · 05/11/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
+>
+> **Cambios en 0.11** (ADR-017): se agrega HU-01.5: el comprador ve las unidades online disponibles. HU-08.4 y HU-08.5: motivos del ajuste y límite del físico.
+>
+> **Cambios en 0.10** (ADR-015): se agrega RN-26, sobre las contraseñas, y RN-23 indica cómo se crea la cuenta de administrador.
+>
+> **Cambios en 0.9** (ADR-014): en CU-01 primero se reserva y después se guarda la venta. Mercado Pago se reemplaza por un simulador local, sin credenciales de prueba, y los mails se ven en Mailpit.
 >
 > **Cambios en 0.8:** la cátedra asignó los grupos. La capacidad publicada pasa a ser **catálogo y pedidos** para el grupo de proveedores, y se suma la capacidad a consumir: la venta en consignación en un gimnasio (§11). Las opciones A y B quedan descartadas (ADR-008).
 >
@@ -54,7 +60,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 - **Mercadería nueva:** suele estar activa primero en el local y unos días después en la web.
 - **Pérdidas y fallas:** pueden ocurrir y obligan a corregir el stock a mano.
 - **Medios de pago hoy:** efectivo y transferencia. En el local, pagando en efectivo puede haber un porcentaje de descuento.
-- **Mercado Pago:** el cliente todavía no tiene cuenta de vendedor. Para el TP se usan credenciales de prueba.
+- **Mercado Pago:** el cliente todavía no tiene cuenta de vendedor. Para el TP se usa un simulador local (ADR-014).
 - **Usuarios:** por ahora el sistema lo administra una sola persona.
 
 ## 4. Actores
@@ -111,8 +117,9 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | RN-20 | El comprador solo puede cancelar una compra pendiente de pago. Después del pago, cualquier cambio se gestiona por mail o teléfono. | Cliente |
 | RN-21 | El sistema no gestiona cambios, devoluciones, saldo a favor ni reclamos. La política de cambios y devoluciones del cliente y los datos de contacto se publican como página informativa. | Cliente + equipo. **[?]** datos de contacto |
 | RN-22 | En la venta online el precio lo calcula el servidor al comprar y el comprador no puede modificarlo. En la venta del local el sistema sugiere el monto con la promoción vigente para el medio de pago, y el administrador registra el monto efectivamente cobrado. | Equipo |
-| RN-23 | Hay un único rol de administración. En v1 se usa una sola cuenta de administrador. | Cliente |
+| RN-23 | Hay un único rol de administración. En v1 se usa una sola cuenta de administrador, que el sistema crea al arrancar con los datos de su configuración. No se obtiene por el registro público (ADR-015). | Cliente. **[propuesta]** cómo se crea |
 | RN-24 | El comprador sin cuenta no consulta el estado en el sitio: se entera por los mails de compra realizada y de pedido despachado, y para cualquier otra consulta se comunica con el local. No hay número de seguimiento en v1: el seguimiento del envío llega con la integración de envíos (RN-16). | Cliente |
+| RN-26 | La contraseña tiene como mínimo 8 caracteres, sin requisitos de mayúsculas, números ni símbolos (ADR-015). | **[propuesta]**, a confirmar con el cliente |
 | RN-25 | Si el stock físico de una variante queda en negativo, el sistema la marca como *stock a corregir*. El administrador la ve en un filtro del panel (sin mail) y la corrige con un ajuste de stock (HU-08). El stock físico negativo no afecta al stock online ni a las compras de la web. | Equipo |
 
 ## 7. Estados de la venta online
@@ -137,13 +144,14 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 2. Dado un producto no publicado, cuando el comprador navega o busca, entonces no aparece.
 3. Dada una variante sin stock online disponible, entonces se muestra como "sin stock" y no se puede agregar al carrito.
 4. Dado un producto con una promoción vigente, entonces se muestra el precio original y el precio con promoción. **[?]** cómo se muestra una promoción condicionada al medio de pago.
+5. Cuando elige talle y color, entonces ve cuántas unidades online hay disponibles. **[propuesta]**
 
 **HU-02 · Buscar, filtrar y ordenar.** Como comprador quiero buscar y filtrar productos, para encontrar rápido lo que busco. *(RN-02, RN-17)*
 1. Cuando el comprador busca por texto, entonces obtiene los productos publicados cuyo nombre o descripción coinciden.
 2. Cuando filtra por categoría, talle, color o rango de precio, entonces solo ve productos que cumplen todos los filtros aplicados.
 3. Cuando ordena por precio (ascendente o descendente) o por novedad, entonces los resultados respetan ese orden.
 4. Dados más resultados que el tamaño de página, cuando pasa de página, entonces no hay resultados repetidos ni salteados.
-5. Dado un cambio en un producto o en su stock, cuando pasa el retraso máximo definido, entonces la búsqueda lo refleja. **[?]** el retraso máximo se define en el D6.
+5. Dado un cambio en un producto, cuando pasa el retraso máximo de 10 segundos **[propuesta]**, entonces la búsqueda lo refleja (ADR-006). El stock no se indexa: se consulta a Inventario al mostrar el resultado.
 
 **HU-03 · Alta y edición de productos (admin).** Como administrador quiero cargar y editar productos con sus variantes y fotos, para mantener la tienda actualizada. *(RN-01, RN-02, RN-03, RN-17)*
 1. Dado un producto nuevo, entonces queda no publicado por defecto. **[propuesta]**
@@ -184,6 +192,8 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 1. Cuando ajusta el stock con un motivo, entonces se aplica y queda registrado.
 2. Cuando no indica un motivo, entonces se rechaza. **[propuesta]**
 3. Cuando el ajuste dejaría el stock por debajo de lo reservado, entonces se rechaza.
+4. Los motivos son *pérdida*, *falla* y *corrección de conteo*, con una nota opcional. **[propuesta]**
+5. Cuando el ajuste dejaría el stock físico negativo, entonces se rechaza; sumar siempre se puede, y así se corrige un físico negativo (RN-25). **[propuesta]**
 
 **HU-09 · Ver el stock y las variantes a corregir (admin).** Como administrador quiero ver el stock de cada variante y cuáles tienen el stock físico mal registrado, para decidir qué reponer y qué corregir. *(RN-01, RN-25 · ADR-001)*
 1. Cuando abre un producto en el panel, entonces ve cada variante (talle y color) con su stock online, su stock físico y las unidades reservadas.
@@ -254,7 +264,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 
 **HU-18 · Registro e inicio de sesión.** Como comprador quiero registrarme e iniciar sesión, para ver mis compras.
 1. Cuando se registra con un email que ya existe, entonces se rechaza.
-2. Las contraseñas se guardan con hash y nunca se devuelven en ninguna respuesta.
+2. Las contraseñas se guardan con hash y nunca se devuelven en ninguna respuesta. Una contraseña de menos de 8 caracteres se rechaza (RN-26).
 3. Cuando inicia sesión con datos correctos, entonces recibe un token con vencimiento. Con datos incorrectos recibe un error genérico que no revela si el email existe.
 4. ~~Dado un invitado que compró con un email, cuando después se registra con ese email, entonces ve esas compras.~~ **Descartado** (ADR-001): sin verificación de email, cualquiera podría registrarse con un email ajeno y ver esos pedidos.
 
@@ -297,8 +307,8 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 1. El comprador, registrado o invitado, revisa el carrito y aprieta "Comprar". El frontend envía el contenido del carrito a Ventas.
 2. El invitado completa sus datos (como mínimo el email, RN-11). El registrado usa el email de su cuenta, que llega en el token. Elige Mercado Pago.
 3. Ventas obtiene de Catálogo el precio vigente de cada variante. **[propuesta]**
-4. Ventas crea la venta en *Pendiente de pago*, con una clave de idempotencia, y guarda el email del comprador.
-5. Ventas le pide a Inventario reservar las unidades por 20 minutos (llamada síncrona, con timeout).
+4. Ventas le pide a Inventario reservar las unidades por 20 minutos (llamada síncrona, con timeout y clave de idempotencia).
+5. Ventas crea la venta en *Pendiente de pago* y guarda el email del comprador (ADR-014).
 6. Ventas crea el pago en Mercado Pago y redirige al comprador.
 7. Mercado Pago avisa que el pago fue aprobado.
 8. Ventas registra el pago aprobado y le pide a Inventario confirmar la reserva (llamada síncrona, con reintentos; ADR-005).
@@ -306,9 +316,9 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 10. Ventas envía los mails.
 
 **Flujos alternativos**
-- **5a.** No hay stock suficiente: se rechaza y el comprador ve "sin stock".
-- **5b.** Inventario no responde: timeout, reintento acotado y error claro al comprador. No queda una reserva a medias.
-- **7a.** El pago es rechazado: se libera la reserva.
+- **4a.** No hay stock suficiente: se rechaza y el comprador ve "sin stock".
+- **4b.** Inventario no responde: timeout, reintento acotado y error claro al comprador. No se crea la venta y no queda una reserva a medias.
+- **7a.** El pago es rechazado: se libera la reserva. **[?]** Estado de la venta: **[propuesta]** *Cancelada* (ADR-014).
 - **7b.** No llega aviso en 20 minutos: la reserva vence, Inventario publica `ReservaVencida` y la venta pasa a *Vencida*.
 - **7c.** El pago llega con la reserva vencida: Inventario rechaza la confirmación y la venta queda *A verificar* (RN-14).
 - **8a.** Inventario no responde al confirmar: Ventas reintenta hasta que responda y la venta sigue *Pendiente de pago*. Si mientras tanto vence la reserva, sigue como 7c.
@@ -392,7 +402,9 @@ FAV deja ropa en un **gimnasio**, que la vende y se queda con una comisión. La 
 
 Fuera de la v1 **[propuesta]**: registrar las ventas que hace el gimnasio y calcular la comisión. Se liquidan por fuera del sistema.
 
-**[?]** Contrato del gimnasio: se pidió al grupo. La decisión se documenta en el ADR-009 (D9).
+Solo un rechazo definitivo del gimnasio devuelve las unidades al stock físico. El administrador ve el estado de cada reposición en el panel. Contrato: `docs/contracts/externos/gimnasio/`. La decisión se documenta en el ADR-018 (D9).
+
+**El gimnasio también consume a FAV:** ve el catálogo y la disponibilidad por variante, con su propia clave y sin hacer pedidos (`GET /v1/productos` y `GET /v1/disponibilidad`, contrato 1.1.0, ADR-008). **[?]** Confirmar con el grupo que les sirve el stock online **[propuesta]**.
 
 ## 12. Pendientes
 
@@ -404,6 +416,7 @@ Fuera de la v1 **[propuesta]**: registrar las ventas que hace el gimnasio y calc
 | Cómo cobra con Mercado Pago en el local (fuera del sistema o desde el sistema) | RN-18 |
 | Datos de contacto (mail y teléfono) | RN-21, HU-24 |
 | Datos para transferir (alias o CBU y titular) | HU-12, HU-26 |
+| Mínimo de 8 caracteres en las contraseñas | RN-26 |
 | Avisarle que el filtro de poco stock no entra en v1 y que se reemplaza por la vista de stock por producto | HU-09 |
 | Cuántos productos piensa tener | Dimensionamiento (D13) |
 | Una versión del Excel de stock, para ver la estructura | Carga inicial |
@@ -412,5 +425,4 @@ Fuera de la v1 **[propuesta]**: registrar las ventas que hace el gimnasio y calc
 | Tema | Dónde se resuelve |
 |---|---|
 | Cómo se entrega y se rota la clave de cada grupo consumidor | D8 |
-| Contrato del gimnasio y cómo se identifican los productos de FAV en su sistema | D9 |
-| Retraso máximo del índice de búsqueda | D6 |
+| URL pública y clave del gimnasio, prueba conjunta y cómo se revisa una reposición en conflicto | D9 (ADR-018) |

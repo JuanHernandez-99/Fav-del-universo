@@ -1,0 +1,3 @@
+# Los scripts corren dentro de contenedores Linux: con fin de línea CRLF de Windows fallan.
+*.sh text eol=lf
+*.js text eol=lf

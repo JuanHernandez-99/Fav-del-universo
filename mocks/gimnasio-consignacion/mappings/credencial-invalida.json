@@ -1,0 +1,12 @@
+{
+  "priority": 1,
+  "request": {
+    "urlPathPattern": "/api/v1/consignaciones/.*",
+    "headers": { "X-API-Key": { "equalTo": "clave-invalida" } }
+  },
+  "response": {
+    "status": 401,
+    "headers": { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    "jsonBody": { "codigo": "NO_AUTENTICADO", "mensaje": "Clave de consumidor ausente o inválida." }
+  }
+}

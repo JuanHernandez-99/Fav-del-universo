@@ -1,0 +1,162 @@
+# Nube: se suma al archivo local, sin cambiarlo. Guía completa en desplegar/README.md.
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d --build
+# Requiere Docker Compose 2.24.4 o mayor (!reset y !override).
+#
+# Qué cambia respecto de local:
+#   - Solo Caddy publica puertos hacia internet: 80 y 443. Los paneles quedan en 127.0.0.1 (túnel SSH).
+#   - Los secretos son obligatorios: sin ellos el arranque falla con un mensaje. No hay valores por defecto.
+#   - Todo se reinicia solo (también al reiniciar la VM).
+#   - El gimnasio sigue simulado hasta tener su URL real: se carga en .env sin tocar este archivo.
+
+x-reinicio: &reinicio
+  restart: unless-stopped
+
+x-rabbitmq-url: &rabbitmq-url
+  RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:?falta RABBITMQ_DEFAULT_PASS en .env}@rabbitmq:5672/
+
+services:
+  # ---------- Entrada pública ----------
+  caddy:
+    image: caddy:2.10-alpine
+    <<: *reinicio
+    environment:
+      DOMINIO: ${DOMINIO:?falta DOMINIO en .env (por ejemplo fav-ucc.chilecentral.cloudapp.azure.com)}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./desplegar/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # certificados: si se pierden, se vuelven a pedir (Let's Encrypt limita cuántos)
+      - caddy-config:/config
+    networks:
+      borde: { ipv4_address: 172.30.250.10 } # fija: el gateway confía en esta IP (desplegar/proxy-confiable.conf)
+    depends_on:
+      gateway: { condition: service_started }
+
+  gateway:
+    <<: *reinicio
+    ports: !reset [] # ya no se publica el 8080: se entra por Caddy
+    environment:
+      CAPACIDAD_API_KEY: ${CAPACIDAD_API_KEY:?falta CAPACIDAD_API_KEY en .env}
+      CAPACIDAD_API_KEY_GIMNASIO: ${CAPACIDAD_API_KEY_GIMNASIO:?falta CAPACIDAD_API_KEY_GIMNASIO en .env}
+    volumes:
+      - ./desplegar/proxy-confiable.conf:/etc/nginx/proxy-confiable/caddy.conf:ro
+    networks: [default, borde]
+
+  # ---------- Servicios ----------
+  inventario:
+    environment:
+      <<: *rabbitmq-url
+      INVENTARIO_DB_PASSWORD: ${INVENTARIO_DB_PASSWORD:?falta INVENTARIO_DB_PASSWORD en .env}
+
+  catalogo:
+    environment:
+      <<: *rabbitmq-url
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?falta MONGO_INITDB_ROOT_PASSWORD en .env}
+
+  catalogo-init:
+    environment:
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?falta MONGO_INITDB_ROOT_PASSWORD en .env}
+
+  ventas:
+    environment:
+      <<: *rabbitmq-url
+      VENTAS_DB_PASSWORD: ${VENTAS_DB_PASSWORD:?falta VENTAS_DB_PASSWORD en .env}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:?falta MERCADOPAGO_WEBHOOK_SECRET en .env}
+
+  usuarios:
+    environment:
+      USUARIOS_DB_PASSWORD: ${USUARIOS_DB_PASSWORD:?falta USUARIOS_DB_PASSWORD en .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?falta ADMIN_EMAIL en .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?falta ADMIN_PASSWORD en .env}
+
+  frontend:
+    <<: *reinicio
+
+  # ---------- Bases y mensajería: sin puertos publicados ----------
+  mysql-inventario:
+    <<: *reinicio
+    ports: !reset []
+    environment:
+      MYSQL_ROOT_PASSWORD: ${INVENTARIO_DB_ROOT_PASSWORD:?falta INVENTARIO_DB_ROOT_PASSWORD en .env}
+      MYSQL_PASSWORD: ${INVENTARIO_DB_PASSWORD:?falta INVENTARIO_DB_PASSWORD en .env}
+
+  mysql-ventas:
+    <<: *reinicio
+    ports: !reset []
+    environment:
+      MYSQL_ROOT_PASSWORD: ${VENTAS_DB_ROOT_PASSWORD:?falta VENTAS_DB_ROOT_PASSWORD en .env}
+      MYSQL_PASSWORD: ${VENTAS_DB_PASSWORD:?falta VENTAS_DB_PASSWORD en .env}
+
+  mysql-usuarios:
+    <<: *reinicio
+    ports: !reset []
+    environment:
+      MYSQL_ROOT_PASSWORD: ${USUARIOS_DB_ROOT_PASSWORD:?falta USUARIOS_DB_ROOT_PASSWORD en .env}
+      MYSQL_PASSWORD: ${USUARIOS_DB_PASSWORD:?falta USUARIOS_DB_PASSWORD en .env}
+
+  mongo-catalogo:
+    <<: *reinicio
+    environment:
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?falta MONGO_INITDB_ROOT_PASSWORD en .env}
+
+  rabbitmq:
+    <<: *reinicio
+    ports: !reset []
+    environment:
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?falta RABBITMQ_DEFAULT_PASS en .env}
+
+  memcached:
+    <<: *reinicio
+
+  elasticsearch:
+    <<: *reinicio
+    # Heap de 512 MB (archivo local) más la memoria fuera del heap: en reposo usó 933 MiB propios (09/11/2026).
+    # Con 1 GB quedaba sin margen. Si pasa el límite, Docker lo reinicia y mientras tanto la búsqueda usa MongoDB (ADR-006).
+    mem_limit: 1536m
+
+  # ---------- Simulados ----------
+  # Mercado Pago (ADR-014): Caddy expone solo la página de pago y sus dos botones (desplegar/Caddyfile).
+  mercadopago-simulador:
+    <<: *reinicio
+    ports: !reset []
+    environment:
+      URL_PUBLICA: https://${DOMINIO:?falta DOMINIO en .env}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:?falta MERCADOPAGO_WEBHOOK_SECRET en .env}
+    networks: [default, borde]
+
+  # Gimnasio (ADR-018): simulado hasta tener su URL. Con GIMNASIO_BASE_URL real en .env, Inventario deja de usarlo.
+  gimnasio-mock:
+    <<: *reinicio
+    ports: !reset []
+
+  # Mails (ADR-014): no salen a internet. Se leen con un túnel SSH a http://localhost:8025.
+  mailpit:
+    <<: *reinicio
+    ports: !override ["127.0.0.1:8025:8025"] # su página no tiene contraseña
+
+  # ---------- Observabilidad: solo desde la VM (túnel SSH) ----------
+  jaeger:
+    <<: *reinicio
+    ports: !override ["127.0.0.1:16686:16686"]
+
+  prometheus:
+    <<: *reinicio
+    ports: !override ["127.0.0.1:9090:9090"]
+
+  alertmanager:
+    <<: *reinicio
+
+  grafana:
+    <<: *reinicio
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?falta GRAFANA_ADMIN_PASSWORD en .env}
+
+networks:
+  # Red entre Caddy y lo que publica (gateway y página de pago), con la IP de Caddy fija.
+  borde:
+    ipam:
+      config: [{ subnet: 172.30.250.0/24 }]
+
+volumes:
+  caddy-data:
+  caddy-config:

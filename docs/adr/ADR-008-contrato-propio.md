@@ -10,6 +10,8 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
+> **Actualización 08/11/2026 (contrato 1.1.0):** el equipo confirmó que, por la consigna, el grupo del gimnasio también consume a FAV: el catálogo y la disponibilidad. Se suma `GET /v1/disponibilidad`, un cambio compatible. Inventario la responde, por lo que Catálogo sigue sin depender de Inventario y `GET /v1/productos` sigue sin informar stock. El gimnasio tiene su propia clave (`CAPACIDAD_API_KEY_GIMNASIO`), con el mismo límite de uso, y no puede hacer pedidos. Devuelve el stock **online [propuesta]**, el mismo que aparta un pedido; las reposiciones al gimnasio salen del físico. **[?]** Falta confirmar con el grupo del gimnasio que es lo que necesitan. Como la tienda usa la misma ruta interna de Inventario, esta operación se apaga en el gateway con `CAPACIDAD_PUBLICA_ACTIVA=false`.
+
 ## Contexto
 
 La consigna (sección 4) pide publicar una capacidad para que la use otro grupo:
@@ -87,6 +89,7 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 
 | Alternativa | Por qué se descartó |
 |---|---|
+| **Escribir el mock a mano** | Prism lo genera desde el OpenAPI: el mock no se puede apartar del contrato publicado, y el otro grupo pudo integrarse antes de que existiera la capacidad real. |
 | **Opción A de la Entrega 1: reserva de cupos con vencimiento** (Inventario) | Se pensó para un consumidor de otro dominio, sin ropa que comprar. El consumidor asignado sí compra ropa: necesita el catálogo y pedidos sobre stock real. |
 | **Opción B de la Entrega 1: envío de emails** (Ventas) | Mismo motivo. Además, es poco central para un consumidor que compra. |
 | **Reservar y confirmar por separado** (tres o más operaciones) | Obliga a exponer reservas y su vencimiento a otro sistema. El consumidor no lo pidió y la tienda no lo necesita: la confirmación ya existe como confirmación de la transferencia. |

@@ -1,0 +1,319 @@
+# API Gateway (nginx). La imagen oficial reemplaza las ${VARIABLES} al arrancar.
+# Rutea la capacidad publicada (productos a Catálogo, disponibilidad a Inventario, pedidos a Ventas), la tienda a Ventas y las rutas de
+# administración a Inventario, Catálogo y Ventas, con balanceo y verificación de disponibilidad (ADR-012).
+
+# Valida el token con njs (ADR-016).
+js_path "/etc/nginx/njs/";
+js_import jwt from jwt.js;
+
+# DNS interno de Docker. `resolve` en cada upstream vuelve a consultarlo cada 5 s,
+# así una réplica nueva o reiniciada (con otra IP) entra al balanceo sin reiniciar nginx.
+resolver 127.0.0.11 valid=5s ipv6=off;
+
+upstream inventario {
+    zone inventario 64k;
+    # Round robin entre todas las IPs del nombre `inventario` (una por réplica).
+    # Una réplica que falla 2 veces en 10 s queda fuera 10 s (verificación pasiva).
+    server inventario:8080 resolve max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
+
+# Catálogo: mismo criterio que Inventario.
+upstream usuarios {
+    zone usuarios 64k;
+    server usuarios:8080 resolve max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
+
+upstream catalogo {
+    zone catalogo 64k;
+    server catalogo:8080 resolve max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
+
+upstream ventas {
+    zone ventas 64k;
+    server ventas:8080 resolve max_fails=2 fail_timeout=10s;
+    keepalive 16;
+}
+
+upstream frontend {
+    zone frontend 64k;
+    server frontend:80 resolve max_fails=2 fail_timeout=10s;
+    keepalive 8;
+}
+
+# Correlation id: se respeta el del cliente; si no viene, se usa el id del pedido de nginx (ADR-005, punto 7).
+map $http_x_correlation_id $correlacion {
+    ""      $request_id;
+    default $http_x_correlation_id;
+}
+
+# Una clave por grupo consumidor (ADR-008). El gimnasio ve el catálogo y la disponibilidad, pero no hace pedidos.
+map $http_x_api_key $grupo_valido {
+    default                         0;
+    "${CAPACIDAD_API_KEY}"          1;
+    "${CAPACIDAD_API_KEY_GIMNASIO}" 1;
+}
+
+map $http_x_api_key $grupo_puede_pedir {
+    default                0;
+    "${CAPACIDAD_API_KEY}" 1;
+}
+
+# Apaga en el gateway lo que Inventario no puede apagar: su disponibilidad también la usa la tienda (ADR-008).
+map "${CAPACIDAD_PUBLICA_ACTIVA}" $capacidad_activa {
+    default 1;
+    "false" 0;
+}
+
+# IP real del cliente cuando hay un proxy adelante (Caddy en la nube): el archivo dice en qué proxy confiar.
+# En local la carpeta no existe y no se incluye nada: la IP es la de quien se conecta.
+include /etc/nginx/proxy-confiable/*.conf;
+
+# Límite por grupo: 60 pedidos por minuto, con ráfagas de hasta 20 (contrato, respuesta 429).
+limit_req_zone $http_x_api_key zone=por_grupo:10m rate=60r/m;
+# Límite por IP en registro e inicio de sesión: frena los intentos masivos de adivinar contraseñas (ADR-015).
+limit_req_zone $binary_remote_addr zone=por_ip_sesion:10m rate=30r/m;
+limit_req_status 429;
+
+# Trazas (ADR-011): un span por pedido, que se manda a Jaeger por OTLP/gRPC. Con "propagate", si el pedido trae
+# traceparent (Ventas, por la entrada interna) el gateway sigue esa traza; si no, abre una nueva. En los dos casos
+# la pasa al servicio, así el gateway queda como un paso más entre quien llama y la réplica que atiende.
+# Si Jaeger no responde, el gateway atiende igual y esos spans se pierden.
+otel_exporter {
+    endpoint jaeger:4317;
+}
+otel_service_name gateway;
+otel_trace on;
+otel_trace_context propagate;
+otel_span_name "$request_method $uri";
+otel_span_attr correlation_id $correlacion;
+
+# Log de acceso en JSON, con la réplica que atendió cada pedido (upstream_addr) y el trace_id para abrir su traza.
+log_format json escape=json '{"time":"$time_iso8601","servicio":"gateway","correlation_id":"$correlacion","trace_id":"$otel_trace_id",'
+    '"metodo":"$request_method","ruta":"$uri","codigo":$status,"duracion_s":$request_time,'
+    '"upstream":"$upstream_addr","upstream_codigo":"$upstream_status","upstream_duracion_s":"$upstream_response_time"}';
+
+proxy_http_version 1.1;
+proxy_set_header Connection "";
+proxy_set_header Host $host;
+proxy_set_header X-Correlation-Id $correlacion;
+proxy_connect_timeout 1s;
+proxy_read_timeout 5s;     # gateway → servicio: 5 s (ADR-005)
+proxy_send_timeout 5s;
+# Si una réplica no acepta la conexión, no responde o responde 502, se prueba la otra. nginx no reenvía
+# un POST que ya llegó a una réplica (no es idempotente para nginx); sí lo hace si no pudo conectarse.
+# El 503 queda afuera a propósito: Inventario lo usa para decir que una dependencia (el gimnasio) no está
+# disponible. Contarlo como falla sacaba del balanceo a réplicas sanas.
+proxy_next_upstream error timeout http_502;
+proxy_next_upstream_tries 2;
+
+# ---------- Entrada pública ----------
+server {
+    listen 8080;
+    access_log /dev/stdout json;
+    # El gateway siempre devuelve el correlation id, también en sus propios errores (401, 429).
+    proxy_hide_header X-Correlation-Id;
+    add_header X-Correlation-Id $correlacion always;
+
+    location = /healthz { access_log off; otel_trace off; return 200; }
+
+    # Errores que genera el propio nginx, con el formato del contrato en lugar de su página HTML. Sin réplicas
+    # que atiendan, responde 503 y se puede reintentar. Los errores de los servicios no pasan por acá
+    # (proxy_intercept_errors está apagado): un 503 GIMNASIO_NO_DISPONIBLE llega tal cual.
+    error_page 502 503 504 = @no_disponible;
+    error_page 429 = @limite_excedido;
+
+    location @no_disponible {
+        add_header X-Correlation-Id $correlacion always;
+        add_header Retry-After 1 always;
+        return 503 '{"type":"https://fav.example/errores/no-disponible","title":"Servicio no disponible","status":503,"detail":"Reintentar con la misma Idempotency-Key.","codigo":"NO_DISPONIBLE"}';
+    }
+
+    location @limite_excedido {
+        add_header X-Correlation-Id $correlacion always;
+        add_header Retry-After 2 always;
+        return 429 '{"type":"https://fav.example/errores/limite-excedido","title":"Límite excedido","status":429,"detail":"Reintentar después de Retry-After.","codigo":"LIMITE_EXCEDIDO"}';
+    }
+
+    # Capacidad publicada: catálogo y pedidos (contrato catalogo-pedidos-v1).
+    location = /v1/productos {
+        if ($grupo_valido = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        limit_req zone=por_grupo burst=20 nodelay;
+        proxy_pass http://catalogo;
+    }
+
+    location = /v1/disponibilidad {
+        if ($grupo_valido = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        if ($capacidad_activa = 0) {
+            return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}';
+        }
+        limit_req zone=por_grupo burst=20 nodelay;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://inventario;
+    }
+
+    location = /v1/pedidos {
+        if ($grupo_puede_pedir = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        limit_req zone=por_grupo burst=20 nodelay;
+        # proxy_set_header en una location anula los heredados: se repiten los comunes.
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://ventas;
+    }
+
+    # Validación del token: solo se llega por auth_request (ADR-016).
+    location = /_auth/opcional {
+        internal;
+        js_content jwt.opcional;
+    }
+
+    location = /_auth/administrador {
+        internal;
+        js_content jwt.administrador;
+    }
+
+    location @no_autenticado {
+        add_header X-Correlation-Id $correlacion always;
+        add_header WWW-Authenticate Bearer always;
+        return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+    }
+
+    location @no_autorizado {
+        add_header X-Correlation-Id $correlacion always;
+        return 403 '{"type":"https://fav.example/errores/no-autorizado","title":"No autorizado","status":403,"codigo":"NO_AUTORIZADO"}';
+    }
+
+    # Tienda: productos publicados y si hay stock (HU-01). Públicas: no pasan los encabezados de identidad.
+    # Estas rutas exactas ganan sobre /catalogo/ y /inventario/, que siguen siendo solo de administrador.
+    location ~ ^/catalogo/v1/tienda/productos(/[^/]+)?$ {
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        rewrite ^/catalogo/(.*)$ /$1 break;
+        proxy_pass http://catalogo;
+    }
+
+    location = /inventario/v1/disponibilidad {
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://inventario/v1/disponibilidad;
+    }
+
+    # Tienda: se puede comprar sin cuenta, así que el token es opcional. Si viene, tiene que ser válido.
+    # "Mis compras" sin token la rechaza Ventas (HU-14.2).
+    location ~ ^/ventas/v1/(compras|compras/[^/]+/cancelar|mis-compras|mis-compras/[^/]+)$ {
+        auth_request /_auth/opcional;
+        include /etc/nginx/snippets/identidad.conf;
+        rewrite ^/ventas/(.*)$ /$1 break;
+        proxy_pass http://ventas;
+    }
+
+    # Aviso de Mercado Pago: no lleva token, lo valida Ventas con la firma.
+    location = /ventas/v1/pagos/aviso {
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://ventas/v1/pagos/aviso;
+    }
+
+    # Registro e inicio de sesión. Son públicas: no pasan los encabezados de identidad.
+    location ~ ^/usuarios/v1/(registro|sesiones)$ {
+        limit_req zone=por_ip_sesion burst=10 nodelay;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        rewrite ^/usuarios/(.*)$ /$1 break;
+        proxy_pass http://usuarios;
+    }
+
+    # Panel de administración: ventas por estado, confirmar transferencias y ventas del local.
+    location /ventas/v1/admin/ {
+        auth_request /_auth/administrador;
+        include /etc/nginx/snippets/identidad.conf;
+        proxy_pass http://ventas/v1/admin/;
+    }
+
+    # Panel de administración: stock, transferencias y consignación.
+    location /inventario/ {
+        auth_request /_auth/administrador;
+        include /etc/nginx/snippets/identidad.conf;
+        proxy_pass http://inventario/;
+    }
+
+    # Panel de administración: productos y variantes de Catálogo.
+    location /catalogo/ {
+        auth_request /_auth/administrador;
+        include /etc/nginx/snippets/identidad.conf;
+        proxy_pass http://catalogo/;
+    }
+
+    # Una ruta de la API que no existe es un 404, no la página de la tienda.
+    location /v1/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+    location /ventas/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+    location /usuarios/ { return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}'; }
+
+    # Lo demás es la tienda: mismo origen que la API, así que no hace falta CORS (ADR-017).
+    location / {
+        error_page 502 503 504 = @tienda_no_disponible; # acá llega una persona: se le responde una página
+        otel_trace off; # archivos de la tienda (HTML, JS, imágenes): una traza por archivo solo taparía las de la API
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_pass http://frontend;
+    }
+
+    location @tienda_no_disponible {
+        default_type "text/html; charset=utf-8";
+        add_header X-Correlation-Id $correlacion always;
+        add_header Retry-After 5 always;
+        return 503 '<!doctype html><html lang="es-AR"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>FAV del universo</title><body style="font-family:Georgia,serif;text-align:center;padding:4rem 1rem;background:#fbf7f0;color:#261f2e"><h1>La tienda no está disponible en este momento</h1><p>Es un problema de nuestro lado. Probá de nuevo en un rato.</p></body></html>';
+    }
+
+    default_type application/problem+json;
+}
+
+# ---------- Entrada interna (red de Docker, sin puerto publicado) ----------
+# Ventas llama a Inventario y a Catálogo por acá, así sus llamadas también se reparten entre las réplicas.
+server {
+    listen 8081;
+    access_log /dev/stdout json;
+
+    # Catálogo: por ejemplo, la consulta por lote GET /catalogo/v1/variantes?variantes=...
+    location /catalogo/ {
+        proxy_pass http://catalogo/;
+    }
+
+    location / {
+        proxy_pass http://inventario;
+    }
+}

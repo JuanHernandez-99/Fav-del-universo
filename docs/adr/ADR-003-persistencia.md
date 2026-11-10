@@ -45,8 +45,8 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 
 | Componente        | Qué guarda                                                  | Se decide en |
 | ----------------- | ----------------------------------------------------------- | ------------ |
-| Redis (caché)     | Lecturas del catálogo                                       | ADR-007 (D7) |
-| Motor de búsqueda | Índice de productos publicados con su disponibilidad online | ADR-006 (D6) |
+| Memcached (caché) | Lecturas del catálogo                                       | ADR-007 y ADR-019 (D7) |
+| Motor de búsqueda | Índice de productos publicados | ADR-006 (D6) |
 
 **Cómo se cumplen las garantías:**
 
@@ -66,8 +66,9 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 | **Ventas en MongoDB**                                                 | La venta tiene relaciones (ítems, pagos) y se consulta por estado y fecha. Las transiciones condicionales y las restricciones únicas son más simples en SQL.                                                                          |
 | **Una base compartida, con esquemas separados**                       | La prohíbe la cátedra (RNF-08). Además, la caída o la carga de la base afectaría a todos los servicios.                                                                                                                               |
 | **Una sola instancia de MySQL con tres bases lógicas**                | Ahorra recursos, pero la caída de la instancia tumba a tres servicios a la vez y rompe el aislamiento de fallas previsto (ARCHITECTURE §8).                                                                                           |
+| **MySQL con GORM** (lo que se usó en clase)                           | Las garantías de ADR-004 dependen de consultas exactas: `UPDATE … WHERE online - reservado >= ?`, `SELECT … FOR UPDATE` e `INSERT … ON DUPLICATE KEY UPDATE`. Con `database/sql` se ve y se prueba exactamente lo que se ejecuta. GORM también permite SQL directo, pero en estos casos se usaría poco lo que aporta. **Costo aceptado:** convertir las filas se escribe a mano. Reemplazarlo ahora obligaría a revisar 68 consultas y sus pruebas de concurrencia. |
 | **PostgreSQL en lugar de MySQL**                                      | Equivalente en garantías para este uso. Ver **[?]** en la decisión.                                                                                                                                                                   |
-| **Redis o el motor de búsqueda como el almacenamiento no relacional** | Son copias derivadas, no la fuente de verdad de ningún servicio. **[?]** Consultado a la cátedra.                                                                                                                                     |
+| **La caché o el motor de búsqueda como el almacenamiento no relacional** | Son copias derivadas, no la fuente de verdad de ningún servicio. **[?]** Consultado a la cátedra.                                                                                                                                     |
 
 ## Consecuencias
 
@@ -98,3 +99,22 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 - Cada servicio arranca con su propia base en Docker Compose y ningún servicio tiene credenciales de otra base (RNF-08).
 - Test de integración por servicio contra su base real (requisito 2.11).
 - Test de concurrencia: dos reservas simultáneas sobre la última unidad; solo una se confirma y el stock nunca queda negativo.
+
+## Validación (Entrega 2)
+
+**Inventario (MySQL) — implementado y probado.**
+
+| Elemento del ADR                                  | Resultado                                                                                                                                                   |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Base propia con credenciales propias              | **Confirmado** (`mysql-inventario`, puerto 3307 en el host para desarrollo).                                                                                 |
+| Esquema versionado                                | **Confirmado:** `sql/001_esquema.sql` y `sql/002_datos_de_ejemplo.sql` (datos de ejemplo solo con `INVENTARIO_DATOS_EJEMPLO=true`).                          |
+| Reglas en la base                                 | **Confirmado:** restricciones `CHECK` sobre las cantidades de `stock`, claves únicas para la idempotencia y para los ítems de una reserva.                   |
+| Tablas de Inventario                              | `stock`, `reservas`, `reserva_items`, `movimientos`, `operaciones`, `reposiciones`, `outbox`.                                                                |
+| Test de integración contra la base real           | **Hecho:** 7 pruebas (ADR-004), con `-race`, contra MySQL 8.0.                                                                                               |
+
+**Diferencias con lo previsto**
+
+- La tabla de **mensajes procesados** (consumo idempotente de eventos) **todavía no existe**: Inventario aún no consume eventos.
+- El Compose usa **MySQL 8.4**; los tests corrieron en **8.0**. Repetirlos contra 8.4.
+- **MongoDB (Catálogo) no se validó:** el servicio no está implementado.
+- El `outbox` se escribe en la misma transacción y un proceso lo publica a RabbitMQ (04/11/2026).

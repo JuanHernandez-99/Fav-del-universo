@@ -1,0 +1,33 @@
+# Entrada pública en la nube: HTTPS con Let's Encrypt delante del gateway.
+# Caddy pide y renueva el certificado solo, y redirige HTTP (80) a HTTPS (443).
+{
+	# Para la primera prueba: ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory (ver desplegar/README.md).
+	acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
+	servers {
+		protocols h1 h2 # sin HTTP/3: usaría el 443/udp, que no se abre
+	}
+}
+
+{$DOMINIO} {
+	# Simulador de Mercado Pago (ADR-014): el navegador del comprador abre la página de pago y aprieta un botón.
+	# Solo pasan esas dos rutas; crear pagos (/checkout/preferences) y consultarlos (/v1/payments) quedan adentro.
+	@pago_pagina {
+		method GET
+		path_regexp ^/checkout/pref-[0-9]+$
+	}
+	@pago_resultado {
+		method POST
+		path_regexp ^/checkout/pref-[0-9]+/(aprobar|rechazar)$
+	}
+	handle @pago_pagina {
+		reverse_proxy mercadopago-simulador:8080
+	}
+	handle @pago_resultado {
+		reverse_proxy mercadopago-simulador:8080
+	}
+
+	# Todo lo demás va al gateway, que sigue siendo el único punto de entrada a los servicios.
+	handle {
+		reverse_proxy gateway:8080
+	}
+}
