@@ -56,6 +56,7 @@ services:
     build: ./services/catalogo
     deploy: { replicas: 2 } # ADR-012
     environment:
+      <<: *otel
       MONGO_HOST: mongo-catalogo:27017
       ELASTICSEARCH_URL: ${ELASTICSEARCH_URL-http://elasticsearch:9200} # vacía: busca en MongoDB (ADR-006)
       MEMCACHED_ADDR: ${MEMCACHED_ADDR-memcached:11211}
@@ -231,7 +232,7 @@ services:
 
   # ---------- Gateway ----------
   gateway:
-    image: nginx:1.28-alpine
+    image: nginx:1.28-alpine-otel # trae el módulo de OpenTelemetry: el gateway aparece en las trazas (ADR-011)
     environment:
       CAPACIDAD_API_KEY: ${CAPACIDAD_API_KEY:-clave-grupo-proveedores}
       CAPACIDAD_API_KEY_GIMNASIO: ${CAPACIDAD_API_KEY_GIMNASIO:-clave-grupo-gimnasio}

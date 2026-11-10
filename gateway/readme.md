@@ -13,6 +13,7 @@ Punto de entrada único del sistema: valida el token, rutea a los servicios y co
 - Si no queda ninguna réplica responde `503 NO_DISPONIBLE`, y si se supera un límite, `429 LIMITE_EXCEDIDO`, ambos en JSON y con `Retry-After`, como pide el contrato. Los errores de los servicios pasan tal cual.
 - **No tiene lógica de negocio ni compone respuestas** de varios servicios.
 - Balancea entre las dos réplicas de Inventario y las dos de Catálogo.
+- Abre un span por pedido a la API y lo manda a Jaeger, con el módulo de OpenTelemetry de la imagen `nginx:1.28-alpine-otel`. Sigue la traza que trae el pedido o abre una nueva, y la pasa al servicio. El log de acceso lleva el `trace_id` ([ADR-011](../docs/adr/ADR-011-observabilidad.md)).
 
 **Después de cambiar su configuración, reiniciarlo:** `docker compose restart gateway`. nginx la arma al arrancar.
 

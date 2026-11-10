@@ -77,8 +77,21 @@ limit_req_zone $http_x_api_key zone=por_grupo:10m rate=60r/m;
 limit_req_zone $binary_remote_addr zone=por_ip_sesion:10m rate=30r/m;
 limit_req_status 429;
 
-# Log de acceso en JSON, con la réplica que atendió cada pedido (upstream_addr).
-log_format json escape=json '{"time":"$time_iso8601","servicio":"gateway","correlation_id":"$correlacion",'
+# Trazas (ADR-011): un span por pedido, que se manda a Jaeger por OTLP/gRPC. Con "propagate", si el pedido trae
+# traceparent (Ventas, por la entrada interna) el gateway sigue esa traza; si no, abre una nueva. En los dos casos
+# la pasa al servicio, así el gateway queda como un paso más entre quien llama y la réplica que atiende.
+# Si Jaeger no responde, el gateway atiende igual y esos spans se pierden.
+otel_exporter {
+    endpoint jaeger:4317;
+}
+otel_service_name gateway;
+otel_trace on;
+otel_trace_context propagate;
+otel_span_name "$request_method $uri";
+otel_span_attr correlation_id $correlacion;
+
+# Log de acceso en JSON, con la réplica que atendió cada pedido (upstream_addr) y el trace_id para abrir su traza.
+log_format json escape=json '{"time":"$time_iso8601","servicio":"gateway","correlation_id":"$correlacion","trace_id":"$otel_trace_id",'
     '"metodo":"$request_method","ruta":"$uri","codigo":$status,"duracion_s":$request_time,'
     '"upstream":"$upstream_addr","upstream_codigo":"$upstream_status","upstream_duracion_s":"$upstream_response_time"}';
 
@@ -104,7 +117,7 @@ server {
     proxy_hide_header X-Correlation-Id;
     add_header X-Correlation-Id $correlacion always;
 
-    location = /healthz { access_log off; return 200; }
+    location = /healthz { access_log off; otel_trace off; return 200; }
 
     # Errores que genera el propio nginx, con el formato del contrato en lugar de su página HTML. Sin réplicas
     # que atiendan, responde 503 y se puede reintentar. Los errores de los servicios no pasan por acá
@@ -272,6 +285,7 @@ server {
     # Lo demás es la tienda: mismo origen que la API, así que no hace falta CORS (ADR-017).
     location / {
         error_page 502 503 504 = @tienda_no_disponible; # acá llega una persona: se le responde una página
+        otel_trace off; # archivos de la tienda (HTML, JS, imágenes): una traza por archivo solo taparía las de la API
         proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Correlation-Id $correlacion;
