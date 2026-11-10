@@ -28,11 +28,12 @@ type Repositorio struct {
 const indiceVariantes = "variantes_id_unico"
 
 // Conectar arma el cliente. No abre la conexión todavía: el driver conecta recién en la primera
-// operación, por eso quien llama debe usar Ping para saber si la base responde.
-func Conectar(uri, base string) (*Repositorio, error) {
-	cliente, err := mongo.Connect(options.Client().
+// operación, por eso quien llama debe usar Ping para saber si la base responde. extras agrega opciones
+// del driver, como el monitor que abre un span por consulta (ADR-011).
+func Conectar(uri, base string, extras ...*options.ClientOptions) (*Repositorio, error) {
+	cliente, err := mongo.Connect(append([]*options.ClientOptions{options.Client().
 		ApplyURI(uri).
-		SetServerSelectionTimeout(3 * time.Second))
+		SetServerSelectionTimeout(3 * time.Second)}, extras...)...)
 	if err != nil {
 		return nil, err
 	}
