@@ -363,7 +363,6 @@ Los puntos 1, 5, 6 y 8 dependen de lo que defina el equipo de FAV. Se resolviero
 Sin cambiar lo anterior:
 
 - **Evento `VarianteCreada`** con outbox (ni se publica ni se consume hoy). Si se guarda junto con el producto en una transacción, requiere replica set.
-- **Observabilidad**: correlation id y trazas (ADR-011). Las métricas ya están.
 - **Identidad** con los encabezados `X-User-*`.
 - **Tests de contrato** contra el YAML publicado.
 - El **stock sigue siendo de Inventario**.

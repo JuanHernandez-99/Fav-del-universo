@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Estado** | Aceptada · Tablero, alertas y retención implementados y probados en local. Faltan las trazas de Catálogo y el aviso real en la nube. |
+| **Estado** | Aceptada · Tablero, alertas, retención y trazas de todos los servicios y el gateway implementados y probados en local. Falta el aviso real en la nube. |
 | **Fecha** | 23/10/2026, actualizada el 09/11/2026 |
 | **Decisión de la consigna** | D11 · Observabilidad |
 | **Relacionadas** | [ADR-005](ADR-005-comunicacion.md) (identificador de correlación, DLQ con alerta), ADR-010 (resiliencia: circuit breaker hacia el gimnasio), [ADR-012](ADR-012-balanceo.md) (reparto entre réplicas) |
@@ -51,9 +51,11 @@ La consigna pide tablero y alerta, sin fijar herramientas: son decisión del gru
 
 ### 3. Trazas
 
-- Propagación con **W3C Trace Context** (`traceparent`). nginx reenvía el encabezado sin tocarlo, así la traza de Ventas y la de Inventario quedan unidas aunque pasen por el gateway.
-- Spans: un span por pedido HTTP entrante, uno por llamada HTTP saliente (al gimnasio, a Inventario) y uno por consulta a MySQL.
-- Las consultas de los procesos periódicos solo se trazan si forman parte de una operación (vencer una reserva, enviar una reposición), para no llenar Jaeger de trazas sueltas.
+- Propagación con **W3C Trace Context** (`traceparent`). El gateway sigue la traza que llega (Ventas, por la entrada interna) o abre una nueva, y la pasa al servicio (`otel_trace_context propagate`).
+- Spans: un span por pedido HTTP entrante, uno por llamada HTTP saliente (al gimnasio, a Inventario, a Catálogo, a Elasticsearch), uno por consulta a MySQL y uno por comando a MongoDB.
+- **Gateway:** módulo oficial de OpenTelemetry de nginx (imagen `nginx:1.28-alpine-otel`), por OTLP/gRPC. Un span por pedido a la API, con el `correlation_id`, y el `trace_id` en su log de acceso. No traza los archivos de la tienda ni `/healthz`.
+- **Catálogo:** mismo paquete que Ventas. Los comandos a MongoDB se trazan con el monitor de comandos del driver: `otelmongo` no tiene versión publicada para el driver v2. El span lleva el comando y la colección, no el filtro.
+- Las consultas de los procesos periódicos solo se trazan si forman parte de una operación (vencer una reserva, enviar una reposición, indexar un producto al consumir su evento), para no llenar Jaeger de trazas sueltas.
 - Sin `OTEL_EXPORTER_OTLP_ENDPOINT` el servicio no exporta, pero igual propaga el contexto. Así los tests no necesitan Jaeger.
 
 ### 4. Métricas de Inventario y Ventas
@@ -136,7 +138,8 @@ Los umbrales son **[propuesta]**:
 - **`ReposicionARevisar` no se apaga sola:** el sistema no tiene cómo resolver ese conflicto (ADR-018) y hay que corregirlo en la base.
 - **Las alertas de reposiciones tardan 1 minuto más en apagarse** (`keep_firing_for`). Así no se resuelven en falso cuando la métrica falta al reiniciar Inventario.
 - **`ReposicionBloqueada` puede tardar más de 5 minutos en resolverse** después de corregir la clave, por la espera entre reintentos (ADR-018).
-- **El gateway no genera spans propios.** Aparece en los logs (con correlación y réplica) pero no como un paso en la traza; su tiempo queda incluido en el del span que lo llama.
+- **Las trazas no cruzan RabbitMQ:** el evento no lleva el `traceparent`. Indexar un producto es una traza aparte de la edición que lo provocó; se relacionan por el id del producto.
+- **El gateway depende de una imagen con el módulo de OpenTelemetry** (`nginx:*-otel`). Con Jaeger caído atiende igual y pierde esos spans.
 - **Los logs no se centralizan:** se consultan con `docker compose logs`, filtrando por `correlation_id`.
 
 ## Pendientes
@@ -144,7 +147,6 @@ Los umbrales son **[propuesta]**:
 - **Confirmar el objetivo de servicio** con la prueba de carga (ADR-013).
 - **Destino real de las alertas en la nube:** **[?]** se resuelve con el despliegue. Hoy llegan a Mailpit.
 - **Almacenamiento persistente de trazas** **[?]**, si hace falta revisarlas después de reiniciar.
-- Trazas en Catálogo. Mientras tanto, las llamadas a Catálogo aparecen en la traza solo del lado de Ventas.
 
 ## Validación prevista
 
@@ -182,6 +184,22 @@ Los umbrales son **[propuesta]**:
 **Sin explicar:** en la corrida completa no llegó el mail de disparo de `CacheNoDisponible`, sin errores de envío en Alertmanager. En la repetición llegó. **La causa no se confirmó.**
 
 **Sin probar:** el tablero en el navegador, los 15 días reales de historial y el aviso fuera de Mailpit. Las pruebas de `ReposicionARevisar` y `ReposicionPendienteAntigua` cambian datos en la base, porque no se puede provocar de otra forma el final del conflicto ni esperar 10 minutos.
+
+## Validación de trazas completas (09/11/2026)
+
+En local, con `curl` y la API de Jaeger. Unitarios en `services/catalogo/internal/observabilidad`.
+
+| Comprobación | Resultado |
+|---|---|
+| `POST /v1/pedidos` con la clave de un grupo | Una sola traza de 30 spans: gateway → Ventas → gateway → Catálogo → MongoDB, y gateway → Inventario → MySQL |
+| Búsqueda en la tienda (`?q=remera`) | gateway → Catálogo → Elasticsearch y MongoDB |
+| Alta de un producto | La traza del alta, y otra de "indexar producto" con la lectura de MongoDB y la escritura en Elasticsearch |
+| Logs | El log de Catálogo y el del gateway llevan el mismo `correlation_id` y `trace_id` que la traza |
+| Procesos periódicos | En un minuto sin pedidos no aparecieron trazas sueltas de Catálogo, aunque avisa cambios cada segundo |
+| Jaeger caído | El gateway y Catálogo arrancan y atienden (búsquedas `200`, pedido `201`). Al volver Jaeger, las trazas llegan sin reiniciar nada |
+| Pruebas del gateway | `token.mjs` 42/42 y `errores.mjs` 35/35. `tienda.mjs` 43/44: falla "la búsqueda por texto lo encuentra", también sin este cambio (busca sin esperar la indexación) |
+
+**Sin probar:** en la nube (se aplica al hacer `git pull` y `docker compose up -d --build` en la VM).
 
 ---
 
