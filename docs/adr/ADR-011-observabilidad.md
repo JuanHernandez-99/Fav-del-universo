@@ -58,6 +58,23 @@ La consigna pide tablero y alerta, sin fijar herramientas: son decisión del gru
 - Las consultas de los procesos periódicos solo se trazan si forman parte de una operación (vencer una reserva, enviar una reposición, indexar un producto al consumir su evento), para no llenar Jaeger de trazas sueltas.
 - Sin `OTEL_EXPORTER_OTLP_ENDPOINT` el servicio no exporta, pero igual propaga el contexto. Así los tests no necesitan Jaeger.
 
+#### Seguir un evento: el `correlation_id`, no la traza
+
+La compra es síncrona y queda en una sola traza. Los eventos de RabbitMQ (`ReservaVencida` e indexado de Catálogo) quedan en **dos trazas**: la de quien publica y la de quien consume.
+
+**Por qué:** el evento no se publica en el momento del cambio. Se guarda en el outbox, en la misma transacción, y otro proceso lo manda después (ADR-005). Cuando sale, la traza del cambio ya terminó. Continuarla obligaría a guardar el `traceparent` en cada fila del outbox (una columna en MySQL, un campo en Mongo), mandarlo en los encabezados del mensaje y leerlo en el consumidor.
+
+**Cómo se siguen igual:** el `correlation_id` ya viaja en el sobre del evento (ADR-005) y va como atributo en las dos trazas. Con `ReservaVencida`:
+
+| Paso | Traza en Jaeger | `correlation_id` |
+|---|---|---|
+| Inventario vence la reserva y guarda el evento en el outbox | `inventario` · `proceso vencer_reserva` | `proceso-<uuid>`, generado por el proceso |
+| Ventas consume el evento y pasa la venta a *Vencida* | `ventas` · `consumir ReservaVencida`, con sus consultas a MySQL | el mismo, leído del sobre |
+
+En Jaeger, buscando por el tag `correlation_id=proceso-<uuid>` aparecen las dos trazas. En los logs, `docker compose logs inventario ventas | grep proceso-<uuid>` muestra el vencimiento y su consumo.
+
+**Costo aceptado:** Jaeger no muestra la espera en la cola como un tramo. Se ve en la diferencia de horario entre las dos trazas.
+
 ### 4. Métricas de Inventario y Ventas
 
 | Métrica | Tipo | Etiquetas | Responde |
@@ -132,19 +149,19 @@ Los umbrales son **[propuesta]**:
 
 **Negativas aceptadas**
 
-- **Jaeger all-in-one guarda las trazas en memoria:** se pierden al reiniciar el contenedor. Alcanza para diagnosticar en el momento, no para auditoría.
+- **Jaeger all-in-one guarda las trazas en memoria:** se pierden al reiniciar el contenedor. Alcanza para diagnosticar en el momento, no para auditoría. **Y sin límite:** en la prueba de carga llegó a 4,3 GB y degradó todo el sistema (ADR-013). Pendiente de decidir cómo limitarlo.
 - **El historial se pierde con `docker compose down -v`,** porque borra el volumen de Prometheus.
 - **Una falla puede avisar varias veces:** con MySQL caído avisaron `ErroresDelServidor` y, con el servicio ya recuperado, `LatenciaAlta`. Las alertas se agrupan por nombre y no se silencian entre sí.
 - **`ReposicionARevisar` no se apaga sola:** el sistema no tiene cómo resolver ese conflicto (ADR-018) y hay que corregirlo en la base.
 - **Las alertas de reposiciones tardan 1 minuto más en apagarse** (`keep_firing_for`). Así no se resuelven en falso cuando la métrica falta al reiniciar Inventario.
 - **`ReposicionBloqueada` puede tardar más de 5 minutos en resolverse** después de corregir la clave, por la espera entre reintentos (ADR-018).
-- **Las trazas no cruzan RabbitMQ:** el evento no lleva el `traceparent`. Indexar un producto es una traza aparte de la edición que lo provocó; se relacionan por el id del producto.
+- **Las trazas no cruzan RabbitMQ.** Quien publica y quien consume un evento quedan en dos trazas, unidas por el `correlation_id` (ver "Seguir un evento").
 - **El gateway depende de una imagen con el módulo de OpenTelemetry** (`nginx:*-otel`). Con Jaeger caído atiende igual y pierde esos spans.
 - **Los logs no se centralizan:** se consultan con `docker compose logs`, filtrando por `correlation_id`.
 
 ## Pendientes
 
-- **Confirmar el objetivo de servicio** con la prueba de carga (ADR-013).
+- **Limitar la memoria de Jaeger** (local y nube): ver ADR-013. El objetivo de servicio se cumplió hasta 800 pedidos por segundo en la prueba de carga.
 - **Destino real de las alertas en la nube:** **[?]** se resuelve con el despliegue. Hoy llegan a Mailpit.
 - **Almacenamiento persistente de trazas** **[?]**, si hace falta revisarlas después de reiniciar.
 
@@ -197,6 +214,7 @@ En local, con `curl` y la API de Jaeger. Unitarios en `services/catalogo/interna
 | Logs | El log de Catálogo y el del gateway llevan el mismo `correlation_id` y `trace_id` que la traza |
 | Procesos periódicos | En un minuto sin pedidos no aparecieron trazas sueltas de Catálogo, aunque avisa cambios cada segundo |
 | Jaeger caído | El gateway y Catálogo arrancan y atienden (búsquedas `200`, pedido `201`). Al volver Jaeger, las trazas llegan sin reiniciar nada |
+| `ReservaVencida` (10/11) | Con una reserva vencida a mano en la base, buscar en Jaeger el tag `correlation_id=proceso-…` devuelve las dos trazas: `proceso vencer_reserva` (Inventario, 13 spans) y `consumir ReservaVencida` (Ventas, 11 spans). La venta pasó a *Vencida* y los logs de los dos servicios tienen el mismo id |
 | Pruebas del gateway | `token.mjs` 42/42 y `errores.mjs` 35/35. `tienda.mjs` 43/44: falla "la búsqueda por texto lo encuentra", también sin este cambio (busca sin esperar la indexación) |
 
 **Sin probar:** en la nube (se aplica al hacer `git pull` y `docker compose up -d --build` en la VM).

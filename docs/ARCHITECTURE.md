@@ -392,6 +392,6 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 | Observabilidad | Alertas probadas solo en local, con aviso a Mailpit; una falla puede avisar varias veces; Jaeger pierde las trazas al reiniciar; las trazas no cruzan RabbitMQ (indexar un producto es una traza aparte); los logs no están centralizados | ADR-011 |
 | Búsqueda | Sin carga real: el retraso se midió con un administrador. Buscar pendientes recorre la colección | ADR-006 |
 | Caché | Medida en una sola máquina y con 19 productos: la latencia con la base sin límite no fue concluyente. Cualquier cambio vacía toda la caché | ADR-007, ADR-019 |
-| Capacidad y costos | Guion de carga corrido una vez para validarlo, sin análisis; costos sin completar | ADR-013 |
+| Capacidad y costos | Medida en una notebook, no en la VM: el objetivo se cumple hasta 800 pedidos/s. Jaeger guarda las trazas en memoria sin límite y es lo primero que degrada el sistema, también en la nube. Falta confirmar el tamaño de la VM para cerrar los costos | ADR-013 |
 | Núcleo de Inventario | Sin tests unitarios de `aplicacion`; etiquetas `json` en `dominio` | ADR-002 |
 | Resiliencia comprobada | Ensayo en local de 3 caídas de dependencias de Inventario, en [`POSTMORTEM.md`](POSTMORTEM.md). Falta la jornada con el gimnasio real y probar la compra desde la tienda durante una caída | ADR-010 |
