@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/dominio"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/observabilidad"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/puertos"
 )
 
@@ -351,5 +352,52 @@ func TestListarFiltraPorEstadoYComprador(t *testing.T) {
 	ninguna, err := r.ListarVentas(context.Background(), puertos.FiltroVentas{CompradorID: comprador, Estado: dominio.EstadoPagada, Limite: 10})
 	if err != nil || len(ninguna) != 0 {
 		t.Errorf("pagadas: %+v, %v", ninguna, err)
+	}
+}
+
+// La venta guarda el track id del pedido que la creó, y sus tareas y mails lo copian aunque se generen en otro
+// pedido, como el aviso de pago (ADR-020). La migración se puede aplicar dos veces.
+func TestLaVentaSusTareasYSusMailsGuardanElTrackIDDeLaCompra(t *testing.T) {
+	r, _ := repoDePrueba(t)
+	if err := r.Migrar(context.Background()); err != nil {
+		t.Fatalf("la migración no es idempotente: %v", err)
+	}
+	ctxCompra := observabilidad.ConCorrelationID(context.Background(), "compra-remera-1")
+	v, _, err := r.CrearVenta(ctxCompra, ventaNueva(), nil, []dominio.Mail{{Tipo: dominio.MailCompraRealizada, Destinatario: "ana@example.com", Asunto: "a", Cuerpo: "c"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctxAviso := observabilidad.ConCorrelationID(context.Background(), "aviso-mercadopago-9")
+	err = r.RegistrarAvisoPago(ctxAviso, "pago-"+uuid.NewString(), v.ID, func(*dominio.Venta) ([]dominio.TipoTarea, []dominio.Mail, error) {
+		return []dominio.TipoTarea{dominio.TareaConfirmar}, nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if g, err := r.ObtenerVenta(context.Background(), v.ID); err != nil || g.TrackID != "compra-remera-1" {
+		t.Fatalf("venta.TrackID = %q (%v)", g.TrackID, err)
+	}
+	tareas, err := r.TomarTareas(context.Background(), time.Now().Add(time.Minute), time.Minute, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mails, err := r.TomarMails(context.Background(), time.Now().Add(time.Minute), time.Minute, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var tareaOK, mailOK bool
+	for _, ta := range tareas {
+		if ta.VentaID == v.ID {
+			tareaOK = ta.TrackID == "compra-remera-1"
+		}
+	}
+	for _, m := range mails {
+		if m.VentaID == v.ID {
+			mailOK = m.TrackID == "compra-remera-1"
+		}
+	}
+	if !tareaOK || !mailOK {
+		t.Errorf("la tarea (%v) y el mail (%v) tienen que llevar el track id de la compra", tareaOK, mailOK)
 	}
 }

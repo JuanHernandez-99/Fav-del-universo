@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/aplicacion"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/dominio"
@@ -96,7 +94,6 @@ func (h *Handler) reservar(w http.ResponseWriter, r *http.Request) {
 		h.escribirError(w, r, err)
 		return
 	}
-	trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("reserva_id", res.ID), attribute.Bool("idempotente_repetida", repetida))
 	if repetida {
 		w.Header().Set("Idempotent-Replayed", "true")
 	}

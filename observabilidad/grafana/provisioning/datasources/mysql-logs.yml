@@ -1,0 +1,15 @@
+apiVersion: 1
+datasources:
+  # Logs de los servicios (ADR-020). Usuario de solo lectura: desde Grafana no se puede cambiar ni borrar nada.
+  - name: Logs
+    uid: mysql-logs
+    type: mysql
+    access: proxy
+    url: mysql-logs:3306
+    user: logs_lector
+    jsonData:
+      database: logs
+      maxOpenConns: 5
+    secureJsonData:
+      password: $LOGS_MYSQL_LECTOR_PASSWORD
+    editable: false

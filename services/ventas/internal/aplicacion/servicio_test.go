@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/dominio"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/observabilidad"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/puertos"
 )
 
@@ -23,6 +24,7 @@ type repoFalso struct {
 	completas     int
 	reprogramadas int
 	fallaAlCrear  error
+	trackIDs      []string // el track id del contexto en cada cambio de una venta
 }
 
 func nuevoRepo() *repoFalso {
@@ -66,7 +68,8 @@ func (r *repoFalso) GuardarUrlPago(_ context.Context, id, url string) error {
 	return nil
 }
 
-func (r *repoFalso) ModificarVenta(_ context.Context, id string, cambio func(*dominio.Venta) ([]dominio.TipoTarea, []dominio.Mail, error)) (dominio.Venta, error) {
+func (r *repoFalso) ModificarVenta(ctx context.Context, id string, cambio func(*dominio.Venta) ([]dominio.TipoTarea, []dominio.Mail, error)) (dominio.Venta, error) {
+	r.trackIDs = append(r.trackIDs, observabilidad.CorrelationID(ctx))
 	v, ok := r.ventas[id]
 	if !ok {
 		return dominio.Venta{}, dominio.ErrVentaNoEncontrada
@@ -700,5 +703,64 @@ func TestCompraDeOtroCompradorNoSeVe(t *testing.T) {
 	}
 	if _, err := e.s.CompraDe(context.Background(), v.ID, "usuario-1"); err != nil {
 		t.Errorf("dueño: %v", err)
+	}
+}
+
+// ---------- Track id de la venta (ADR-020) ----------
+
+// compraConTrackID crea una venta como si viniera del pedido "compra-remera-1". El repositorio real guarda el
+// track id del contexto al crearla; el doble no, así que se lo pone el test.
+func compraConTrackID(t *testing.T, e *entorno, medio dominio.Medio) dominio.Venta {
+	t.Helper()
+	v, err := e.s.Comprar(context.Background(), compra(medio))
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.TrackID = "compra-remera-1"
+	e.repo.ventas[v.ID] = v
+	e.repo.trackIDs = nil
+	return v
+}
+
+func TestElAvisoDePagoSigueConElTrackIDDeLaCompra(t *testing.T) {
+	e := armar()
+	v := compraConTrackID(t, e, dominio.MedioMercadoPago)
+	e.mp.pago = avisoAprobado(e, v.ID)
+
+	ctxAviso := observabilidad.ConCorrelationID(context.Background(), "aviso-mercadopago-9")
+	if err := e.s.AvisoPago(ctxAviso, "f", "r", "pago-1"); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.repo.trackIDs) != 1 || e.repo.trackIDs[0] != "compra-remera-1" {
+		t.Errorf("el pago se registró con %v, esperaba el track id de la compra", e.repo.trackIDs)
+	}
+}
+
+func TestLaTransferenciaConfirmadaSigueConElTrackIDDeLaCompra(t *testing.T) {
+	e := armar()
+	v := compraConTrackID(t, e, dominio.MedioTransferencia)
+
+	ctxAdmin := observabilidad.ConCorrelationID(context.Background(), "panel-admin-3")
+	if _, err := e.s.ConfirmarTransferencia(ctxAdmin, v.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.repo.trackIDs) != 1 || e.repo.trackIDs[0] != "compra-remera-1" {
+		t.Errorf("la transferencia se registró con %v, esperaba el track id de la compra", e.repo.trackIDs)
+	}
+}
+
+// Una venta guardada antes de ADR-020 no tiene track id: el pago sigue con el del pedido que llegó.
+func TestUnaVentaSinTrackIDSigueConElDelPedido(t *testing.T) {
+	e := armar()
+	v, _ := e.s.Comprar(context.Background(), compra(dominio.MedioMercadoPago))
+	e.repo.trackIDs = nil
+	e.mp.pago = avisoAprobado(e, v.ID)
+
+	ctxAviso := observabilidad.ConCorrelationID(context.Background(), "aviso-mercadopago-9")
+	if err := e.s.AvisoPago(ctxAviso, "f", "r", "pago-1"); err != nil {
+		t.Fatal(err)
+	}
+	if len(e.repo.trackIDs) != 1 || e.repo.trackIDs[0] != "aviso-mercadopago-9" {
+		t.Errorf("trackIDs = %v", e.repo.trackIDs)
 	}
 }

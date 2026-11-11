@@ -9,10 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/aplicacion"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/inventario/internal/observabilidad"
@@ -20,8 +16,6 @@ import (
 )
 
 const lote = 50
-
-var tracer = otel.Tracer("inventario/procesos")
 
 func VencerReservas(ctx context.Context, s *aplicacion.Servicio, cada time.Duration) {
 	cadaVuelta(ctx, cada, func() {
@@ -31,7 +25,7 @@ func VencerReservas(ctx context.Context, s *aplicacion.Servicio, cada time.Durat
 			return
 		}
 		for _, id := range ids {
-			procesar(ctx, "vencer_reserva", attribute.String("reserva_id", id), func(ctx context.Context) (bool, error) {
+			procesar(ctx, "vencer_reserva", slog.String("reserva_id", id), func(ctx context.Context) (bool, error) {
 				return s.VencerReserva(ctx, id)
 			})
 		}
@@ -46,7 +40,7 @@ func EnviarReposiciones(ctx context.Context, s *aplicacion.Servicio, cada time.D
 			return
 		}
 		for _, r := range pendientes {
-			procesar(ctx, "enviar_reposicion", attribute.String("reposicion_id", r.ID), func(ctx context.Context) (bool, error) {
+			procesar(ctx, "enviar_reposicion", slog.String("reposicion_id", r.ID), func(ctx context.Context) (bool, error) {
 				return s.EnviarReposicion(ctx, r)
 			})
 		}
@@ -96,21 +90,16 @@ func cadaVuelta(ctx context.Context, cada time.Duration, vuelta func()) {
 	}
 }
 
-// procesar abre una traza y un correlation id por elemento. Las búsquedas de trabajo no se trazan:
-// una vuelta sin nada que hacer no deja ruido en Jaeger.
-func procesar(ctx context.Context, nombre string, id attribute.KeyValue, tarea func(context.Context) (bool, error)) {
+// procesar le da a cada elemento su propio track id (ADR-020). Las búsquedas de trabajo no loguean nada:
+// una vuelta sin nada que hacer no deja ruido en los logs.
+func procesar(ctx context.Context, nombre string, id slog.Attr, tarea func(context.Context) (bool, error)) {
 	correlacion := "proceso-" + uuid.NewString()
 	ctx = observabilidad.ConCorrelationID(ctx, correlacion)
-	// El correlation id viaja en el evento que genere la tarea (ReservaVencida). Como atributo del span, en Jaeger se
-	// busca por él y aparecen juntas esta traza y la de quien consume el evento (ADR-011).
-	ctx, span := tracer.Start(ctx, "proceso "+nombre, trace.WithAttributes(attribute.String("correlation_id", correlacion)))
-	defer span.End()
-	span.SetAttributes(id)
-
+	// El track id viaja en el evento que genere la tarea (ReservaVencida): en app_logs, el vencimiento y su consumo
+	// en Ventas aparecen con el mismo track id (ADR-020).
 	hecho, err := tarea(ctx)
 	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		slog.ErrorContext(ctx, "falló el proceso", "proceso", nombre, "error", err)
+		slog.ErrorContext(ctx, "falló el proceso", "proceso", nombre, id, "error", err)
 		return
 	}
 	if hecho {

@@ -180,8 +180,8 @@ func TestPublicarMarcaSoloLoQueSeAviso(t *testing.T) {
 	repo.pendientes = []modelo.CambioProducto{{ID: "a", Version: 2}, {ID: "b", Version: 1}}
 	s := Nuevo(repo)
 	falla := errors.New("broker caído")
-	publicados, err := s.PublicarCambios(context.Background(), 10, func(_ context.Context, id string, _ int) error {
-		if id == "b" {
+	publicados, err := s.PublicarCambios(context.Background(), 10, func(_ context.Context, c modelo.CambioProducto) error {
+		if c.ID == "b" {
 			return falla
 		}
 		return nil

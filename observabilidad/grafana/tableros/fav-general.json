@@ -12,6 +12,17 @@
     "from": "now-30m",
     "to": "now"
   },
+  "links": [
+    {
+      "title": "FAV · Logs: buscar por track id",
+      "type": "link",
+      "url": "/d/fav-logs/fav-logs",
+      "icon": "doc",
+      "keepTime": true,
+      "targetBlank": false,
+      "tooltip": "Logs de los servicios en mysql-logs (ADR-020)"
+    }
+  ],
   "panels": [
     {
       "id": 1,

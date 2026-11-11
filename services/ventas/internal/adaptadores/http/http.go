@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/aplicacion"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/dominio"
@@ -187,7 +185,6 @@ func (h *Handler) comprar(w http.ResponseWriter, r *http.Request) {
 		escribirError(w, r, err)
 		return
 	}
-	trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("venta_id", v.ID))
 	escribirJSON(w, http.StatusCreated, h.aJSON(v))
 }
 

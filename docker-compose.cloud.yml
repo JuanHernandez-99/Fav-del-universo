@@ -14,6 +14,9 @@ x-reinicio: &reinicio
 x-rabbitmq-url: &rabbitmq-url
   RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER:-fav}:${RABBITMQ_DEFAULT_PASS:?falta RABBITMQ_DEFAULT_PASS en .env}@rabbitmq:5672/
 
+x-logs-password: &logs-password
+  LOGS_MYSQL_PASSWORD: ${LOGS_MYSQL_ESCRITOR_PASSWORD:?falta LOGS_MYSQL_ESCRITOR_PASSWORD en .env}
+
 services:
   # ---------- Entrada pública ----------
   caddy:
@@ -45,12 +48,12 @@ services:
   # ---------- Servicios ----------
   inventario:
     environment:
-      <<: *rabbitmq-url
+      <<: [*rabbitmq-url, *logs-password]
       INVENTARIO_DB_PASSWORD: ${INVENTARIO_DB_PASSWORD:?falta INVENTARIO_DB_PASSWORD en .env}
 
   catalogo:
     environment:
-      <<: *rabbitmq-url
+      <<: [*rabbitmq-url, *logs-password]
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?falta MONGO_INITDB_ROOT_PASSWORD en .env}
 
   catalogo-init:
@@ -59,12 +62,13 @@ services:
 
   ventas:
     environment:
-      <<: *rabbitmq-url
+      <<: [*rabbitmq-url, *logs-password]
       VENTAS_DB_PASSWORD: ${VENTAS_DB_PASSWORD:?falta VENTAS_DB_PASSWORD en .env}
       MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:?falta MERCADOPAGO_WEBHOOK_SECRET en .env}
 
   usuarios:
     environment:
+      <<: *logs-password
       USUARIOS_DB_PASSWORD: ${USUARIOS_DB_PASSWORD:?falta USUARIOS_DB_PASSWORD en .env}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?falta ADMIN_EMAIL en .env}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?falta ADMIN_PASSWORD en .env}
@@ -93,6 +97,14 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${USUARIOS_DB_ROOT_PASSWORD:?falta USUARIOS_DB_ROOT_PASSWORD en .env}
       MYSQL_PASSWORD: ${USUARIOS_DB_PASSWORD:?falta USUARIOS_DB_PASSWORD en .env}
+
+  mysql-logs:
+    <<: *reinicio
+    ports: !reset []
+    environment:
+      MYSQL_ROOT_PASSWORD: ${LOGS_MYSQL_ROOT_PASSWORD:?falta LOGS_MYSQL_ROOT_PASSWORD en .env}
+      LOGS_MYSQL_ESCRITOR_PASSWORD: ${LOGS_MYSQL_ESCRITOR_PASSWORD:?falta LOGS_MYSQL_ESCRITOR_PASSWORD en .env}
+      LOGS_MYSQL_LECTOR_PASSWORD: ${LOGS_MYSQL_LECTOR_PASSWORD:?falta LOGS_MYSQL_LECTOR_PASSWORD en .env}
 
   mongo-catalogo:
     <<: *reinicio
@@ -135,10 +147,6 @@ services:
     ports: !override ["127.0.0.1:8025:8025"] # su página no tiene contraseña
 
   # ---------- Observabilidad: solo desde la VM (túnel SSH) ----------
-  jaeger:
-    <<: *reinicio
-    ports: !override ["127.0.0.1:16686:16686"]
-
   prometheus:
     <<: *reinicio
     ports: !override ["127.0.0.1:9090:9090"]
@@ -150,6 +158,7 @@ services:
     <<: *reinicio
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?falta GRAFANA_ADMIN_PASSWORD en .env}
+      LOGS_MYSQL_LECTOR_PASSWORD: ${LOGS_MYSQL_LECTOR_PASSWORD:?falta LOGS_MYSQL_LECTOR_PASSWORD en .env}
 
 networks:
   # Red entre Caddy y lo que publica (gateway y página de pago), con la IP de Caddy fija.

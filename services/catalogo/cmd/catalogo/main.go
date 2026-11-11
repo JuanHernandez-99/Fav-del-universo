@@ -15,9 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/busqueda"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/cache"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/eventos"
@@ -37,27 +34,19 @@ func main() {
 }
 
 func correr() error {
-	// Logs en JSON con el servicio, la instancia (con dos réplicas hay que saber cuál escribió), el correlation_id
-	// y el trace_id en cada línea (ADR-011).
+	// Logs en JSON con el servicio, la instancia (con dos réplicas hay que saber cuál escribió) y el track id
+	// en cada línea (ADR-020).
 	instancia, _ := os.Hostname()
 	observabilidad.ConfigurarLogs(servicio, instancia)
+	// Además de stdout, cada línea de INFO o más va a app_logs en mysql-logs (ADR-020). Se cierra última: guarda lo pendiente.
+	cerrarLogsMySQL := observabilidad.IniciarLogsMySQL(servicio, instancia)
+	defer cerrarLogsMySQL()
 
 	// ctx se cancela con Ctrl+C o con SIGTERM (lo que manda Docker al detener el contenedor).
 	ctx, detener := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer detener()
 
-	cerrarTrazas, err := observabilidad.ConfigurarTrazas(ctx, servicio, instancia)
-	if err != nil {
-		return fmt.Errorf("configurando trazas: %w", err)
-	}
-	defer func() {
-		ctxCierre, cancelar := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancelar()
-		_ = cerrarTrazas(ctxCierre) // envía las trazas que quedaron en el lote
-	}()
-
-	repo, err := repository.Conectar(uriMongo(), variable("MONGO_DB", "catalogo"),
-		options.Client().SetMonitor(observabilidad.MonitorMongo())) // un span por consulta (ADR-011)
+	repo, err := repository.Conectar(uriMongo(), variable("MONGO_DB", "catalogo"))
 	if err != nil {
 		return fmt.Errorf("configurando mongo: %w", err)
 	}
@@ -167,10 +156,8 @@ func iniciarIndexacion(ctx context.Context, s *service.Servicio) func() {
 		}
 	}()
 	consumidor := eventos.NuevoConsumidor(urlBroker, func(ctx context.Context, productoID string) error {
-		// Cada evento consumido abre su propia traza: en Jaeger se ve la lectura de MongoDB y la escritura en el índice.
-		ctx, fin := observabilidad.Operacion(ctx, "indexar producto", attribute.String("producto_id", productoID))
+		// El ctx trae el track id del evento: el del pedido que cambió el producto (ADR-020).
 		err := s.IndexarProducto(ctx, productoID)
-		fin(err)
 		if errors.Is(err, busqueda.ErrNoDisponible) {
 			return fmt.Errorf("%w: %v", eventos.ErrTransitorio, err)
 		}

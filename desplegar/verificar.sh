@@ -56,7 +56,7 @@ c=$(codigo -X POST "$URL/checkout/preferences" -H "Content-Type: application/jso
 espera "Consultar pagos del simulador desde afuera" 404 "$URL/v1/payments/1"
 
 echo "Puertos cerrados desde afuera"
-for p in 3307 3308 3309 5672 15672 8025 8095 8096 8080 9090 9093 9200 3000 16686; do
+for p in 3307 3308 3309 5672 15672 8025 8095 8096 8080 9090 9093 9200 3000 3310; do
   if timeout 3 bash -c "</dev/tcp/$DOMINIO/$p" 2>/dev/null; then falla "Puerto $p abierto"; else ok "Puerto $p cerrado"; fi
 done
 

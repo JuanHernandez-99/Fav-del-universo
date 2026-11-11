@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/observabilidad"
 )
 
 var ctx = context.Background()
@@ -214,5 +215,22 @@ func TestAgregarVarianteConcurrenteAgregaUnaSola(t *testing.T) {
 	}
 	if exitos != 1 || duplicadas != 19 || len(p.Variantes) != 2 || p.Version != 2 {
 		t.Fatalf("éxitos %d, duplicadas %d, variantes %d, versión %d", exitos, duplicadas, len(p.Variantes), p.Version)
+	}
+}
+
+// El cambio guarda el track id del pedido que lo hizo, y el outbox lo devuelve para mandarlo en el evento (ADR-020).
+func TestElCambioGuardaElTrackIDDelPedido(t *testing.T) {
+	repo := repoDePrueba(t)
+	nuevo(t, repo, "a")
+	ctxAdmin := observabilidad.ConCorrelationID(ctx, "publicar-remera-9")
+	if _, err := repo.Publicar(ctxAdmin, "a", time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	cambios, err := repo.ProductosSinPublicar(ctx, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cambios) != 1 || cambios[0].Correlacion != "publicar-remera-9" {
+		t.Fatalf("cambios = %+v, esperaba el track id publicar-remera-9", cambios)
 	}
 }

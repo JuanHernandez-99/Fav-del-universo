@@ -1,0 +1,2 @@
+# Los scripts corren dentro del contenedor de MySQL: con fin de línea CRLF de Windows fallan.
+* text eol=lf

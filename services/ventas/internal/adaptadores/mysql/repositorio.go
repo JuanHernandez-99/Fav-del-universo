@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/dominio"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/observabilidad"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/puertos"
 )
 
@@ -53,13 +54,16 @@ func (r *Repositorio) Ping(ctx context.Context) error { return r.db.PingContext(
 // ---------- Ventas ----------
 
 func (r *Repositorio) CrearVenta(ctx context.Context, v dominio.Venta, tareas []dominio.TipoTarea, mails []dominio.Mail) (dominio.Venta, bool, error) {
+	if v.TrackID == "" {
+		v.TrackID = observabilidad.CorrelationID(ctx) // el del pedido que crea la venta (ADR-020)
+	}
 	err := r.enTransaccion(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO ventas (id, clave_idempotencia, huella, canal, estado, medio, comprador_id, email, referencia_externa,
-			                     reserva_id, total, url_pago, vence_en, creada_en, actualizada_en)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			                     reserva_id, total, url_pago, vence_en, creada_en, actualizada_en, track_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			v.ID, v.Clave, v.Huella, v.Canal, v.Estado, v.Medio, v.CompradorID, v.Email, v.ReferenciaExterna,
-			v.ReservaID, v.Total, v.UrlPago, v.VenceEn, v.CreadaEn, v.ActualizadaEn); err != nil {
+			v.ReservaID, v.Total, v.UrlPago, v.VenceEn, v.CreadaEn, v.ActualizadaEn, v.TrackID); err != nil {
 			return err
 		}
 		for _, it := range v.Items {
@@ -69,7 +73,7 @@ func (r *Repositorio) CrearVenta(ctx context.Context, v dominio.Venta, tareas []
 				return err
 			}
 		}
-		return guardarEfectos(ctx, tx, v.ID, tareas, mails)
+		return guardarEfectos(ctx, tx, v.ID, v.TrackID, tareas, mails)
 	})
 	if esClaveDuplicada(err) {
 		existente, errLeer := r.VentaPorClave(ctx, v.Clave)
@@ -153,22 +157,23 @@ func aplicarCambio(ctx context.Context, r *Repositorio, tx *sql.Tx, id string, c
 		v.Estado, v.PagoAprobadoEn, v.ActualizadaEn, v.ID); err != nil {
 		return dominio.Venta{}, err
 	}
-	return v, guardarEfectos(ctx, tx, v.ID, tareas, mails)
+	return v, guardarEfectos(ctx, tx, v.ID, v.TrackID, tareas, mails)
 }
 
-func guardarEfectos(ctx context.Context, tx *sql.Tx, ventaID string, tareas []dominio.TipoTarea, mails []dominio.Mail) error {
+// Las tareas y los mails copian el track id de la venta: se ejecutan después, pero con el id de la compra (ADR-020).
+func guardarEfectos(ctx context.Context, tx *sql.Tx, ventaID, trackID string, tareas []dominio.TipoTarea, mails []dominio.Mail) error {
 	// Sin fracción de segundo: DATETIME la redondea hacia arriba y dejaría la tarea en el futuro.
 	ahora := time.Now().UTC().Truncate(time.Second)
 	for _, t := range tareas {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO tareas (id, venta_id, tipo, proximo_intento) VALUES (?, ?, ?, ?)`,
-			uuid.NewString(), ventaID, t, ahora); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO tareas (id, venta_id, tipo, proximo_intento, track_id) VALUES (?, ?, ?, ?, ?)`,
+			uuid.NewString(), ventaID, t, ahora, trackID); err != nil {
 			return err
 		}
 	}
 	for _, m := range mails {
 		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO mails (id, venta_id, tipo, destinatario, asunto, cuerpo, proximo_intento) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			uuid.NewString(), ventaID, m.Tipo, m.Destinatario, m.Asunto, m.Cuerpo, ahora); err != nil {
+			`INSERT INTO mails (id, venta_id, tipo, destinatario, asunto, cuerpo, proximo_intento, track_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			uuid.NewString(), ventaID, m.Tipo, m.Destinatario, m.Asunto, m.Cuerpo, ahora, trackID); err != nil {
 			return err
 		}
 	}
@@ -212,7 +217,7 @@ func (r *Repositorio) ListarVentas(ctx context.Context, f puertos.FiltroVentas) 
 }
 
 const columnasVenta = `id, clave_idempotencia, huella, canal, estado, medio, comprador_id, email, referencia_externa,
-	reserva_id, total, url_pago, pago_aprobado_en, vence_en, creada_en, actualizada_en`
+	reserva_id, total, url_pago, pago_aprobado_en, vence_en, creada_en, actualizada_en, track_id`
 
 type escaneable interface{ Scan(dest ...any) error }
 
@@ -220,7 +225,7 @@ func escanearVenta(f escaneable) (dominio.Venta, error) {
 	var v dominio.Venta
 	var pago, vence sql.NullTime
 	err := f.Scan(&v.ID, &v.Clave, &v.Huella, &v.Canal, &v.Estado, &v.Medio, &v.CompradorID, &v.Email, &v.ReferenciaExterna,
-		&v.ReservaID, &v.Total, &v.UrlPago, &pago, &vence, &v.CreadaEn, &v.ActualizadaEn)
+		&v.ReservaID, &v.Total, &v.UrlPago, &pago, &vence, &v.CreadaEn, &v.ActualizadaEn, &v.TrackID)
 	if pago.Valid {
 		v.PagoAprobadoEn = &pago.Time
 	}
@@ -273,7 +278,7 @@ func (r *Repositorio) TomarTareas(ctx context.Context, ahora time.Time, plazo ti
 	var tomadas []dominio.Tarea
 	err := r.enTransaccion(ctx, func(tx *sql.Tx) error {
 		filas, err := tx.QueryContext(ctx,
-			`SELECT id, venta_id, tipo, intentos FROM tareas
+			`SELECT id, venta_id, tipo, intentos, track_id FROM tareas
 			 WHERE estado = 'PENDIENTE' AND proximo_intento <= ?
 			 ORDER BY proximo_intento LIMIT ? FOR UPDATE SKIP LOCKED`, ahora.UTC(), limite)
 		if err != nil {
@@ -281,7 +286,7 @@ func (r *Repositorio) TomarTareas(ctx context.Context, ahora time.Time, plazo ti
 		}
 		for filas.Next() {
 			var t dominio.Tarea
-			if err := filas.Scan(&t.ID, &t.VentaID, &t.Tipo, &t.Intentos); err != nil {
+			if err := filas.Scan(&t.ID, &t.VentaID, &t.Tipo, &t.Intentos, &t.TrackID); err != nil {
 				filas.Close()
 				return err
 			}
@@ -318,7 +323,7 @@ func (r *Repositorio) TomarMails(ctx context.Context, ahora time.Time, plazo tim
 	var tomados []dominio.Mail
 	err := r.enTransaccion(ctx, func(tx *sql.Tx) error {
 		filas, err := tx.QueryContext(ctx,
-			`SELECT id, venta_id, tipo, destinatario, asunto, cuerpo, intentos FROM mails
+			`SELECT id, venta_id, tipo, destinatario, asunto, cuerpo, intentos, track_id FROM mails
 			 WHERE estado = 'PENDIENTE' AND proximo_intento <= ?
 			 ORDER BY proximo_intento LIMIT ? FOR UPDATE SKIP LOCKED`, ahora.UTC(), limite)
 		if err != nil {
@@ -326,7 +331,7 @@ func (r *Repositorio) TomarMails(ctx context.Context, ahora time.Time, plazo tim
 		}
 		for filas.Next() {
 			var m dominio.Mail
-			if err := filas.Scan(&m.ID, &m.VentaID, &m.Tipo, &m.Destinatario, &m.Asunto, &m.Cuerpo, &m.Intentos); err != nil {
+			if err := filas.Scan(&m.ID, &m.VentaID, &m.Tipo, &m.Destinatario, &m.Asunto, &m.Cuerpo, &m.Intentos, &m.TrackID); err != nil {
 				filas.Close()
 				return err
 			}

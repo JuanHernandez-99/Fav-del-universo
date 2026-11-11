@@ -41,8 +41,8 @@ type Cliente struct {
 // ConAlias usa otro alias: los tests no tocan el índice del servicio.
 func ConAlias(urlBase, alias string) *Cliente {
 	return &Cliente{url: strings.TrimRight(urlBase, "/"), alias: alias,
-		// Un span por llamada a Elasticsearch, dentro de la traza del pedido (ADR-011).
-		http: &http.Client{Transport: observabilidad.Transporte(http.DefaultTransport, "elasticsearch")}}
+		// Cada llamada a Elasticsearch lleva el track id del pedido (ADR-020).
+		http: &http.Client{Transport: observabilidad.Transporte(http.DefaultTransport)}}
 }
 
 func Nuevo(urlBase string) *Cliente {
