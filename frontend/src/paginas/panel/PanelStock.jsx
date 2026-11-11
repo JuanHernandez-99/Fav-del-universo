@@ -304,7 +304,7 @@ function Listado({ token, fallo, alMover }) {
                 return (
                   <span key={campo} role="columnheader" aria-sort={sentido ? (sentido === 'desc' ? 'descending' : 'ascending') : 'none'}>
                     <button type="button" className="stock-ordenar" onClick={() => ordenarPor(campo)} title="Ordenar por esta columna">
-                      {titulo} <span aria-hidden="true">{sentido === 'desc' ? '↓' : sentido === 'asc' ? '↑' : '↕'}</span>
+                      {titulo}{sentido && <span aria-hidden="true"> {sentido === 'desc' ? '↓' : '↑'}</span>}
                     </button>
                   </span>
                 );
