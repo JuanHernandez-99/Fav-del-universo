@@ -86,7 +86,7 @@ Con `LOGS_MYSQL_ACTIVO=false`, los logs quedan solo en stdout. Por defecto es `t
   - Una tabla de hasta 500 líneas, con hora en milisegundos, servicio, réplica, nivel, mensaje y atributos.
   - Un gráfico de advertencias y errores por servicio.
   - Con track id muestra todas sus líneas, sin importar el rango de tiempo. Sin track id, las últimas del rango.
-  - **Tiempos del flujo:** con track id, cada línea muestra cuánto pasó desde la primera y desde la anterior, y un panel muestra la duración total, las líneas y los servicios. Se calculan en la consulta SQL (`LAG` y `MIN` sobre `created_at`, que tiene milisegundos), sobre todas las líneas del track id, así filtrar por servicio o nivel no cambia los tiempos.
+  - **Tiempos del flujo:** con track id, un panel muestra la duración total, las líneas y los servicios, y una tabla aparte, "Tiempos del flujo", muestra cada línea con cuánto pasó desde la primera y desde la anterior. La tabla de todos los logs no cambia. Se calculan en la consulta SQL (`LAG` y `MIN` sobre `created_at`, que tiene milisegundos), sobre todas las líneas del track id, así filtrar por servicio o nivel no cambia los tiempos.
 - **Un link** desde "FAV · Estado general".
 
 ### 6. Sin Jaeger ni OpenTelemetry
