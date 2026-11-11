@@ -463,6 +463,8 @@ a.panel-fila:hover { background: var(--papel); }
 .stock-producto .boton-texto { font-size: .86rem; }
 .stock-fila { grid-template-columns: minmax(0, 1.6fr) repeat(var(--columnas, 4), minmax(0, 1fr)); }
 .stock-volver { margin-bottom: 1rem; }
+.stock-ordenar { padding: 0; background: none; border: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
+.stock-ordenar:hover, [aria-sort='ascending'] .stock-ordenar, [aria-sort='descending'] .stock-ordenar { color: var(--tinta); }
 .stock-fila-producto small { color: var(--tinta-suave); }
 .stock-fila-producto .resultado-estado { margin-left: .5rem; padding: .1rem .5rem; font-size: .7rem; }
 .stock-desplegar { padding: 0; background: none; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }

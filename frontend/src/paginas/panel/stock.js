@@ -45,6 +45,18 @@ export function totalesDe(filas) {
   return total;
 }
 
+// Tocar una columna ordena de mayor a menor; otra vez, de menor a mayor; la tercera, saca el orden.
+export function siguienteOrden(actual, campo) {
+  if (actual?.campo !== campo) return { campo, sentido: 'desc' };
+  return actual.sentido === 'desc' ? { campo, sentido: 'asc' } : null;
+}
+
+// Ordena productos por el total de una cantidad. Con el mismo total, por nombre, para que el orden no salte.
+export function ordenarPorStock(productos, { campo, sentido }) {
+  const signo = sentido === 'asc' ? 1 : -1;
+  return [...productos].sort((a, b) => signo * (a.total[campo] - b.total[campo]) || a.nombre.localeCompare(b.nombre));
+}
+
 // El pedido a Inventario según el tipo de movimiento. En el ajuste la cantidad lleva signo: negativa resta.
 export function pedidoDe({ tipo, varianteId, canal, origen, cantidad, sentido, motivo, nota }) {
   const n = Number(cantidad);

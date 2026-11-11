@@ -8,7 +8,8 @@ import { claveDelPedido, olvidarClave } from '../../compra/compra.js';
 import { nombreCategoria } from '../../dominio.js';
 import { useSesion } from '../../sesion/contexto.jsx';
 import {
-  cantidadValida, CANALES_STOCK, columnasDe, explicarRechazo, filasDeStock, MOTIVOS, pedidoDe, totalesDe, VISTAS_CANTIDADES,
+  cantidadValida, CANALES_STOCK, columnasDe, explicarRechazo, filasDeStock, MOTIVOS, ordenarPorStock, pedidoDe, siguienteOrden,
+  totalesDe, VISTAS_CANTIDADES,
 } from './stock.js';
 
 const talleLegible = (t) => (t === 'U' ? 'Único' : t);
@@ -202,34 +203,65 @@ function Listado({ token, fallo, alMover }) {
   const vista = parametros.get('cantidades') ?? 'todo';
   const pagina = Number(parametros.get('pagina') ?? 1);
   const columnas = columnasDe(vista);
+  const campoOrden = parametros.get('orden');
+  const orden = columnas.some(([campo]) => campo === campoOrden) ? { campo: campoOrden, sentido: parametros.get('sentido') === 'asc' ? 'asc' : 'desc' } : null;
   const [texto, setTexto] = useState(q);
-  const [resultado, setResultado] = useState(null);
+  const [datos, setDatos] = useState(null);
   const [error, setError] = useState(false);
   const [reintento, setReintento] = useState(0);
   const [abiertos, setAbiertos] = useState(() => new Set());
 
+  // Sin orden, Catálogo pagina y se pide el stock de esa página. Con orden, Catálogo no puede ordenar por stock (no lo
+  // conoce): se traen todos los productos de los filtros y el orden y la paginación se hacen acá. Cambiar de columna,
+  // de sentido o de página no vuelve a consultar.
+  const paginaDelServidor = orden ? 'todas' : pagina;
   useEffect(() => {
     const control = new AbortController();
-    setResultado(null);
+    const opciones = { signal: control.signal };
+    setDatos(null);
     setError(false);
     (async () => {
       try {
-        const r = await listarProductosAdmin(token, { q, publicado, pagina, tamano: TAMANO }, { signal: control.signal });
-        const ids = r.items.flatMap((p) => p.variantes.map((v) => v.varianteId));
-        const stocks = ids.length ? await consultarStockEnTandas(token, ids, { signal: control.signal }) : [];
+        let productos;
+        let r;
+        if (paginaDelServidor === 'todas') {
+          r = await listarProductosAdmin(token, { q, publicado, pagina: 1, tamano: 100 }, opciones);
+          const resto = await Promise.all(Array.from({ length: Math.max(0, r.paginas - 1) }, (_, i) => listarProductosAdmin(token, { q, publicado, pagina: i + 2, tamano: 100 }, opciones)));
+          productos = [r, ...resto].flatMap((p) => p.items);
+        } else {
+          r = await listarProductosAdmin(token, { q, publicado, pagina: paginaDelServidor, tamano: TAMANO }, opciones);
+          productos = r.items;
+        }
+        const ids = productos.flatMap((p) => p.variantes.map((v) => v.varianteId));
+        const stocks = ids.length ? await consultarStockEnTandas(token, ids, opciones) : [];
         if (control.signal.aborted) return;
-        setResultado({ ...r, items: r.items.map((p) => ({ ...p, filas: filasDeStock(p.variantes, stocks) })) });
+        const items = productos.map((p) => {
+          const filas = filasDeStock(p.variantes, stocks);
+          return { ...p, filas, total: totalesDe(filas) };
+        });
+        setDatos({ items, total: r.total, paginas: paginaDelServidor === 'todas' ? Math.ceil(items.length / TAMANO) : r.paginas, completo: paginaDelServidor === 'todas' });
       } catch (e) {
         if (!control.signal.aborted && !fallo(e)) setError(true);
       }
     })();
     return () => control.abort();
-  }, [token, q, publicado, pagina, fallo, reintento]);
+  }, [token, q, publicado, paginaDelServidor, fallo, reintento]);
+
+  const resultado = datos && (datos.completo && orden
+    ? { ...datos, items: ordenarPorStock(datos.items, orden).slice((pagina - 1) * TAMANO, pagina * TAMANO) }
+    : datos);
 
   const cambiar = (nombre, valor) => {
     const nuevos = new URLSearchParams(parametros);
     if (valor) nuevos.set(nombre, valor); else nuevos.delete(nombre);
     if (nombre !== 'pagina' && nombre !== 'cantidades') nuevos.delete('pagina');
+    setParametros(nuevos);
+  };
+  const ordenarPor = (campo) => {
+    const siguiente = siguienteOrden(orden, campo);
+    const nuevos = new URLSearchParams(parametros);
+    nuevos.delete('pagina');
+    if (siguiente) { nuevos.set('orden', siguiente.campo); nuevos.set('sentido', siguiente.sentido); } else { nuevos.delete('orden'); nuevos.delete('sentido'); }
     setParametros(nuevos);
   };
   const alternar = (id) => setAbiertos((a) => {
@@ -267,11 +299,20 @@ function Listado({ token, fallo, alMover }) {
           <div className="panel-tabla" role="table" aria-label="Stock por producto">
             <div className="panel-fila stock-fila panel-fila-titulos" role="row" style={ancho}>
               <span role="columnheader">Producto</span>
-              {columnas.map(([campo, titulo]) => <span key={campo} role="columnheader">{titulo}</span>)}
+              {columnas.map(([campo, titulo]) => {
+                const sentido = orden?.campo === campo ? orden.sentido : null;
+                return (
+                  <span key={campo} role="columnheader" aria-sort={sentido ? (sentido === 'desc' ? 'descending' : 'ascending') : 'none'}>
+                    <button type="button" className="stock-ordenar" onClick={() => ordenarPor(campo)} title="Ordenar por esta columna">
+                      {titulo} <span aria-hidden="true">{sentido === 'desc' ? '↓' : sentido === 'asc' ? '↑' : '↕'}</span>
+                    </button>
+                  </span>
+                );
+              })}
             </div>
             {resultado.items.map((p) => {
               const abierto = abiertos.has(p.productoId);
-              const total = totalesDe(p.filas);
+              const { total } = p;
               return (
                 <Fragment key={p.productoId}>
                   <div className="panel-fila stock-fila stock-fila-producto" role="row" style={ancho}>

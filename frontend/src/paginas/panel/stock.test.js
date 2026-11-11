@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cantidadValida, columnasDe, explicarRechazo, filasDeStock, pedidoDe, totalesDe } from './stock.js';
+import {
+  cantidadValida, columnasDe, explicarRechazo, filasDeStock, ordenarPorStock, pedidoDe, siguienteOrden, totalesDe,
+} from './stock.js';
 
 describe('stock por variante (HU-09.1)', () => {
   const variantes = [
@@ -36,6 +38,28 @@ describe('lista de stock por producto', () => {
     ['cualquiera', ['online', 'reservado', 'disponibleOnline', 'fisico']],
   ])('la vista "%s" muestra %j', (vista, campos) => {
     expect(columnasDe(vista).map(([campo]) => campo)).toEqual(campos);
+  });
+});
+
+describe('orden por columna', () => {
+  it('desc, después asc, después sin orden; otra columna empieza en desc', () => {
+    const primero = siguienteOrden(null, 'fisico');
+    expect(primero).toEqual({ campo: 'fisico', sentido: 'desc' });
+    const segundo = siguienteOrden(primero, 'fisico');
+    expect(segundo).toEqual({ campo: 'fisico', sentido: 'asc' });
+    expect(siguienteOrden(segundo, 'fisico')).toBeNull();
+    expect(siguienteOrden(segundo, 'reservado')).toEqual({ campo: 'reservado', sentido: 'desc' });
+  });
+
+  it('ordena productos por el total y desempata por nombre', () => {
+    const productos = [
+      { nombre: 'Remera Luna', total: { disponibleOnline: 3 } },
+      { nombre: 'Buzo Cometa', total: { disponibleOnline: 10 } },
+      { nombre: 'Jean Órbita', total: { disponibleOnline: 3 } },
+    ];
+    const nombres = (o) => ordenarPorStock(productos, o).map((p) => p.nombre);
+    expect(nombres({ campo: 'disponibleOnline', sentido: 'desc' })).toEqual(['Buzo Cometa', 'Jean Órbita', 'Remera Luna']);
+    expect(nombres({ campo: 'disponibleOnline', sentido: 'asc' })).toEqual(['Jean Órbita', 'Remera Luna', 'Buzo Cometa']);
   });
 });
 
