@@ -385,6 +385,7 @@ El **grupo de proveedores** ve el catálogo de FAV y le hace pedidos para sí mi
 | Operación | Qué hace | Servicio |
 |---|---|---|
 | `GET /v1/productos` | Devuelve los productos publicados con sus variantes (talle y color) y el precio vigente. No informa stock. | Catálogo |
+| `GET /v1/disponibilidad` | Unidades del stock online sin reservar por variante (contrato 1.1.0). | Inventario |
 | `POST /v1/pedidos` | Aparta el stock y registra la venta, pendiente de pago por transferencia. | Ventas, que aparta el stock en Inventario |
 | `GET /v1/pedidos/{pedidoId}` | Devuelve el pedido con su estado vigente (contrato 1.3.0). | Ventas |
 
