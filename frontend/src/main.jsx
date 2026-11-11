@@ -1,7 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
-import '@fontsource-variable/archivo';
+import '@fontsource-variable/fraunces';
 import '@fontsource-variable/manrope';
 import './estilos.css';
 import { ProveedorCarrito } from './carrito/contexto.jsx';
