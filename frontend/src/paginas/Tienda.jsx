@@ -26,7 +26,7 @@ function Cabecera({ filtros }) {
       <svg className="portada-astro" viewBox="0 0 400 400" aria-hidden="true">
         <circle cx="200" cy="200" r="104" />
         <ellipse cx="200" cy="200" rx="188" ry="46" transform="rotate(-24 200 200)" />
-        <circle cx="42" cy="262" r="9" />
+        <circle className="astro-luna" cx="42" cy="262" r="9" />
       </svg>
     </section>
   );

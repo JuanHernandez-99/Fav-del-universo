@@ -86,6 +86,7 @@ Con `LOGS_MYSQL_ACTIVO=false`, los logs quedan solo en stdout. Por defecto es `t
   - Una tabla de hasta 500 líneas, con hora en milisegundos, servicio, réplica, nivel, mensaje y atributos.
   - Un gráfico de advertencias y errores por servicio.
   - Con track id muestra todas sus líneas, sin importar el rango de tiempo. Sin track id, las últimas del rango.
+  - **Tiempos del flujo:** con track id, cada línea muestra cuánto pasó desde la primera y desde la anterior, y un panel muestra la duración total, las líneas y los servicios. Se calculan en la consulta SQL (`LAG` y `MIN` sobre `created_at`, que tiene milisegundos), sobre todas las líneas del track id, así filtrar por servicio o nivel no cambia los tiempos.
 - **Un link** desde "FAV · Estado general".
 
 ### 6. Sin Jaeger ni OpenTelemetry
@@ -116,7 +117,7 @@ Con `LOGS_MYSQL_ACTIVO=false`, los logs quedan solo en stdout. Por defecto es `t
 
 **Negativas aceptadas**
 
-- **No se ve cuánto tardó cada paso entre servicios.** Cada línea `pedido http` tiene su `duracion_ms`, pero no hay un árbol que muestre qué parte del pedido fue cada llamada ni cada consulta a la base.
+- **No se ve cuánto tardó cada llamada.** El tablero muestra el tiempo entre líneas de log, y cada línea `pedido http` tiene su `duracion_ms`, pero no hay un árbol que muestre qué parte del pedido fue cada llamada ni cada consulta a la base. El tiempo entre líneas incluye esperas ajenas al sistema, como el comprador pagando.
 - **El gateway no escribe en la tabla.** Su log de acceso, con la réplica que atendió, sigue en stdout (`docker compose logs gateway`).
 - **Se descartan líneas** bajo una carga mayor a la que se aguanta, o mientras `mysql-logs` no responde. Las líneas de mientras estuvo caído no se recuperan, aunque quedan en stdout.
 - **La tabla crece sin límite,** como crecía la memoria de Jaeger, aunque en disco y no en memoria: en un minuto a 600 pedidos/s sumó unas 44.000 filas. Ver Pendientes.
@@ -141,6 +142,7 @@ Con `LOGS_MYSQL_ACTIVO=false`, los logs quedan solo en stdout. Por defecto es `t
 | Cambio de un producto con `X-Track-ID` | La línea "índice actualizado" lleva ese track id |
 | `docker compose stop mysql-logs` | La compra sigue (201). Al volver, los logs nuevos aparecen sin reiniciar ningún servicio y los descartes quedan en `logs_descartados_total` |
 | Sin Jaeger ni OpenTelemetry | Ningún log con `trace_id`. Los `go.mod` no tienen dependencias de OpenTelemetry |
+| Tiempos del flujo (11/11/2026) | Una compra por transferencia confirmada por el administrador: 13 líneas en 3 servicios, 5,37 s en total; la reserva a los 13 ms y la venta a los 26 ms. Filtrando solo Inventario, sus líneas conservan los tiempos del flujo completo. Probado con la consulta directa, con la API de Grafana y en el tablero |
 | Repetido el 11/11/2026, en local, sin `-race` | `go test` de los cuatro servicios, con la integración activada (MySQL de cada servicio y de logs; MongoDB y Memcached descartables; Elasticsearch del Compose): 391 pasan, ninguno salteado. `go vet` sin avisos. Gateway: `token` 42/42, `tienda` 44/44 y `errores` 35/35. Frontend: 125/125 |
 
 **Prueba de carga** (`TASAS="600" bash loadtest/pico_tienda.sh`, 60 s, en la notebook):

@@ -241,9 +241,9 @@
       }
     },
     {
-      "id": 2,
-      "type": "table",
-      "title": "Logs (más viejo arriba)",
+      "id": 4,
+      "type": "stat",
+      "title": "Flujo del track id",
       "datasource": {
         "type": "mysql",
         "uid": "mysql-logs"
@@ -252,9 +252,9 @@
         "x": 0,
         "y": 14,
         "w": 24,
-        "h": 20
+        "h": 4
       },
-      "description": "Máximo 500 líneas. Con track id, todas las líneas de ese pedido en todos los servicios, en orden.",
+      "description": "Tiempo entre la primera y la última línea del track id, cuántas líneas tiene y por cuántos servicios pasó. Incluye las esperas ajenas al sistema, como el comprador pagando en Mercado Pago. No depende de los filtros de servicio y nivel.",
       "targets": [
         {
           "refId": "A",
@@ -265,7 +265,74 @@
           "format": "table",
           "rawQuery": true,
           "editorMode": "code",
-          "rawSql": "-- Con track id: todas sus líneas, sin importar el rango de tiempo. Sin track id: las últimas 500 del rango.\nSELECT hora AS `Hora`, servicio AS `Servicio`, replica AS `Réplica`, nivel AS `Nivel`, mensaje AS `Mensaje`, track_id AS `Track id`, atributos AS `Atributos`\nFROM (\n  (SELECT id, created_at AS hora, stage AS servicio, instancia AS replica, level AS nivel, message AS mensaje, track_id, atributos FROM app_logs\n   WHERE ${track_id:sqlstring} <> '' AND track_id = ${track_id:sqlstring} AND stage IN (${servicio:sqlstring}) AND level IN (${nivel:sqlstring})\n   ORDER BY created_at DESC, id DESC LIMIT 500)\n  UNION ALL\n  (SELECT id, created_at AS hora, stage AS servicio, instancia AS replica, level AS nivel, message AS mensaje, track_id, atributos FROM app_logs\n   WHERE ${track_id:sqlstring} = '' AND $__timeFilter(created_at) AND stage IN (${servicio:sqlstring}) AND level IN (${nivel:sqlstring})\n   ORDER BY created_at DESC, id DESC LIMIT 500)\n) lineas\nORDER BY hora, id"
+          "rawSql": "SELECT TIMESTAMPDIFF(MICROSECOND, MIN(created_at), MAX(created_at)) / 1000 AS `Duración del flujo`, COUNT(*) AS `Líneas`, COUNT(DISTINCT stage) AS `Servicios`\nFROM app_logs\nWHERE ${track_id:sqlstring} <> '' AND track_id = ${track_id:sqlstring}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Pegá un track id",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duración del flujo"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Logs (más viejo arriba)",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 20
+      },
+      "description": "Máximo 500 líneas. Con track id, todas las líneas de ese pedido en todos los servicios, en orden, con el tiempo desde la primera línea y desde la anterior. Los tiempos se miden sobre todo el flujo, aunque se filtre por servicio o nivel. Sin track id, esas dos columnas quedan vacías.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql-logs"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "-- Con track id: todas sus líneas, sin importar el rango de tiempo, con los tiempos medidos sobre todo el flujo\n-- (antes de filtrar por servicio y nivel). Sin track id: las últimas 500 del rango, sin tiempos.\nSELECT hora AS `Hora`, servicio AS `Servicio`, replica AS `Réplica`, nivel AS `Nivel`, mensaje AS `Mensaje`, desde_inicio AS `Desde inicio`, desde_anterior AS `Desde anterior`, track_id AS `Track id`, atributos AS `Atributos`\nFROM (\n  (SELECT * FROM (\n     SELECT id, created_at AS hora, stage AS servicio, instancia AS replica, level AS nivel, message AS mensaje, track_id, atributos,\n       TIMESTAMPDIFF(MICROSECOND, MIN(created_at) OVER (), created_at) / 1000 AS desde_inicio,\n       TIMESTAMPDIFF(MICROSECOND, LAG(created_at) OVER (ORDER BY created_at, id), created_at) / 1000 AS desde_anterior\n     FROM app_logs\n     WHERE ${track_id:sqlstring} <> '' AND track_id = ${track_id:sqlstring}\n   ) flujo\n   WHERE servicio IN (${servicio:sqlstring}) AND nivel IN (${nivel:sqlstring})\n   ORDER BY hora DESC, id DESC LIMIT 500)\n  UNION ALL\n  (SELECT id, created_at AS hora, stage AS servicio, instancia AS replica, level AS nivel, message AS mensaje, track_id, atributos, NULL AS desde_inicio, NULL AS desde_anterior FROM app_logs\n   WHERE ${track_id:sqlstring} = '' AND $__timeFilter(created_at) AND stage IN (${servicio:sqlstring}) AND level IN (${nivel:sqlstring})\n   ORDER BY created_at DESC, id DESC LIMIT 500)\n) lineas\nORDER BY hora, id"
         }
       ],
       "fieldConfig": {
@@ -275,6 +342,7 @@
             "cellOptions": {
               "type": "auto"
             },
+            "minWidth": 60,
             "inspect": true,
             "filterable": true
           }
@@ -288,11 +356,11 @@
             "properties": [
               {
                 "id": "unit",
-                "value": "time:YYYY-MM-DD HH:mm:ss.SSS"
+                "value": "time:HH:mm:ss.SSS"
               },
               {
                 "id": "custom.width",
-                "value": 190
+                "value": 110
               }
             ]
           },
@@ -304,7 +372,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 95
               }
             ]
           },
@@ -316,7 +384,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 120
+                "value": 110
               }
             ]
           },
@@ -328,7 +396,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 70
+                "value": 60
               },
               {
                 "id": "custom.cellOptions",
@@ -368,7 +436,58 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 320
+                "value": 260
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Atributos"
+            },
+            "properties": [
+              {
+                "id": "custom.minWidth",
+                "value": 180
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Desde inicio"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Desde anterior"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.width",
+                "value": 125
               }
             ]
           },
@@ -380,7 +499,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 280
+                "value": 250
               }
             ]
           }
