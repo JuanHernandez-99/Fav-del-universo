@@ -7,7 +7,7 @@ Juan Hernandez - 2325917
 
 Sistema de venta online y control de stock para **FAV**, una tienda de indumentaria femenina que hoy vende solo en el local y lleva el stock en un Excel. Es también el Trabajo Práctico Integrador de **Arquitectura de Software 2026**.
 
-> **Estado: rumbo a la presentación grupal. Desplegado en Azure:** https://fav-ucc.chilecentral.cloudapp.azure.com. Los cuatro servicios funcionan detrás de un gateway nginx, con logs, trazas y métricas. **Inventario** y **Catálogo**, con 2 réplicas cada uno. **Catálogo** tiene búsqueda con Elasticsearch y caché con Memcached. **Ventas** usa Mercado Pago simulado y manda mails a Mailpit ([ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). **Usuarios** emite tokens y el gateway los valida. El **frontend** muestra la tienda, el carrito, el inicio de sesión, la compra y "Mis compras", y en el panel las ventas, la venta del local, los productos, las promociones y el stock ([ADR-017](docs/adr/ADR-017-frontend.md)). Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md).
+> **Estado: rumbo a la presentación grupal. Desplegado en Azure:** https://fav-ucc.chilecentral.cloudapp.azure.com. Los cuatro servicios funcionan detrás de un gateway nginx, con logs, métricas y alertas. En esta rama los logs se centralizan en MySQL y una compra se sigue por su track id ([ADR-020](docs/adr/ADR-020-logs-y-track-id-modelo-catedra.md)); la VM de Azure todavía corre `main`, con Jaeger (ADR-011). **Inventario** y **Catálogo**, con 2 réplicas cada uno. **Catálogo** tiene búsqueda con Elasticsearch y caché con Memcached. **Ventas** usa Mercado Pago simulado y manda mails a Mailpit ([ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). **Usuarios** emite tokens y el gateway los valida. El **frontend** muestra la tienda, el carrito, el inicio de sesión, la compra y "Mis compras", y en el panel las ventas, la venta del local, los productos, las promociones y el stock ([ADR-017](docs/adr/ADR-017-frontend.md)). Ver las limitaciones en [ARCHITECTURE §16](docs/ARCHITECTURE.md).
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: parte del diseño, todavía no implementado.
 
@@ -67,7 +67,8 @@ El grupo del gimnasio también nos consume: con su propia clave ve el catálogo 
 | [ADR-009](docs/adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018 |
 | [ADR-018](docs/adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada |
 | [ADR-010](docs/adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada                   |
-| [ADR-011](docs/adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada                   |
+| [ADR-011](docs/adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada; trazas y logs reemplazados por ADR-020 |
+| [ADR-020](docs/adr/ADR-020-logs-y-track-id-modelo-catedra.md) | D11 · Logs en MySQL y track id (modelo de la cátedra) | Aceptada |
 | [ADR-012](docs/adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada                   |
 | [ADR-013](docs/adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | Aceptada con mediciones    |
 | [ADR-014](docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md) | Adicional · Simulador de pagos, mails y orden de la compra | Aceptada |
@@ -85,14 +86,15 @@ Con Docker, desde la raíz:
 docker compose up --build
 ```
 
-No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) con su MongoDB, los productos de ejemplo, Elasticsearch y Memcached, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, Jaeger, Prometheus, Alertmanager y Grafana.
+No hace falta crear un `.env`: todas las variables tienen valores por defecto para desarrollo. Levanta Inventario (2 réplicas) y su MySQL con stock de ejemplo, Catálogo (2 réplicas) con su MongoDB, los productos de ejemplo, Elasticsearch y Memcached, Ventas y su MySQL, Usuarios y su MySQL, RabbitMQ, Mailpit, el gateway, el simulador de Mercado Pago, el mock del gimnasio, la base de logs (`mysql-logs`), Prometheus, Alertmanager y Grafana.
 
 | Qué | Dónde |
 |---|---|
 | Gateway (API) | http://localhost:8080 |
-| Jaeger (trazas) | http://localhost:16686 |
 | Prometheus (métricas) | http://localhost:9090 |
 | Grafana (tablero, sin iniciar sesión) | http://localhost:3000 |
+| Logs de una compra | Grafana → tablero **FAV · Logs**: pegar el `X-Correlation-Id` que devuelve el gateway |
+| MySQL de logs (`root` / `cambiar`) | `localhost:3310`, solo desde esta máquina |
 | Alertmanager (alertas) | http://localhost:9093 |
 | Mailpit (mails) | http://localhost:8025 |
 | Simulador de Mercado Pago | http://localhost:8096 |
@@ -106,7 +108,7 @@ Una VM de Azure con el mismo Docker Compose, detrás de Caddy con HTTPS. Cómo s
 |---|---|
 | Tienda y panel de administración | https://fav-ucc.chilecentral.cloudapp.azure.com |
 | Capacidad publicada (otros grupos) | `https://fav-ucc.chilecentral.cloudapp.azure.com/v1/…`, con la `X-API-Key` que se le pasa a cada grupo por un canal privado ([contrato](docs/contracts/README.md)) |
-| Grafana, Jaeger, Prometheus y Mailpit | No se publican: se ven desde la VM con un túnel SSH ([cómo](desplegar/README.md#6-paneles-por-túnel-ssh)) |
+| Grafana, Prometheus y Mailpit | No se publican: se ven desde la VM con un túnel SSH ([cómo](desplegar/README.md#6-paneles-por-túnel-ssh)) |
 
 Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/README.md). Catálogo: [`services/catalogo/README.md`](services/catalogo/README.md). Ventas: [`services/ventas/README.md`](services/ventas/README.md). Usuarios: [`services/usuarios/README.md`](services/usuarios/README.md).
 
@@ -124,7 +126,7 @@ Cómo probar Inventario: [`services/inventario/README.md`](services/inventario/R
 ├── gateway/
 ├── frontend/
 ├── mocks/                  Mercado Pago, contrato con Prism y gimnasio
-├── observabilidad/         Prometheus, alertas, Grafana y prueba de alertas
+├── observabilidad/         Prometheus, alertas, Grafana, base de logs (mysql-logs) y prueba de alertas
 ├── loadtest/               pruebas de carga (k6)
 ├── desplegar/              despliegue en la VM de Azure (Caddy y scripts)
 ├── docker-compose.yml      arranque local

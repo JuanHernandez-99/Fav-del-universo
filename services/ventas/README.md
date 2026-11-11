@@ -105,7 +105,7 @@ Cada pedido tiene 4,5 s en total, por debajo de los 5 s del gateway ([ADR-014](.
 
 ## Observabilidad
 
-Logs JSON con `correlation_id`, trazas a Jaeger y métricas en Prometheus: `http_pedidos_total`, `http_duracion_segundos`, `dependencia_llamadas_total`, `circuit_breaker_estado`, `proceso_elementos_total` y `mensajes_consumidos_total`.
+Logs JSON con `correlation_id` (el track id), también en `app_logs` de `mysql-logs` ([ADR-020](../../docs/adr/ADR-020-logs-y-track-id-modelo-catedra.md)). La venta guarda el track id de la compra: el aviso de pago, la confirmación de una transferencia, las tareas y los mails lo siguen usando, así una compra se ve completa en "FAV · Logs". Métricas en Prometheus: `http_pedidos_total`, `http_duracion_segundos`, `dependencia_llamadas_total`, `circuit_breaker_estado`, `proceso_elementos_total` y `mensajes_consumidos_total`.
 
 ## Tests
 

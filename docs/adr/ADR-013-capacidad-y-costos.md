@@ -176,7 +176,7 @@ Para FAV, el límite de cómputo no es el problema: 800 pedidos/s con 5 % de com
 
 ## Pendientes
 
-- **Decidir cómo limitar Jaeger** (local y nube) y repetir la corrida de 800 pedidos/s con el límite.
+- **Decidir cómo limitar Jaeger** (local y nube) y repetir la corrida de 800 pedidos/s con el límite. *Actualización 10/11/2026:* en la rama `feat/sin-jaeger`, [ADR-020](ADR-020-logs-y-track-id-modelo-catedra.md) saca Jaeger. En su lugar queda `app_logs`, que también crece sin límite (retención pendiente). A 600 pedidos/s, el p95 fue de 18 ms con los logs en MySQL. La corrida de 800 pedidos/s no se repitió.
 - **[completar]** Confirmar el tamaño de la VM de Azure y ajustar la tabla de costos.
 - Medir la espera del pool de conexiones, si la hipótesis 2 hiciera falta.
 

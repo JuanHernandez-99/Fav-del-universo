@@ -49,7 +49,7 @@ Fuente editable: [`diagrams/contenedores.drawio`](diagrams/contenedores.drawio).
 
 **Diferencias con lo implementado (04/11/2026).** Los diagramas muestran el diseño del 14/10 y se actualizan una sola vez, cuando estén decididos el frontend y la búsqueda:
 
-- Gateway y observabilidad ya tienen tecnología: nginx, Jaeger y Prometheus. Inventario y Catálogo tienen dos réplicas.
+- Gateway y observabilidad ya tienen tecnología: nginx, Prometheus, Grafana y MySQL para los logs (ADR-020). Inventario y Catálogo tienen dos réplicas.
 - Mercado Pago y el proveedor de mail se reemplazan en local por un simulador y Mailpit ([ADR-014](adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)).
 - Ventas llama a Catálogo e Inventario por la entrada interna del gateway, no directo. Ventas no publica eventos ni tiene outbox: solo consume `ReservaVencida`.
 - Estados: también llegan a *A verificar* una venta pendiente cuya reserva venció al confirmar y una cancelada que recibe un pago. Un pago rechazado la deja *Cancelada* **[propuesta]**.
@@ -216,15 +216,14 @@ Si algo se cae, lo demás tiene que seguir funcionando y tiene que poder saberse
 
 El estado de una operación tiene que poder entenderse sin revisar cada componente a mano (**[ADR-011](adr/ADR-011-observabilidad.md), D11**).
 
-**Implementado en los cuatro servicios y el gateway:** logs JSON con `servicio`, `instancia`, `correlation_id`, `trace_id` y `span_id`; log de acceso del gateway con la réplica que atendió y el `trace_id`; trazas OpenTelemetry a Jaeger (`:16686`): una compra se ve como una sola traza gateway → Ventas → Catálogo (MongoDB) e Inventario (MySQL), y la búsqueda incluye Elasticsearch; métricas Prometheus (`:9090`) con una serie por réplica y 15 días de historial; tablero en Grafana (`:3000`); 14 alertas que Alertmanager avisa por mail, a Mailpit en local. **Falta:** el destino real de las alertas en la nube. El objetivo completo es:
-
+**Implementado en los cuatro servicios y el gateway:** logs JSON por stdout con `servicio`, `instancia` y `correlation_id` (el track id, que viaja en cada llamada HTTP y en cada evento); las líneas de INFO o más de los servicios también van a la tabla `app_logs` de `mysql-logs`, y en Grafana el tablero "FAV · Logs" muestra todo lo de un track id: una compra se ve desde los precios en Catálogo hasta el pago, la confirmación en Inventario y los mails (**[ADR-020](adr/ADR-020-logs-y-track-id-modelo-catedra.md)**); log de acceso del gateway, solo en stdout, con la réplica que atendió; métricas Prometheus (`:9090`) con una serie por réplica y 15 días de historial; tablero en Grafana (`:3000`); 14 alertas que Alertmanager avisa por mail, a Mailpit en local. **Falta:** el destino real de las alertas en la nube. El objetivo completo es:
 
 - **Logs estructurados** en todos los servicios y en el gateway, con un identificador de correlación que viaja en cada llamada y en cada evento. Permite seguir una compra de punta a punta. El token nunca se escribe en los logs.
 - **Métricas** por servicio: pedidos por endpoint y código de estado (incluidos 4xx y 5xx), latencia, fallas de cada dependencia, mensajes en la DLQ, aciertos de caché y estado de cada réplica.
 - **Historial:** las métricas se conservan el tiempo suficiente para responder preguntas sobre el pasado, por ejemplo cuántos errores 404 hubo la semana pasada. **[propuesta]** al menos dos semanas.
-- **Trazas distribuidas** del flujo de compra.
+- **Seguimiento de una compra entre servicios** con el track id, en lugar de trazas con Jaeger (ADR-020).
 - **Tablero** con el estado general del sistema y al menos una alerta.
-- **Herramientas:** OpenTelemetry y Jaeger, Prometheus, Grafana y Alertmanager (ADR-011).
+- **Herramientas:** MySQL con GORM para los logs (ADR-020), Prometheus, Grafana y Alertmanager (ADR-011).
 
 ## 11. Pruebas de carga (previstas, guion validado con una corrida)
 
@@ -234,7 +233,7 @@ Se simula un **pico de demanda** como los que describe el cliente (cambio de tem
 
 - **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Catálogo con dos réplicas), MongoDB, tres MySQL y RabbitMQ. Memcached, el motor de búsqueda y las herramientas de observabilidad se suman cuando se incorporen. Los secretos van en un archivo `.env` que no se sube al repositorio, y las claves del token las genera `usuarios-init` en volúmenes de Docker (ADR-015).
 - **Balanceo:** en la Entrega 2 el servicio replicado es **Inventario** (2 réplicas con `deploy.replicas`), detrás de un gateway nginx con round robin y verificación pasiva ([ADR-012](adr/ADR-012-balanceo.md), D12). Catálogo también tiene 2 réplicas, con el mismo mecanismo.
-- **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), Elasticsearch, Memcached, Ventas y su MySQL, RabbitMQ, Mailpit, Usuarios y su MySQL (con `usuarios-init`, que genera las claves del token), simulador de Mercado Pago, mock del gimnasio, Jaeger y Prometheus.
+- **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), Elasticsearch, Memcached, Ventas y su MySQL, RabbitMQ, Mailpit, Usuarios y su MySQL (con `usuarios-init`, que genera las claves del token), simulador de Mercado Pago, mock del gimnasio, `mysql-logs`, Prometheus, Alertmanager y Grafana.
 - **Nube:** para que el grupo de proveedores use la capacidad con una URL pública se despliegan el gateway, Catálogo, Ventas e Inventario con sus bases. **[?]** proveedor de nube.
 
 ## 13. Estructura del repositorio
@@ -338,7 +337,8 @@ services/inventario/            # hexagonal
 | [ADR-009](adr/ADR-009-consumo-del-gimnasio.md)     | D9 · Consumo del gimnasio         | Reemplazada por ADR-018                              |
 | [ADR-018](adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada · Presentación grupal |
 | [ADR-010](adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada · Entrega 2                                 |
-| [ADR-011](adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada, con tablero y alertas                      |
+| [ADR-011](adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada en métricas, tablero y alertas; trazas y logs reemplazados por ADR-020 |
+| [ADR-020](adr/ADR-020-logs-y-track-id-modelo-catedra.md) | D11 · Logs en MySQL y track id | Aceptada · implementada en local |
 | [ADR-012](adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada · Entrega 2                                 |
 | [ADR-013](adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | **Propuesta** · Entrega 2 (sin mediciones)           |
 
@@ -358,14 +358,14 @@ La consigna establece qué condiciones cumplir y no cómo: "las decisiones de di
 | `go test` | Igual | Viene con el lenguaje. Los tests de integración corren contra la dependencia real cuando se define su variable de entorno, y se saltean si no | — |
 | Prometheus | Igual | Va a buscar las métricas de cada réplica, lo que muestra el reparto del balanceo. Guarda historial para consultar el pasado | ADR-011 |
 | Grafana | Igual | Muestra el estado general en una pantalla, y el tablero se versiona como JSON | ADR-011 |
-| Correlation ID | Igual | Permite seguir un pedido entre servicios y eventos, también en los logs del gateway, donde no hay trazas | ADR-005, ADR-011 |
+| Track id | Igual: es el `X-Correlation-Id` (también se acepta `X-Track-ID`) | Permite seguir un pedido entre servicios y eventos. La venta lo guarda, así el pago y los mails quedan con el de la compra | ADR-005, ADR-020 |
 | ccache o Memcached | **Memcached** | ccache vive en cada réplica: responderían distinto y la invalidación no llegaría a todas | ADR-019 |
 | Go con Gin | Go con **`net/http`** | El router estándar ya cubre lo necesario, sin una dependencia más | ADR-002 |
-| MySQL con GORM | MySQL con **`database/sql`** | Las garantías de stock dependen de consultas exactas, y así se ve y se prueba lo que se ejecuta | ADR-003 |
+| MySQL con GORM | MySQL con **`database/sql`** en las bases de negocio; **GORM** para los logs | Las garantías de stock dependen de consultas exactas, y así se ve y se prueba lo que se ejecuta. Los logs son solo inserciones por tandas | ADR-003, ADR-020 |
 | Apache Solr | **Elasticsearch** | Resuelve de forma más directa los errores de tipeo: con una opción de la consulta, mientras que Solr necesitó código en el cliente y un campo extra (sin eso, 0 resultados con "remra"). Se compararon en 16 casos: los dos cumplen, y Solr usó menos memoria | ADR-006 |
-| Logs en MySQL | **Logs JSON por stdout** | Una caída de la base se llevaría los logs justo cuando hacen falta, y cada pedido sumaría una escritura | ADR-011 |
+| Logs en MySQL | Igual, en una base propia (`mysql-logs`), y además por stdout | Se escriben por tandas y sin esperar: con la base caída, las compras siguen y las líneas quedan en stdout | ADR-020 |
 
-**Agregados que pide la consigna:** trazas con OpenTelemetry y Jaeger (defensa), circuit breaker (2.9), prueba de carga con k6 (2.11), test de contrato con `kin-openapi` (punto 4) y alerta con Alertmanager (defensa). El frontend, con React y Vite, se justifica en ADR-017.
+**Agregados que pide la consigna:** circuit breaker (2.9), prueba de carga con k6 (2.11), test de contrato con `kin-openapi` (punto 4) y alerta con Alertmanager (defensa). El frontend, con React y Vite, se justifica en ADR-017.
 
 ## 15. Pendientes de arquitectura
 
@@ -384,14 +384,14 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 
 | Tema | Situación | Dónde |
 | ---- | --------- | ----- |
-| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote, catálogo público búsqueda con Elasticsearch, caché con Memcached, métricas y trazas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend tiene la tienda, la compra, "Mis compras" y el panel; la política de cambios está publicada, sin el texto ni los contactos del cliente (ADR-017) | — |
+| Servicios implementados | **Inventario** es real. **Catálogo** es real: productos, promociones, consulta por lote, catálogo público, búsqueda con Elasticsearch, caché con Memcached y métricas. **Ventas** y **Usuarios** son reales. La capacidad publicada ya no pasa por mocks. El frontend tiene la tienda, la compra, "Mis compras" y el panel; la política de cambios está publicada, sin el texto ni los contactos del cliente (ADR-017) | — |
 | Gateway único | Punto único de falla | ADR-012 |
 | Encabezados de identidad | Los servicios confían en `X-User-*`: en la nube sus puertos no pueden quedar abiertos | ADR-016 |
 | Integración con el gimnasio | Contrato real aplicado, pero probada solo contra el mock local: falta su URL pública, su clave y la prueba conjunta. Una reposición `REQUIERE_REVISION` no se puede resolver desde el sistema | ADR-018 |
 | Mercado Pago simulado | El adaptador no se probó contra la API real; los mails van a Mailpit | ADR-014 |
-| Observabilidad | Alertas probadas solo en local, con aviso a Mailpit; una falla puede avisar varias veces; Jaeger pierde las trazas al reiniciar; las trazas no cruzan RabbitMQ (indexar un producto es una traza aparte); los logs no están centralizados | ADR-011 |
+| Observabilidad | Alertas probadas solo en local, con aviso a Mailpit; una falla puede avisar varias veces. Sin tiempos por paso: el track id muestra qué pasó y en qué orden, no cuánto tardó cada llamada dentro de un pedido. El gateway no escribe en `app_logs` (su log queda en stdout). Bajo una carga mayor a la que se aguanta, o con `mysql-logs` caído, se descartan líneas de la tabla (quedan en stdout y se cuentan en `logs_descartados_total`). `app_logs` crece sin límite: la retención está pendiente | ADR-011, ADR-020 |
 | Búsqueda | Sin carga real: el retraso se midió con un administrador. Buscar pendientes recorre la colección | ADR-006 |
 | Caché | Medida en una sola máquina y con 19 productos: la latencia con la base sin límite no fue concluyente. Cualquier cambio vacía toda la caché | ADR-007, ADR-019 |
-| Capacidad y costos | Medida en una notebook, no en la VM: el objetivo se cumple hasta 800 pedidos/s. Jaeger guarda las trazas en memoria sin límite y es lo primero que degrada el sistema, también en la nube. Falta confirmar el tamaño de la VM para cerrar los costos | ADR-013 |
+| Capacidad y costos | Medida en una notebook, no en la VM: el objetivo se cumple hasta 800 pedidos/s. Medido con Jaeger, que guardaba las trazas en memoria sin límite y fue lo primero que degradó el sistema; ADR-020 lo saca. Falta confirmar el tamaño de la VM para cerrar los costos | ADR-013 |
 | Núcleo de Inventario | Etiquetas `json` en `dominio`. Los tests de `aplicacion` (68 % de cobertura) usan dobles de los puertos: la atomicidad de la reserva se prueba contra MySQL real, en el adaptador | ADR-002 |
 | Resiliencia comprobada | Ensayo en local de 3 caídas de dependencias de Inventario, en [`POSTMORTEM.md`](POSTMORTEM.md). Falta la jornada con el gimnasio real y probar la compra desde la tienda durante una caída | ADR-010 |

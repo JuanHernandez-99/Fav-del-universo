@@ -44,5 +44,5 @@ Variables: `BASE_URL` (por defecto `http://host.docker.internal:8080`), `ADMIN_E
 ## Qué mirar mientras corre
 
 - **Prometheus** (`http://localhost:9090`): `histogram_quantile(0.95, sum by (le) (rate(http_duracion_segundos_bucket[1m])))` y `sum by (instance) (rate(http_pedidos_total[1m]))`.
-- **Jaeger** (`http://localhost:16686`): las trazas más lentas.
+- **Grafana**, tablero "FAV · Logs": advertencias y errores por servicio durante la carga. Para comparar con los logs en MySQL apagados, `LOGS_MYSQL_ACTIVO=false docker compose up -d catalogo inventario ventas usuarios` ([ADR-020](../docs/adr/ADR-020-logs-y-track-id-modelo-catedra.md)).
 - Registrar los resultados en el ADR-013.

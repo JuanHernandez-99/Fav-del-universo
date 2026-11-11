@@ -87,8 +87,8 @@ Los errores siguen RFC 9457 (`application/problem+json`) con un `codigo` estable
 
 ## Observabilidad
 
-- **Logs** JSON en stdout con `servicio`, `instancia`, `correlation_id`, `trace_id` y `span_id`.
-- **Trazas** OpenTelemetry → Jaeger (`http://localhost:16686`): HTTP entrante y saliente y cada consulta SQL.
+- **Logs** JSON en stdout con `servicio`, `instancia` y `correlation_id` (el track id). Los de INFO o más también van a `app_logs` de `mysql-logs` y se ven en Grafana, tablero "FAV · Logs" ([ADR-020](../../docs/adr/ADR-020-logs-y-track-id-modelo-catedra.md)).
+- **Track id:** viaja en las llamadas al gimnasio y en el evento `ReservaVencida`.
 - **Métricas** Prometheus (`http://localhost:9090`): `http_pedidos_total`, `http_duracion_segundos`, `dependencia_llamadas_total`, `circuit_breaker_estado`, `proceso_elementos_total`.
 
 ## Tests
@@ -109,7 +109,7 @@ INVENTARIO_TEST_DSN="root:cambiar@tcp(localhost:3307)/inventario_test?parseTime=
 | `GIMNASIO_BASE_URL`, `GIMNASIO_API_KEY`, `GIMNASIO_PROVEEDOR_ID`, `GIMNASIO_TIMEOUT_MS` | mock, —, `fav`, `3000` | Capacidad consumida |
 | `VENCIMIENTO_CADA_MS`, `REPOSICIONES_CADA_MS`, `PUBLICADOR_CADA_MS` | `10000`, `5000`, `1000` | Frecuencia de los procesos |
 | `RABBITMQ_URL` | — | Sin valor, los eventos quedan en el outbox |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Sin valor, no exporta trazas |
+| `LOGS_MYSQL_ACTIVO`, `LOGS_MYSQL_HOST`, `_DB`, `_USUARIO`, `_PASSWORD` | `true`, `mysql-logs:3306`, `logs`, `logs_escritor` | Logs en `app_logs`. Con `false`, solo stdout |
 | `LOG_LEVEL` | `info` | `debug` para más detalle |
 
 ## Más información

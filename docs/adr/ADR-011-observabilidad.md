@@ -2,12 +2,14 @@
 
 | | |
 |---|---|
-| **Estado** | Aceptada · Tablero, alertas, retención y trazas de todos los servicios y el gateway implementados y probados en local. Falta el aviso real en la nube. |
-| **Fecha** | 23/10/2026, actualizada el 09/11/2026 |
+| **Estado** | Aceptada en métricas, tablero y alertas. **Trazas y dónde se ven los logs: reemplazados por [ADR-020](ADR-020-logs-y-track-id-modelo-catedra.md)** (rama `feat/sin-jaeger`; la nube sigue con este ADR). Falta el aviso real en la nube. |
+| **Fecha** | 23/10/2026, actualizada el 10/11/2026 |
 | **Decisión de la consigna** | D11 · Observabilidad |
 | **Relacionadas** | [ADR-005](ADR-005-comunicacion.md) (identificador de correlación, DLQ con alerta), ADR-010 (resiliencia: circuit breaker hacia el gimnasio), [ADR-012](ADR-012-balanceo.md) (reparto entre réplicas) |
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
+
+> **Actualización 10/11/2026: reemplazada en parte por [ADR-020](ADR-020-logs-y-track-id-modelo-catedra.md).** Se sacaron Jaeger y OpenTelemetry: el seguimiento de un pedido es el track id (el `correlation_id`), y los logs se guardan además en la tabla `app_logs` de `mysql-logs`, que se consulta en el tablero "FAV · Logs". Quedan reemplazados: la fila de trazas y la de logs de la tabla de herramientas (§1), el `trace_id` en los logs (§2), las trazas (§3, incluido "Seguir un evento") y la alternativa descartada "Guardar los logs en MySQL". Siguen vigentes las métricas, el tablero, las alertas y el objetivo de servicio. El texto de abajo se conserva como historia.
 
 > **Actualización 04/11/2026:** Ventas ya es real y usa el mismo paquete de observabilidad. Catálogo sigue sin trazas ni métricas. Ver la validación al final.
 

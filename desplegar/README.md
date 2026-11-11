@@ -23,8 +23,8 @@ Internet ──HTTPS──► Caddy :443 ──► gateway :8080 ──► servi
 | Desde | Qué |
 |---|---|
 | Internet | Solo `https://DOMINIO`: tienda, panel, capacidad publicada (`/v1/…`) y la página de pago simulada |
-| La VM (túnel SSH) | Grafana `3000`, Mailpit `8025`, Prometheus `9090`, Alertmanager `9093`, Elasticsearch `9200`, Jaeger `16686` |
-| Nadie de afuera | MySQL, MongoDB, RabbitMQ, los servicios, el gateway directo y los simuladores |
+| La VM (túnel SSH) | Grafana `3000` (con el tablero "FAV · Logs"), Mailpit `8025`, Prometheus `9090`, Alertmanager `9093`, Elasticsearch `9200` |
+| Nadie de afuera | MySQL (también `mysql-logs`), MongoDB, RabbitMQ, los servicios, el gateway directo y los simuladores |
 
 ## 1. Firewall de Azure
 
@@ -48,6 +48,7 @@ En `.env`:
    ```bash
    for v in INVENTARIO_DB_ROOT_PASSWORD INVENTARIO_DB_PASSWORD VENTAS_DB_ROOT_PASSWORD VENTAS_DB_PASSWORD \
             USUARIOS_DB_ROOT_PASSWORD USUARIOS_DB_PASSWORD MONGO_INITDB_ROOT_PASSWORD RABBITMQ_DEFAULT_PASS \
+            LOGS_MYSQL_ROOT_PASSWORD LOGS_MYSQL_ESCRITOR_PASSWORD LOGS_MYSQL_LECTOR_PASSWORD \
             GRAFANA_ADMIN_PASSWORD MERCADOPAGO_WEBHOOK_SECRET ADMIN_PASSWORD; do
      sed -i "s/^$v=.*/$v=$(openssl rand -hex 24)/" .env
    done
@@ -57,10 +58,11 @@ En `.env`:
    - `ADMIN_EMAIL`.
    - `CAPACIDAD_API_KEY` y `CAPACIDAD_API_KEY_GIMNASIO`: distintas entre sí. Se les pasan a los grupos por un canal privado. De 32 caracteres (`openssl rand -hex 16`): con claves más largas el gateway no arrancó (`could not build map_hash`, límite de nginx).
    - `GIMNASIO_BASE_URL` y `GIMNASIO_API_KEY`: solo cuando el gimnasio dé las reales. Sin ellas, Inventario usa el simulador.
+   - **En una VM que ya estaba andando antes de ADR-020:** agregar al `.env` las tres `LOGS_MYSQL_*_PASSWORD` (con `openssl rand -hex 24` cada una) antes del `git pull && docker compose up -d --build`. Sin ellas, Compose corta con `falta LOGS_MYSQL_...`. El volumen de `mysql-logs` es nuevo, así que toman esos valores.
 
 4. Guardar una copia del `.env` fuera de la VM, en un lugar privado. Sin ella, un respaldo de las bases no se puede usar con otras contraseñas.
 
-> **Las contraseñas de MySQL, MongoDB y Grafana se fijan la primera vez que se crea cada volumen.** Cambiarlas después en `.env` no cambia la base, y los servicios dejan de conectarse. Por eso el `.env` va completo antes del primer arranque.
+> **Las contraseñas de MySQL (también las tres de `mysql-logs`), MongoDB y Grafana se fijan la primera vez que se crea cada volumen.** Cambiarlas después en `.env` no cambia la base, y los servicios dejan de conectarse. Por eso el `.env` va completo antes del primer arranque.
 
 ## 3. Arrancar
 
@@ -106,7 +108,7 @@ Falta probar a mano una compra desde el navegador:
 ## 6. Paneles por túnel SSH
 
 ```bash
-ssh -L 3000:localhost:3000 -L 8025:localhost:8025 -L 9090:localhost:9090 -L 16686:localhost:16686 usuario@DOMINIO
+ssh -L 3000:localhost:3000 -L 8025:localhost:8025 -L 9090:localhost:9090 usuario@DOMINIO
 ```
 
 Mientras la sesión está abierta: Grafana en http://localhost:3000, mails y alertas en http://localhost:8025, etc. Los mails no salen a internet (ADR-014).
