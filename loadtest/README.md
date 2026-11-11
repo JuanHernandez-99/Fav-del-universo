@@ -15,7 +15,7 @@ TASAS=600 REPETICIONES=4 bash loadtest/comparar_cache.sh
 docker compose up -d --no-deps --force-recreate mongo-catalogo
 ```
 
-Los resultados están en el ADR-007.
+Los resultados están en el ADR-019 (Memcached) y en el ADR-007 (los de Redis, que se conservan).
 
 ## Pico de la tienda (ADR-013)
 

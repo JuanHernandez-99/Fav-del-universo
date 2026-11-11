@@ -10,7 +10,7 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
-> **Actualización 08/11/2026 (contrato 1.1.0):** el equipo confirmó que, por la consigna, el grupo del gimnasio también consume a FAV: el catálogo y la disponibilidad. Se suma `GET /v1/disponibilidad`, un cambio compatible. Inventario la responde, por lo que Catálogo sigue sin depender de Inventario y `GET /v1/productos` sigue sin informar stock. El gimnasio tiene su propia clave (`CAPACIDAD_API_KEY_GIMNASIO`), con el mismo límite de uso, y no puede hacer pedidos. Devuelve el stock **online [propuesta]**, el mismo que aparta un pedido; las reposiciones al gimnasio salen del físico. **[?]** Falta confirmar con el grupo del gimnasio que es lo que necesitan. Como la tienda usa la misma ruta interna de Inventario, esta operación se apaga en el gateway con `CAPACIDAD_PUBLICA_ACTIVA=false`.
+> **Actualización 08/11/2026 (contrato 1.1.0):** el equipo confirmó que, por la consigna, el grupo del gimnasio también consume a FAV: el catálogo y la disponibilidad. Se suma `GET /v1/disponibilidad`, un cambio compatible. Inventario la responde, por lo que Catálogo sigue sin depender de Inventario y `GET /v1/productos` sigue sin informar stock. El gimnasio tiene su propia clave (`CAPACIDAD_API_KEY_GIMNASIO`), con el mismo límite de uso, y no puede hacer pedidos. Devuelve el stock **online**, el mismo que aparta un pedido; las reposiciones al gimnasio salen del físico. **[?]** Falta confirmar con el grupo del gimnasio que es lo que necesitan. Como la tienda usa la misma ruta interna de Inventario, esta operación se apaga en el gateway con `CAPACIDAD_PUBLICA_ACTIVA=false`.
 
 ## Contexto
 
@@ -52,9 +52,9 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 - **Lo hace el grupo para sí mismo.** No se envían datos de clientes finales; el comprador es el grupo, identificado por su clave.
 - **Todo o nada:** si una variante no alcanza, no se aparta ninguna (`409 STOCK_INSUFICIENTE`, con las faltantes).
 - **El precio lo calcula FAV** al momento del pedido (RN-22) y se devuelve en la respuesta.
-- **Queda pendiente de pago por transferencia,** con el stock **online [propuesta]** apartado por 48 horas. Desde ahí sigue como cualquier compra por transferencia (CU-02): el administrador confirma la transferencia, o la venta vence y el stock se libera. Se reutiliza el flujo que la tienda ya tiene.
+- **Queda pendiente de pago por transferencia,** con el stock **online** apartado por 48 horas. Desde ahí sigue como cualquier compra por transferencia (CU-02): el administrador confirma la transferencia, o la venta vence y el stock se libera. Se reutiliza el flujo que la tienda ya tiene.
 - **En un solo paso para el consumidor.** Por dentro, Ventas usa la misma reserva de Inventario que la compra online.
-- **Límites [propuesta]:** hasta 20 variantes por pedido y hasta 10 unidades por variante.
+- **Límites:** hasta 20 variantes por pedido y hasta 10 unidades por variante.
 
 ### 2. Reglas comunes
 
@@ -62,10 +62,10 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 |---|---|
 | Formato | **OpenAPI 3.0.3**, REST sobre HTTPS con JSON. |
 | Entrada | Por el gateway de FAV, no directo a los servicios. |
-| Autenticación | Una **clave propia por grupo** en el header `X-API-Key` **[propuesta]**, validada en el gateway. **[?]** Cómo se entrega y se rota. |
-| Idempotencia | `POST /v1/pedidos` exige `Idempotency-Key`. Misma clave y mismo cuerpo: misma respuesta, sin otro pedido. Misma clave con otro cuerpo: `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`. Vigencia de 48 horas **[propuesta]**. |
+| Autenticación | Una **clave propia por grupo** en el header `X-API-Key`, validada en el gateway. Se entrega por mensaje directo y, para rotarla, se pide al contacto del contrato ([contrato §2](../contracts/README.md)). |
+| Idempotencia | `POST /v1/pedidos` exige `Idempotency-Key`. Misma clave y mismo cuerpo: misma respuesta, sin otro pedido. Misma clave con otro cuerpo: `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`. La clave se conserva como mínimo 48 horas. |
 | Errores | **Problem Details (RFC 9457)** con un campo `codigo` estable. El contrato indica qué códigos conviene reintentar. |
-| Límite de uso | 60 pedidos por minuto por grupo **[propuesta]**; el exceso recibe `429` con `Retry-After`. |
+| Límite de uso | 60 pedidos por minuto por grupo, con ráfagas de 20; el exceso recibe `429` con `Retry-After`. |
 | Correlación | Header `X-Correlation-Id`, que se devuelve siempre (ADR-005). |
 | Separación interna | El catálogo y los pedidos entran por adaptadores aparte en Catálogo y en Ventas, que se pueden desactivar por configuración. Las ventas de grupos externos se registran con su propio canal. |
 
@@ -74,7 +74,7 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 | Etapa | Qué se publica |
 |---|---|
 | Entrega 2 | Contrato, `docs/contracts/README.md` y mock en `mocks/catalogo-pedidos-v1/`. La capacidad funcionando en el entorno local. |
-| Presentación grupal | Desplegada en la nube con URL pública, operativa hasta el fin de la evaluación. **[?]** Proveedor de nube. |
+| Presentación grupal | Desplegada en Azure con URL pública (ver el README del repositorio), operativa hasta el fin de la evaluación. |
 
 ### 4. Versionado y compatibilidad
 
@@ -118,10 +118,7 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 
 ## Pendientes
 
-- **Clave por grupo:** cómo se entrega y se rota. **[?]**
 - **Datos para transferir** (alias o CBU y titular): los define el cliente. **[?]**
-- **Canal de contacto** con el consumidor. **[propuesta]** Issues del repositorio.
-- **URL pública y proveedor de nube.** **[?]**
 - **Respuesta del grupo de proveedores** sobre el contrato. Si piden cambios antes de que exista el servicio, se ajusta la v1.
 
 ## Validación prevista

@@ -9,7 +9,7 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
-> **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
+> **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Las opciones A y B de la Entrega 1 se descartaron y se quitaron de este ADR. Inventario consume la capacidad de un gimnasio ([ADR-018](ADR-018-consumo-del-gimnasio-contrato-real.md)).
 
 ## Contexto
 
@@ -37,8 +37,8 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 | Servicio       | Almacenamiento                          | Qué guarda                                                                                                                                                                                                                              | Patrones de acceso                                                                                                                                      | Por qué                                                                                                                                                                                          |
 | -------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Catálogo**   | **MongoDB** (documental, no relacional) | Un documento por producto, con sus variantes, sus fotos (referencias) y su categoría. Promociones en una colección aparte.                                                                                                              | Muchas lecturas del producto completo (ficha, listados). Pocas escrituras, hechas por un solo administrador. Atributos que pueden variar por categoría. | El producto se lee y se edita como una unidad: un documento lo devuelve completo sin joins. Las escrituras tocan un solo producto, así que alcanzan las operaciones atómicas sobre un documento. |
-| **Inventario** | **MySQL** (relacional)                  | Stock por variante y canal, reservas y sus ítems, movimientos, transferencias, claves de idempotencia, outbox y mensajes procesados. Con la opción A de la capacidad, los cupos y reservas de cada grupo consumidor, en tablas propias. | Escrituras concurrentes sobre las mismas filas (las últimas unidades). Una reserva toca varias variantes a la vez. Consultas por id de variante.        | Necesita transacciones que abarquen varias filas (todo o nada), actualizaciones condicionales (`stock − reservado ≥ cantidad`), bloqueo de filas y restricciones únicas para la idempotencia.    |
-| **Ventas**     | **MySQL** (relacional)                  | Ventas, ítems (con copia de nombre, talle, color y precio **[propuesta]**), pagos, registro de mails, claves de idempotencia, outbox y mensajes procesados. Con la opción B, los emails de cada grupo consumidor, en una tabla propia.  | Transiciones de estado que no pueden aplicarse dos veces. Consultas por estado, por comprador y por fecha (HU-14, HU-16).                               | Relaciones claras (venta, ítems, pagos), transiciones condicionales (`UPDATE … WHERE estado = …`) y restricciones únicas para no duplicar pagos ni avisos.                                       |
+| **Inventario** | **MySQL** (relacional)                  | Stock por variante y canal, reservas y sus ítems, movimientos, transferencias, claves de idempotencia, outbox y mensajes procesados. | Escrituras concurrentes sobre las mismas filas (las últimas unidades). Una reserva toca varias variantes a la vez. Consultas por id de variante.        | Necesita transacciones que abarquen varias filas (todo o nada), actualizaciones condicionales (`stock − reservado ≥ cantidad`), bloqueo de filas y restricciones únicas para la idempotencia.    |
+| **Ventas**     | **MySQL** (relacional)                  | Ventas, ítems (con copia de nombre, talle, color y precio), pagos, registro de mails, tareas pendientes hacia Inventario, claves de idempotencia y mensajes procesados. | Transiciones de estado que no pueden aplicarse dos veces. Consultas por estado, por comprador y por fecha (HU-14, HU-16).                               | Relaciones claras (venta, ítems, pagos), transiciones condicionales (`UPDATE … WHERE estado = …`) y restricciones únicas para no duplicar pagos ni avisos.                                       |
 | **Usuarios**   | **MySQL** (relacional)                  | Usuarios, hash de contraseña y rol.                                                                                                                                                                                                     | Búsqueda por email al iniciar sesión. Pocas escrituras.                                                                                                 | El email único se garantiza con una restricción de la base (HU-18.1).                                                                                                                            |
 
 **Almacenamiento derivado** (no es fuente de verdad; se puede perder y reconstruir):
@@ -81,26 +81,17 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 **Negativas aceptadas**
 
 - **Sin joins entre servicios.** Las vistas que cruzan datos (stock con nombres de variante) se componen en el frontend (ADR-001, decisión 3).
-- **Consistencia eventual entre Catálogo e Inventario:** una variante nueva aparece en Inventario cuando llega `VarianteCreada`.
-- **Copia de datos en Ventas:** cada venta guarda nombre, talle, color y precio del momento de la compra **[propuesta]**. Es intencional, para que la venta conserve su precio (HU-05.1).
+- **Catálogo e Inventario no comparten datos:** una variante nueva figura en Inventario con su primer ingreso (el evento `VarianteCreada` no está implementado, ADR-005).
+- **Copia de datos en Ventas:** cada venta guarda nombre, talle, color y precio del momento de la compra. Es intencional, para que la venta conserve su precio (HU-05.1).
 - **Dos motores que operar** (MongoDB y MySQL) y cuatro contenedores de base para un volumen bajo.
-- **MongoDB no impone un esquema:** hay que validar la forma de los documentos en el servicio **[propuesta]**, o con la validación de esquemas de MongoDB.
-- **Datos de otros grupos** en Inventario (opción A) o en Ventas (opción B), en tablas propias separadas por grupo consumidor (ADR-008).
+- **MongoDB no impone un esquema:** hay que validar la forma de los documentos en el servicio y con la validación de esquemas de MongoDB (`$jsonSchema`).
 
 ## Pendientes
 
-- **Dónde se guardan las fotos de los productos.** **[propuesta]** Almacenamiento de objetos compatible con S3, con una instancia local en Docker; MongoDB guarda solo la referencia. **[?]** Herramienta a verificar.
-- **Cuánto tiempo se conservan los emails de otros grupos** (opción B, ADR-008).
+- **Dónde se alojan los archivos de las fotos.** Hoy MongoDB guarda solo la URL de cada foto, y el sistema no aloja los archivos. **[propuesta]** Almacenamiento de objetos compatible con S3. **[?]** Herramienta a verificar.
 - **Respaldo de las bases** en el entorno desplegado. **[?]** Depende del proveedor de nube.
-- **Índices concretos** de cada base: se definen al implementar, según las consultas reales.
 
-## Validación prevista (Entrega 2)
-
-- Cada servicio arranca con su propia base en Docker Compose y ningún servicio tiene credenciales de otra base (RNF-08).
-- Test de integración por servicio contra su base real (requisito 2.11).
-- Test de concurrencia: dos reservas simultáneas sobre la última unidad; solo una se confirma y el stock nunca queda negativo.
-
-## Validación (Entrega 2)
+## Validación
 
 **Inventario (MySQL) — implementado y probado.**
 
@@ -110,11 +101,11 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 | Esquema versionado                                | **Confirmado:** `sql/001_esquema.sql` y `sql/002_datos_de_ejemplo.sql` (datos de ejemplo solo con `INVENTARIO_DATOS_EJEMPLO=true`).                          |
 | Reglas en la base                                 | **Confirmado:** restricciones `CHECK` sobre las cantidades de `stock`, claves únicas para la idempotencia y para los ítems de una reserva.                   |
 | Tablas de Inventario                              | `stock`, `reservas`, `reserva_items`, `movimientos`, `operaciones`, `reposiciones`, `outbox`.                                                                |
-| Test de integración contra la base real           | **Hecho:** 7 pruebas (ADR-004), con `-race`, contra MySQL 8.0.                                                                                               |
+| Test de integración contra la base real           | **Hecho:** pruebas de integración y de concurrencia contra MySQL (ADR-004).                                                                                  |
 
 **Diferencias con lo previsto**
 
-- La tabla de **mensajes procesados** (consumo idempotente de eventos) **todavía no existe**: Inventario aún no consume eventos.
+- La tabla de **mensajes procesados** (consumo idempotente de eventos) existe en Ventas, que consume `ReservaVencida`. Inventario no consume eventos, así que no la tiene.
 - El Compose usa **MySQL 8.4**. Los tests corrieron primero en **8.0** y el 04/11/2026 se repitieron contra 8.4 (ADR-004).
 - **MongoDB (Catálogo):** implementado, con tests de integración contra MongoDB real (`services/catalogo/internal/repository/mongo_test.go`).
 - El `outbox` se escribe en la misma transacción y un proceso lo publica a RabbitMQ (04/11/2026).

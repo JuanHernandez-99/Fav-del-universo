@@ -35,7 +35,7 @@ Se mantiene del ADR-009: la capa anticorrupción, el descuento y la reposición 
 |---|---|---|---|
 | `201` con `reposicionId` (UUID) y `estado: RECIBIDA` | `CONFIRMADA` | No | Se guarda el id del gimnasio |
 | `400` `SOLICITUD_INVALIDA` o `IDEMPOTENCIA_INVALIDA`, `413`, `415`, `422`, con el `codigo` del contrato | `RECHAZADA` | **Sí, una sola vez** | Fin |
-| `401`, `403` | `BLOQUEADA_CONFIGURACION` | No | Se reintenta cada 5 min **[propuesta]** y queda en el log como error. Al corregir la clave se destraba sola |
+| `401`, `403` | `BLOQUEADA_CONFIGURACION` | No | Se reintenta cada 5 min y queda en el log como error. Al corregir la clave se destraba sola |
 | `409` | `REQUIERE_REVISION` | No | No se reintenta. Se revisa con el gimnasio |
 | `404`, `408`, `429`, `5xx`, timeout, red, circuito abierto | `PENDIENTE_CONFIRMACION` | No | Se reintenta con la misma clave, referencia y cuerpo |
 | `2xx` o `3xx` fuera de contrato, o `4xx` sin el `codigo` esperado | `PENDIENTE_CONFIRMACION` | No | Igual que el anterior. Si no es un error, además registra `CONTRATO_INCOMPATIBLE` en el log |
@@ -50,7 +50,7 @@ Se mantiene del ADR-009: la capa anticorrupción, el descuento y la reposición 
 
 | Mecanismo | Valor |
 |---|---|
-| Timeout por intento | 3 s (`GIMNASIO_TIMEOUT_MS`). Sube de 2 s porque ahora la llamada sale por internet **[propuesta]** |
+| Timeout por intento | 3 s (`GIMNASIO_TIMEOUT_MS`). Sube de 2 s porque ahora la llamada sale por internet |
 | Circuit breaker | Abre tras 5 fallas seguidas, 30 s abierto, una llamada de prueba. Cuentan red, timeout, `404`, `408`, `429` y `5xx`. **No** cuentan `401`, `403` ni `409`: el gimnasio está atendiendo |
 | Reintentos | Persistidos en la base. De 5 s a 5 min, con hasta 20 % de variación para que no reintenten todas juntas. Sin tope de intentos: la reposición ya descontó stock |
 | Redirecciones | No se siguen |
@@ -93,12 +93,13 @@ Pantalla **Gimnasio** del panel: el stock allá, el formulario de reposición y 
 
 ## Pendientes
 
+Las alertas `ReposicionBloqueada`, `ReposicionARevisar` y `ReposicionPendienteAntigua` ya existen (ADR-011).
+
 **Con el grupo del gimnasio:**
 - **URL pública y `X-API-Key`** por canal privado. Hoy su contrato declara solo `localhost`.
 - **Aceptación del contrato y prueba conjunta:** alta, consulta, reintentos con la misma clave y con otra, `409`, caída y recuperación.
 
 **Del equipo:**
-- **Alertas y tablero:** las métricas por resultado ya están en `dependencia_llamadas_total`. Falta la alerta de `BLOQUEADA_CONFIGURACION` y de pendientes antiguas (ADR-011). Hoy solo queda el log de error.
 - **Cómo se revisa una `REQUIERE_REVISION`.**
 
 ## Validación
@@ -109,4 +110,4 @@ Probado el 08/11/2026 con el mock local y un gimnasio falso por HTTP. **Todavía
 - **Contra MySQL real:** `adaptadores/mysql/reposiciones_test.go`. El stock físico en cada caso, la devolución una sola vez y la migración repetida. Requiere `INVENTARIO_TEST_DSN`.
 - **Migración sobre una base existente:** aplicada al volumen local con `estado` en `ENUM`.
 - **Por el gateway:** una reposición de 25 unidades quedó `CONFIRMADA`; `probar-rechazo-` devolvió las unidades; `probar-conflicto-` quedó `REQUIERE_REVISION` sin devolverlas; con `GIMNASIO_API_KEY=clave-invalida` quedó `BLOQUEADA_CONFIGURACION` y el panel recibió `503`.
-- **Caída provocada:** `services/inventario/pruebas/caida_gimnasio.sh`. Con el mock apagado, la reposición queda pendiente sin devolver unidades, y se confirma sola 7 s después de que vuelve, descontada una sola vez. El informe (`POSTMORTEM.md`) está pendiente.
+- **Caída provocada:** `services/inventario/pruebas/caida_gimnasio.sh`. Con el mock apagado, la reposición queda pendiente sin devolver unidades, y se confirma sola 7 s después de que vuelve, descontada una sola vez. El ensayo de caídas, incluida la del gimnasio, está en [`POSTMORTEM.md`](../POSTMORTEM.md).

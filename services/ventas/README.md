@@ -2,7 +2,7 @@
 
 Ventas online y del local, sus estados, los pagos (Mercado Pago y transferencia) y los mails.
 
-> Estado: **funcionando**, con Mercado Pago simulado y mails en Mailpit ([ADR-014](../../docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). **[propuesta]** marca lo no confirmado.
+> Estado: **funcionando**, con Mercado Pago simulado y mails en Mailpit ([ADR-014](../../docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)).
 
 | | |
 |---|---|

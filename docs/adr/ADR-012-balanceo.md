@@ -90,13 +90,6 @@ Ventas llama a Inventario por el gateway (puerto interno 8081, sin publicar), no
 - **Cantidad de réplicas** según las pruebas de carga (ADR-013).
 - **Gateway redundante** en el despliegue con URL pública **[?]**.
 
-## Validación prevista
-
-- **Entrega 2:** con varios pedidos seguidos, el log del gateway (`upstream`) y `http_pedidos_total` por `instance` muestran el reparto entre las dos réplicas.
-- **Entrega 2:** deteniendo una réplica (`docker stop` sobre uno de los contenedores de `inventario`), los pedidos siguen respondiendo y la réplica caída deja de recibir tráfico. Al levantarla, vuelve a recibir.
-- **Entrega 2:** dos reservas concurrentes sobre la misma variante, atendidas por réplicas distintas, no apartan más stock del que hay.
-- **Pruebas de carga (ADR-013):** latencia y errores con una y con dos réplicas.
-
 ## Validación (04/11/2026)
 
 | Comprobación | Resultado |
@@ -108,7 +101,7 @@ Ventas llama a Inventario por el gateway (puerto interno 8081, sin publicar), no
 | Prometheus | Una serie por réplica de Inventario (`instance`) |
 | Seis compras simultáneas por las últimas unidades, por el gateway | Un `201` y cinco `409` (ADR-004) |
 
-**Sin probar:** un `POST` cortado a mitad de camino al caer una réplica, y las pruebas de carga. En Catálogo no se ve el reparto en Prometheus porque no expone métricas; sí en el log del gateway.
+**Sin probar:** un `POST` cortado a mitad de camino al caer una réplica. Las pruebas de carga con una y con dos réplicas están en ADR-013. En esa fecha Catálogo no exponía métricas, así que su reparto se vio solo en el log del gateway; desde ADR-007 Prometheus también lo scrapea (job `catalogo`).
 
 ---
 

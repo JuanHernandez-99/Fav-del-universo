@@ -122,4 +122,4 @@ Se repitieron las caídas del gimnasio y de MySQL. La de la réplica no, porque 
 - **Las pantallas:** no se vieron en el navegador el mensaje del panel ni el de la tienda.
 - **Un pico de carga:** fueron unos 2 pedidos por segundo por ruta, con todo en una sola computadora.
 - **La integridad completa de los datos:** se comprobaron el stock físico de la reposición y la idempotencia de una reserva. No se auditó toda la base después de la caída de MySQL.
-- **Otras dependencias en este ensayo:** Redis, RabbitMQ, Ventas y Usuarios se apagaron solo para probar sus alertas (ADR-011), sin medir el impacto en los usuarios.
+- **Otras dependencias en este ensayo:** La caché, RabbitMQ, Ventas y Usuarios se apagaron solo para probar sus alertas (ADR-011), sin medir el impacto en los usuarios.

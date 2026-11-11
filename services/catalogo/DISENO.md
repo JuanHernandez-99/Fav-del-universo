@@ -1,9 +1,17 @@
 # Catálogo · Diseño
 
-Decisiones, modelo de datos, API y supuestos del servicio. Viene del diseño hecho para el TP de MongoDB, sin lo que era solo de esa entrega.
+Es el documento de diseño detallado de Catálogo: cómo se modela la base, cómo se calcula el precio vigente, qué API expone y qué supuestos se tomaron. Sirve para entender o defender el servicio por dentro.
+
+| Documento | Para qué |
+|---|---|
+| [`README.md`](README.md) | Guía rápida: qué hace, cómo levantarlo y probarlo |
+| **Este archivo** | Diseño del servicio: modelo de datos, reglas, API y supuestos |
+| [`docs/adr/`](../../docs/adr/) | Decisiones que cruzan servicios (búsqueda en ADR-006, caché en ADR-019, persistencia en ADR-003) |
+
+Viene del diseño hecho para el TP de MongoDB, sin lo que era solo de esa entrega.
 
 - Las decisiones de este archivo (D1, D2…) son del diseño de Catálogo, **no** las D1…D13 de la consigna de FAV que tratan los ADR.
-- Las secciones conservan su número original porque el código las cita (por ejemplo, "sección 14, punto 16").
+- Las secciones conservan su número original porque el código las cita (por ejemplo, "sección 14, punto 16"). Por eso faltan algunos números (1, 4, 6 y 9 a 12): eran del TP y no se trasladaron.
 
 ---
 
@@ -17,10 +25,10 @@ Decisiones, modelo de datos, API y supuestos del servicio. Viene del diseño hec
 | D4 | **El precio público asume transferencia** | Si no se indica `medioPago`, vale `TRANSFERENCIA`. No se implementa ninguna pasarela de pagos |
 | D5 | **Redondeo hacia abajo a 2 decimales** | Se calcula en **centavos enteros** y se trunca, para evitar errores de coma flotante (`0.29 * 100 = 28.999…`) |
 | D6 | **Un producto puede venderse en el local sin estar publicado** | Publicado solo habilita la web. La consulta por lote no filtra por `publicado` |
-| D8 | **Sin autenticación propia** | La autenticación la hace el gateway. La búsqueda y sus eventos están en ADR-006, y la caché en ADR-007 |
+| D8 | **Sin autenticación propia** | La autenticación la hace el gateway. La búsqueda y sus eventos están en ADR-006, y la caché en ADR-019 |
 | D12 | **El servidor genera el id de variante** | El administrador no lo escribe. Regla en 5.5. El generador de datos (`db/datos/generar.py`) aplica la misma regla. Los 3 ids del contrato ya existen y se cargan tal cual (sección 3, punto 11) |
 | D13 | **Montos en centavos enteros (`int64`)** | `precioBase.monto` se guarda en centavos, nunca como double. La API convierte a pesos con 2 decimales hacia afuera, porque el contrato define `precio` como `number` (double) en pesos |
-| D14 | **El CRUD completo va bajo `/v1/admin/productos`** | Un solo recurso para crear, obtener, actualizar, eliminar y listar. `GET /v1/productos` queda libre para la ruta pública del contrato, en la etapa FAV |
+| D14 | **El CRUD completo va bajo `/v1/admin/productos`** | Un solo recurso para crear, obtener, actualizar, eliminar y listar. `GET /v1/productos` queda libre para la ruta pública del contrato |
 | D15 | **Códigos de error propios, con el estilo de Inventario** | `PEDIDO_INVALIDO` (400), `PRODUCTO_NO_ENCONTRADO` (404), `VARIANTE_DUPLICADA` (409), `CONFLICTO_DE_VERSION` (409), `VARIANTE_INEXISTENTE` (400 en el lote, 404 en la ficha; ver sección 7) |
 
 | D16 | **CORS opcional, apagado por defecto** | Lo activa la variable `CORS_ORIGENES` (orígenes separados por coma). En FAV queda apagado: CORS lo maneja el gateway, y si los dos mandaran las cabeceras el navegador rechazaría la respuesta |
@@ -29,7 +37,7 @@ Decisiones, modelo de datos, API y supuestos del servicio. Viene del diseño hec
 
 ## 3. Lo que el servicio debe respetar de FAV
 
-Está tomado del código de Inventario (rama `development`), de los ADR y del contrato. **No inventar reglas que después no vayan a ser así.**
+Está tomado del código de Inventario, de los ADR y del contrato. **No inventar reglas que después no vayan a ser así.**
 
 | # | Requisito ya definido | Fuente |
 |---|---|---|
@@ -39,10 +47,10 @@ Está tomado del código de Inventario (rama `development`), de los ADR y del co
 | 4 | La mercadería nueva suele estar activa primero en el local | SPEC §3, RN-04 |
 | 5 | Invariantes de Catálogo: un solo sistema de talles por producto, sin variantes repetidas, promociones con vigencia | ADR-001, RN-02, RN-05 |
 | 6 | Cada producto lleva una **`version`** que sube con cada cambio (el indexador de búsqueda solo aplica eventos con versión mayor) | ADR-006 |
-| 7 | `VarianteCreada` **hoy no existe**: Inventario da de alta una variante con un ingreso de stock. No se implementa en este trabajo; la creación de variantes queda en **un solo punto** del servicio para sumar el evento después | ADR-005, `002_datos_de_ejemplo.sql` |
+| 7 | El evento `VarianteCreada` **no está implementado**: Catálogo crea la variante (`POST /v1/admin/productos/{id}/variantes`) y Inventario la da de alta con su primer ingreso de stock. La creación de variantes está en **un solo punto** del servicio para sumar el evento después | ADR-005, `002_datos_de_ejemplo.sql` |
 | 8 | Forma del catálogo público: JSON camelCase, solo publicados, **sin stock**, precio vigente por variante, `fotoUrl` opcional | Contrato `catalogo-pedidos-v1` |
 | 9 | Errores en `application/problem+json` con `codigo` estable | Contrato, mock, Inventario |
-| 10 | Go 1.26, sondas `/healthz` y `/readyz`, **sin estado en memoria** (se prevén dos réplicas), variables `MONGO_*` del `.env.example` raíz | Inventario, ADR-011, ARCHITECTURE §12 |
+| 10 | Go 1.26, sondas `/healthz` y `/readyz`, **sin estado en memoria** (corre en dos réplicas), variables `MONGO_*` del `.env.example` raíz | Inventario, ADR-011, ARCHITECTURE §12 |
 | 11 | Los ids de las 3 variantes del contrato ya tienen stock en Inventario: `var-remera-basica-blanca-m`, `var-remera-basica-negra-l`, `var-jean-mom-celeste-38`. **Se respetan tal cual**, aunque no sigan la regla de 5.5 ("blanca" en lugar de "blanco"): un id no cambia nunca y es opaco (el talle y el color se leen de sus campos, no del id). El conjunto mínimo los carga escritos, no generados | `002_datos_de_ejemplo.sql` |
 
 ---
@@ -225,12 +233,12 @@ Todos se crean en `db/scripts/01_crear_colecciones_e_indices.js`. Además, el se
 |---|---|
 | **Consulta por lote de variantes** (Ventas, timeout 1 s; panel) | `{ "variantes.id": 1 }`, **único** (multikey). También garantiza que un id de variante sea único en el catálogo |
 | Listar por categoría y rango de precio, con orden | `{ publicado: 1, categoria: 1, "precioBase.monto": 1 }` |
-| Buscar por texto en nombre y descripción | Índice de texto `{ nombre: "text", descripcion: "text" }`, idioma español |
+| Buscar por texto en nombre y descripción | Índice de texto `{ nombre: "text", descripcion: "text" }`, idioma español. Es el plan B: con `ELASTICSEARCH_URL` la búsqueda por texto usa Elasticsearch (ADR-006) |
 | Filtrar por talle y color | `{ "variantes.talle": 1, "variantes.color": 1 }` (multikey) |
 | Promociones vigentes | `{ "vigencia.desde": 1, "vigencia.hasta": 1 }` |
 | Promociones por alcance | `{ "alcance.tipo": 1, "alcance.ids": 1 }` |
 
-**Para el informe:** cada índice se acompaña de un `explain("executionStats")` antes y después, con lo que se observa (`COLLSCAN` vs `IXSCAN`, documentos examinados vs devueltos). Con pocos datos no se exige mostrar mejoras de tiempo: se evalúa la pertinencia y la interpretación. Se explica también el **costo**: espacio y trabajo extra en cada escritura (aceptable con un solo administrador).
+**Costo de los índices:** espacio y trabajo extra en cada escritura, aceptable con un solo administrador. Para comprobar que una consulta usa su índice se puede correr con `explain("executionStats")` y buscar `IXSCAN` en lugar de `COLLSCAN`.
 
 ### 5.9 Consistencia y concurrencia
 
@@ -292,7 +300,7 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | `GET /v1/tienda/productos`, `GET /v1/tienda/productos/{id}` | Lectura pública del comprador (HU-01, HU-02), en `handler/tienda.go`. Solo publicados, con los filtros del listado salvo `publicado`, que da `400`. El no publicado da `404`. Trae todas las fotos, `precio` (vigente para transferencia, D4), `precioBase` y `promocion`. Sin stock (D1) |
 | `GET /healthz`, `GET /readyz` | Sondas. La segunda verifica la conexión a MongoDB |
 
-- El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote (etapa FAV).
+- El listado filtra y ordena por **precio base**; el vigente se calcula al consultar la ficha o el lote.
 - `GET /v1/productos` es la ruta pública del contrato (con `items`, solo publicados y sin paginar), en un adaptador aparte (`handler/publico.go`, D14). El precio es el vigente para transferencia (D4). Se apaga con `CAPACIDAD_PUBLICA_ACTIVA=false` (ADR-008). Por eso todo el CRUD de administración está bajo `/v1/admin/productos`.
 - Estructura en capas: `handler` (HTTP y validación de entrada) → `service` (reglas y precio vigente) → `repository` (único lugar que habla con MongoDB). Sin estado en memoria.
 
@@ -321,9 +329,8 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 - **Logs** en JSON con `slog`, con `servicio` e `instancia` en cada línea. Sondas sin loguear.
 - **Errores** en `application/problem+json` con `codigo` estable.
 - **Operaciones críticas dentro de la base:** la condición va dentro del filtro de la actualización, nunca "leer, decidir y escribir".
-- **Tests:** unitarios de ids, montos, filtros, CORS y talles del esquema; de concurrencia sobre la variante repetida. Quedan para la etapa FAV los unitarios del precio vigente y los de integración del repositorio contra un Mongo real.
+- **Tests:** unitarios (ids, montos, filtros, CORS, talles del esquema y precio vigente), de concurrencia sobre la variante repetida y de integración contra MongoDB, Elasticsearch y Memcached reales, que se activan con sus variables `*_TEST_*`.
 - **Secretos:** nunca en el repositorio. `.env` va en `.gitignore`; solo se entrega `.env.example`.
-- **Commits** chicos y frecuentes, en `services-catalogo`.
 
 ---
 
@@ -337,8 +344,8 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | 4 | Categorías por producto (RN-17) | Una sola, guardada como string |
 | 5 | Cuál es la foto principal | La primera del arreglo (`fotoUrl` del contrato) |
 | 6 | Dónde se guardan las fotos | Solo la URL |
-| 7 | El listado filtra y ordena por precio base o vigente | Precio base. El vigente se calcula en la etapa FAV (sección 15) |
-| 8 | Contenido del evento `VarianteCreada` | Fuera de este trabajo (sección 15) |
+| 7 | El listado filtra y ordena por precio base o vigente | Precio base. El vigente se calcula al consultar la ficha o el lote |
+| 8 | Contenido del evento `VarianteCreada` | El evento no está implementado (sección 15) |
 | 9 | Ids de variante y rutas de Inventario | Verificados el 02/11/2026 contra `services/inventario`: los tres ids del contrato existen en `002_datos_de_ejemplo.sql` y la consulta por lote de Inventario es `GET /v1/stock?variantes=…` |
 | 10 | Índices del servicio y del script `01_…` | El servicio crea solo `variantes_id_unico`, igual que el script (5.8). Con la base vacía lo crea la API y después `01` no choca |
 | 11 | Cómo se normalizan los espacios y la ñ en los ids (5.5) | Espacio → `-` (como `remera-basica`), ñ → `n`. Cualquier otro símbolo pasa a `-` y se quitan los `-` repetidos o de los extremos (`normalizar` en `datos/generar.py`; la función de Go da lo mismo y un test lo comprueba) |
@@ -351,20 +358,17 @@ Los precios se devuelven en **pesos con 2 decimales** (`number`), como el contra
 | 18 | Publicar o despublicar algo que ya estaba así | No es error y no sube la `version`: `/publicar` responde `200` con el producto y `DELETE` responde `204`. Sobre un id inexistente, los dos dan `404` |
 | 19 | Cómo se filtra el listado | `categoria`, `talle` y `color` son coincidencia exacta: el color distingue mayúsculas (`Celeste`, no `celeste`) y el talle se pasa a mayúscula. Con `talle` y `color` juntos se exige que sean **la misma variante** (`$elemMatch`). `q` busca con el índice de texto en español. `precioMin` y `precioMax` van en pesos y se comparan con el precio base (punto 7). Un parámetro desconocido da `400`, para que un error de tipeo no devuelva todo el catálogo sin avisar. Respuesta: `items`, `pagina`, `tamano`, `total` y `paginas`; `tamano` por defecto 20 y máximo 100. Órdenes: `nuevos` (por defecto), `precio_asc`, `precio_desc` y `nombre`, siempre desempatados por `_id` |
 | 20 | Producto con un nombre que ya existe | Se acepta: el id lleva un sufijo numérico (`-2`, `-3`…), según 5.5 |
-| 21 | Ids del alcance de una promoción | Tienen que existir: con un error de tipeo la promoción no se aplicaría a nada, sin avisar. **[propuesta]** |
-| 22 | Edición concurrente de una promoción | Gana la última: no lleva `version`, porque hay un solo administrador (RN-23). **[propuesta]** |
+| 21 | Ids del alcance de una promoción | Tienen que existir: con un error de tipeo la promoción no se aplicaría a nada, sin avisar. |
+| 22 | Edición concurrente de una promoción | Gana la última: no lleva `version`, porque hay un solo administrador (RN-23). |
 
-Los puntos 1, 5, 6 y 8 dependen de lo que defina el equipo de FAV. Se resolvieron así y se confirman con el equipo.
+Los puntos 1, 5, 6 y 8 los decidió el equipo de Catálogo. El 1 (alcance de las promociones) está reflejado en el SPEC (RN-05, HU-05.6).
 
 ---
 
 ## 15. Pendientes
 
-Sin cambiar lo anterior:
-
-- **Evento `VarianteCreada`** con outbox (ni se publica ni se consume hoy). Si se guarda junto con el producto en una transacción, requiere replica set.
+- **Evento `VarianteCreada`** con outbox (ni se publica ni se consume hoy). Si se guarda junto con el producto en una transacción, requiere replica set. Hoy Inventario da de alta la variante con su primer ingreso.
 - **Identidad** con los encabezados `X-User-*`.
-- **Tests de contrato** contra el YAML publicado.
-- El **stock sigue siendo de Inventario**.
+- **Test de contrato** de la capacidad publicada contra el YAML. Inventario ya lo tiene para el contrato del gimnasio; Catálogo no.
 
 ---

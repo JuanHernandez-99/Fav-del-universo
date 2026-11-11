@@ -82,7 +82,7 @@ paths:
       summary: Consultar la disponibilidad por variante
       description: |
         Devuelve, para cada `varianteId` pedido, las unidades del **stock online** de FAV que no están
-        reservadas **[propuesta]**. Son las que puede apartar un pedido. No incluye el stock físico.
+        reservadas. Son las que puede apartar un pedido. No incluye el stock físico.
 
         Es una foto del momento: no aparta unidades, y el pedido puede responder `409 STOCK_INSUFICIENTE`
         aunque antes figurara disponible. Una variante que no existe o que todavía no tiene stock figura
@@ -253,7 +253,7 @@ components:
       required: true
       description: |
         Clave única por pedido lógico (se recomienda un UUID). Ante timeout, `500` o `503`,
-        reintentar con la misma clave y el mismo cuerpo. Vigencia: 48 horas **[propuesta]**.
+        reintentar con la misma clave y el mismo cuerpo. Se conserva como mínimo 48 horas.
       schema:
         type: string
         minLength: 8
@@ -358,7 +358,7 @@ components:
           type: array
           minItems: 1
           maxItems: 20
-          description: Hasta 20 variantes por pedido **[propuesta]**. Una variante no puede repetirse.
+          description: Hasta 20 variantes por pedido. Una variante no puede repetirse.
           items:
             $ref: '#/components/schemas/ItemPedido'
 
@@ -373,7 +373,7 @@ components:
           type: integer
           minimum: 1
           maximum: 10
-          description: Hasta 10 unidades por variante **[propuesta]**.
+          description: Hasta 10 unidades por variante.
 
     Pedido:
       type: object
@@ -508,7 +508,7 @@ components:
                 status: 401
                 codigo: NO_AUTENTICADO
     LimiteExcedido:
-      description: Demasiados pedidos del grupo (60 por minuto **[propuesta]**). Reintentar después de `Retry-After`.
+      description: Demasiados pedidos del grupo (60 por minuto, con ráfagas de 20). Reintentar después de `Retry-After`.
       headers:
         Retry-After:
           $ref: '#/components/headers/RetryAfter'
@@ -617,5 +617,5 @@ components:
           venceEn: '2026-10-18T15:00:00Z'
           datosTransferencia:
             alias: FAV.ALIAS
-            titular: Cielo
+            titular: Cielo Stellantis
         creadoEn: '2026-10-16T15:00:00Z'

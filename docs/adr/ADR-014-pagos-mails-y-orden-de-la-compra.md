@@ -66,8 +66,8 @@ Al implementar Ventas quedaban tres puntos abiertos.
 
 ## Pendientes
 
-- **[?]** Estado de una venta con el pago rechazado: el SPEC pide liberar la reserva (HU-11.4) pero no define el estado. **[propuesta]** *Cancelada*, que es lo que hace hoy.
-- **[?]** Cómo cancela un comprador invitado: hoy alcanza con conocer el id de la venta, que no se puede adivinar. **[propuesta]**
+- Una venta con el pago rechazado queda *Cancelada* y se libera la reserva (HU-11.4). El SPEC no definía el estado: se tomó este.
+- Un comprador invitado cancela con el id de la venta, que no se puede adivinar: no hay otra forma de identificarlo.
 - **[?]** Datos para transferir y cómo se resuelve una venta *A verificar*: siguen pendientes con el cliente (SPEC §12).
 
 ## Validación

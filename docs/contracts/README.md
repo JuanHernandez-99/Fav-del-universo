@@ -41,13 +41,13 @@ El pedido lo hace el grupo para sí mismo: no se envían datos de clientes final
 ### Consultar la disponibilidad
 
 - `variantes`: entre 1 y 200 `varianteId` separados por coma. Por fuera de ese rango: `400 PEDIDO_INVALIDO`.
-- Responde `items` con `varianteId` y `disponible`: unidades del **stock online [propuesta]** que no están reservadas. No incluye el stock físico.
+- Responde `items` con `varianteId` y `disponible`: unidades del **stock online** que no están reservadas. No incluye el stock físico.
 - Una variante que no existe o que no tiene stock figura con `disponible: 0`, sin error.
 - Es una foto del momento: no aparta unidades. Un pedido posterior puede responder `409 STOCK_INSUFICIENTE`.
 
 ### Hacer un pedido
 
-- Se envían `items` (hasta 20 variantes **[propuesta]**, sin repetir) con `varianteId` y `cantidad` (de 1 a 10 **[propuesta]**), y opcionalmente una `referenciaExterna` (el número de pedido en su sistema).
+- Se envían `items` (hasta 20 variantes, sin repetir) con `varianteId` y `cantidad` (de 1 a 10), y opcionalmente una `referenciaExterna` (el número de pedido en su sistema).
 - **Todo o nada:** si una variante no alcanza, no se aparta ninguna.
 - **El precio lo calcula FAV** al momento del pedido y se devuelve en la respuesta.
 - El pedido queda `PENDIENTE_DE_PAGO`. La respuesta incluye el total, los datos para transferir y `pago.venceEn`: el stock queda apartado **48 horas**.
@@ -66,7 +66,7 @@ POST /v1/pedidos ──► PENDIENTE_DE_PAGO ──(FAV verifica la transferenci
 
 Consultar el estado de un pedido no está en la v1. Para saber si se acreditó un pago, usar el contacto (§7).
 
-Los datos para transferir son los de FAV: alias `FAV.ALIAS`, titular `Cielo`.
+Los datos para transferir son los de FAV: alias `FAV.ALIAS`, titular `Cielo Stellantis`.
 
 ---
 
@@ -77,9 +77,9 @@ Los datos para transferir son los de FAV: alias `FAV.ALIAS`, titular `Cielo`.
 **Idempotencia.** `POST /v1/pedidos` exige el header `Idempotency-Key`: una clave única por pedido (se recomienda un UUID).
 - Ante un timeout, un `500` o un `503`, reintentar **con la misma clave y el mismo cuerpo**: se recibe la misma respuesta, sin crear otro pedido.
 - La misma clave con otro cuerpo devuelve `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`.
-- La clave vale 48 horas **[propuesta]**.
+- La clave se conserva como mínimo 48 horas.
 
-**Límite de uso.** 60 pedidos por minuto por grupo, sumando todas las operaciones **[propuesta]**. El exceso recibe `429` con el header `Retry-After`.
+**Límite de uso.** 60 pedidos por minuto por grupo, sumando todas las operaciones, con ráfagas de 20. El exceso recibe `429` con el header `Retry-After`.
 
 **Correlación.** Se puede enviar `X-Correlation-Id` para seguir una operación en los logs de los dos sistemas. FAV lo devuelve siempre; si no se envía, genera uno.
 
@@ -144,7 +144,7 @@ curl -X POST http://localhost:8090/v1/pedidos \
                    { "varianteId": "var-jean-mom-celeste-38", "cantidad": 1 } ] }'
 # → 201 { "pedidoId": "7d9f2c1e-…", "estado": "PENDIENTE_DE_PAGO", "total": 87000, "moneda": "ARS",
 #         "pago": { "medio": "TRANSFERENCIA", "venceEn": "2026-10-18T15:00:00Z",
-#                   "datosTransferencia": { "alias": "FAV.ALIAS", "titular": "Cielo" } }, … }
+#                   "datosTransferencia": { "alias": "FAV.ALIAS", "titular": "Cielo Stellantis" } }, … }
 
 # 3. Ver un error en el mock (stock insuficiente)
 curl -X POST http://localhost:8090/v1/pedidos \

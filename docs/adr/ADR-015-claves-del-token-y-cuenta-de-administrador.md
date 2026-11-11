@@ -41,11 +41,11 @@ Son volúmenes separados para que el gateway no tenga acceso a la privada. Esto 
 - Si ese email ya es de un comprador, Usuarios no arranca y lo informa: no le cambia el rol.
 - En local usa un valor de prueba, como las demás claves del Compose. **En la nube hay que definir uno propio.**
 
-**3. Contraseñas con bcrypt, costo 12, y un mínimo de 8 caracteres** **[propuesta]** (SPEC RN-26), sin exigir mayúsculas ni símbolos. El máximo es de 72 bytes, porque bcrypt no admite más.
+**3. Contraseñas con bcrypt, costo 12, y un mínimo de 8 caracteres** (SPEC RN-26, a confirmar con el cliente), sin exigir mayúsculas ni símbolos. El máximo es de 72 bytes, porque bcrypt no admite más.
 
 **4. Vencimiento de 1 hora y sin refresh token**, como proponía ADR-001. El vencimiento se configura con `JWT_EXPIRATION_MINUTES`.
 
-**5. El inicio de sesión tiene un límite por IP en el gateway:** 30 pedidos por minuto, con ráfagas de hasta 10 **[propuesta]**. Frena los intentos masivos de adivinar contraseñas.
+**5. El inicio de sesión tiene un límite por IP en el gateway:** 30 pedidos por minuto, con ráfagas de hasta 10. Frena los intentos masivos de adivinar contraseñas.
 
 ## Alternativas consideradas
 
@@ -77,9 +77,9 @@ Son volúmenes separados para que el gateway no tenga acceso a la privada. Esto 
 
 ## Pendientes
 
-- **[?]** Cómo se entregan las claves y la contraseña de administrador en la nube: se resuelve con el despliegue.
-- **Validar el token en el gateway:** es el paso siguiente, y ahí se monta `jwt-publica`.
 - Confirmar con el cliente el mínimo de 8 caracteres (SPEC RN-26).
+
+Resueltos: el gateway valida el token con `jwt-publica` ([ADR-016](ADR-016-validacion-del-token-en-el-gateway.md)), y en la nube las claves las genera `usuarios-init` y la contraseña de administrador se define en el `.env` de la VM ([`desplegar/README.md`](../../desplegar/README.md)).
 
 ## Validación
 

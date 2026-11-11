@@ -6,7 +6,7 @@ Punto de entrada único del sistema: valida el token, rutea a los servicios y co
 
 - Valida la firma y el vencimiento del JWT **sin llamar a Usuarios**, con njs (`njs/jwt.js`), descarta los encabezados de identidad que vengan del cliente y reenvía `X-User-Id`, `X-User-Email` y `X-User-Role` a los servicios ([ADR-001](../docs/adr/ADR-001-limites-de-los-servicios.md)).
 - Aplica límite de pedidos (*rate limiting*), también por grupo externo que usa la capacidad compartida.
-- Valida la clave `X-API-Key` de los grupos externos **[propuesta]** y rutea `GET /v1/productos` a Catálogo y `POST /v1/pedidos` a Ventas ([ADR-008](../docs/adr/ADR-008-contrato-propio.md)).
+- Valida la clave `X-API-Key` de los grupos externos y rutea `GET /v1/productos` a Catálogo y `POST /v1/pedidos` a Ventas ([ADR-008](../docs/adr/ADR-008-contrato-propio.md)).
 - Recibe el aviso de pago de Mercado Pago y lo reenvía a Ventas.
 - Deja pasar sin token la lectura de la tienda: `/catalogo/v1/tienda/productos` y `/inventario/v1/disponibilidad`. El resto de `/catalogo/` e `/inventario/` sigue siendo solo de administrador.
 - Sirve la tienda en `/`, en el mismo origen que la API ([ADR-017](../docs/adr/ADR-017-frontend.md)).

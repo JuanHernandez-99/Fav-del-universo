@@ -52,9 +52,9 @@ La consigna pide tablero y alerta, sin fijar herramientas: son decisión del gru
 
 La etiqueta `ruta` es el **patrón** registrado (`/v1/reservas/{id}`), no la URL, para no crear una serie por cada id.
 
-Prometheus descubre las réplicas por el DNS de Docker (`dns_sd_configs` sobre `inventario` y `ventas`) y scrapea cada una por separado cada 5 s. La etiqueta `instance` muestra el reparto de carga del ADR-012.
+Prometheus descubre las réplicas por el DNS de Docker (`dns_sd_configs` sobre `inventario`, `ventas`, `catalogo` y `usuarios`) y scrapea cada una por separado cada 5 s. La etiqueta `instance` muestra el reparto de carga del ADR-012.
 
-### 3. Objetivo de servicio **[propuesta]**
+### 3. Objetivo de servicio
 
 | Indicador | Objetivo |
 |---|---|
@@ -67,7 +67,7 @@ Se contrastó con la prueba de carga: se cumple hasta 800 pedidos por segundo (A
 
 El tablero `FAV · Estado general` muestra réplicas, alertas activas, tráfico, errores (incluidos los 404 de 7 días), p95, reparto del balanceo, caché, mensajería y gimnasio.
 
-Los umbrales son **[propuesta]**:
+Umbrales de cada alerta:
 
 | Alerta | Se dispara cuando | Severidad |
 |---|---|---|
@@ -112,12 +112,6 @@ Los umbrales son **[propuesta]**:
 ## Pendientes
 
 - **Destino real de las alertas en la nube:** **[?]** se resuelve con el despliegue. Hoy llegan a Mailpit.
-
-## Validación prevista
-
-- **Entrega 2:** en Prometheus, `http_pedidos_total` muestra los pedidos separados por réplica (`instance`) y por código.
-- **Entrega 2:** con el mock del gimnasio fallando, `dependencia_llamadas_total{resultado="error"}` crece y `circuit_breaker_estado` pasa a 2.
-- **Entrega de observabilidad:** el tablero responde "cuántos 404 hubo la semana pasada" y la alerta se dispara provocando errores 5xx.
 
 ## Validación de tablero y alertas (09/11/2026)
 

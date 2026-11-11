@@ -2,10 +2,10 @@
 
 |                             |                                                                                                                                                                                                                                                                 |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**                  | Aceptada · Entrega 2, para las operaciones de Inventario. Las de Ventas están _previstas_.                                                                                                                                                                      |
+| **Estado**                  | Aceptada · Entrega 2. Cubre las operaciones de Inventario y las de Ventas (sección "Ventas").                                                                                                                                                                   |
 | **Fecha**                   | 23/10/2026                                                                                                                                                                                                                                                      |
 | **Decisión de la consigna** | D4 · Consistencia y concurrencia                                                                                                                                                                                                                                |
-| **Relacionadas**            | [ADR-002](ADR-002-arquitectura-interna.md) (dónde vive cada regla), [ADR-003](ADR-003-persistencia.md) (MySQL y garantías), [ADR-005](ADR-005-comunicacion.md) (idempotencia, outbox y reintentos), [ADR-009](ADR-009-consumo-del-gimnasio.md) (reposiciones) |
+| **Relacionadas**            | [ADR-002](ADR-002-arquitectura-interna.md) (dónde vive cada regla), [ADR-003](ADR-003-persistencia.md) (MySQL y garantías), [ADR-005](ADR-005-comunicacion.md) (idempotencia, outbox y reintentos), [ADR-018](ADR-018-consumo-del-gimnasio-contrato-real.md) (reposiciones) |
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: forma parte del diseño pero todavía no está implementado.
 
@@ -64,7 +64,7 @@ La **base de datos decide cada carrera**, con transacciones locales de MySQL. No
 | El cliente da timeout y no sabe si la reserva se hizo                                  | Reintenta con la misma clave (ADR-005, punto 3). Si nunca llegó, se crea; si ya existía, se devuelve. Si no reintenta, la reserva **vence sola** y el stock no queda bloqueado para siempre. |
 | Pago y vencimiento coinciden                                                           | Las dos operaciones bloquean la misma fila: gana una sola. Si gana el vencimiento, `confirmar` responde `409 RESERVA_VENCIDA`.                                                              |
 | Dos réplicas intentan vencer o enviar lo mismo                                         | El bloqueo de la fila y `SKIP LOCKED` hacen que una procese y la otra salte.                                                                                                                |
-| La réplica se cae mientras envía una reposición al gimnasio                            | La reposición quedó apartada 30 s; pasado ese plazo otra réplica la toma. El gimnasio recibe la misma clave de idempotencia, así que no duplica la mercadería **si respeta la clave** (contrato supuesto, ADR-009). |
+| La réplica se cae mientras envía una reposición al gimnasio                            | La reposición quedó apartada 30 s; pasado ese plazo otra réplica la toma. El gimnasio recibe la misma clave de idempotencia, así que no duplica la mercadería **si respeta la clave** (el contrato del gimnasio lo exige, ADR-018). |
 | La base está caída                                                                     | Ninguna operación se aplica a medias: no hay transacción confirmada. Al volver, el servicio sigue sin intervención.                                                                       |
 | El evento `ReservaVencida` no se llega a publicar                                      | Está en el outbox, guardado en la misma transacción que el cambio de estado. Un proceso lo publica a RabbitMQ cuando el broker está disponible; no se pierde.                                       |
 
@@ -123,7 +123,7 @@ La venta no usa `UPDATE … WHERE estado = …`, como se preveía: bloquea la fi
 
 ## Validación
 
-Tests de integración contra un **MySQL real**, en `services/inventario/internal/adaptadores/mysql/repositorio_test.go`. Se corrieron 7 pruebas con el detector de condiciones de carrera de Go (`-race`) y se repitieron 15 veces sin fallas:
+Tests de integración contra un **MySQL real**, en `services/inventario/internal/adaptadores/mysql/repositorio_test.go`. El archivo tiene hoy 16 pruebas. Estas 7 se corrieron con el detector de condiciones de carrera de Go (`-race`) y se repitieron 15 veces sin fallas; las otras 9 se agregaron después (ajustes, stock a corregir, descuento del físico y publicación de eventos):
 
 | Test                                          | Qué comprueba                                                                                      |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -143,7 +143,7 @@ INVENTARIO_TEST_DSN="root:cambiar@tcp(localhost:3307)/inventario_test?parseTime=
   go test -race ./services/inventario/...
 ```
 
-El 04/11/2026 se repitieron sin `-race` contra el contenedor del proyecto (MySQL 8.4), en una base propia de los tests, y pasaron junto con las nuevas de descuento físico y publicación de eventos. Los tests de Ventas (`services/ventas/internal/adaptadores/mysql`) cubren la concurrencia del aviso de pago, la clave repetida, el pago contra el vencimiento y las tareas tomadas por varias réplicas.
+El 04/11/2026 se repitieron sin `-race` contra el contenedor del proyecto (MySQL 8.4), en una base propia de los tests, y pasaron junto con las agregadas hasta esa fecha. Los tests de Ventas (`services/ventas/internal/adaptadores/mysql`) cubren la concurrencia del aviso de pago, la clave repetida, el pago contra el vencimiento y las tareas tomadas por varias réplicas.
 
 **Lo que los tests todavía no cubren** (el comportamiento está implementado, pero sin prueba automática):
 

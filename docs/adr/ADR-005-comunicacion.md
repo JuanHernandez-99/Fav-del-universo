@@ -9,7 +9,7 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar. Los tiempos y reintentos se probaron con caídas y demoras provocadas, no con carga real (ADR-013).
 
-> **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Además, Inventario consume la capacidad de un gimnasio (ADR-009, en preparación). Las menciones a las opciones A y B son de la Entrega 1 y se revisan al validar este ADR en la Entrega 2.
+> **Actualización 14/10/2026:** la capacidad publicada quedó definida en el [ADR-008](ADR-008-contrato-propio.md): **catálogo y pedidos**, servida por Catálogo y Ventas. Las opciones A y B de la Entrega 1 se descartaron. Inventario consume la capacidad de un gimnasio ([ADR-018](ADR-018-consumo-del-gimnasio-contrato-real.md)).
 
 > **Actualización 04/11/2026:** [ADR-014](ADR-014-pagos-mails-y-orden-de-la-compra.md) resuelve los pendientes de Mercado Pago (simulador local) y de mail (Mailpit), y fija un tiempo total de 4,5 s por pedido en Ventas. Ver la validación al final.
 
@@ -48,7 +48,7 @@ ADR-001 fija qué servicios se hablan y dejó abierto si la confirmación de la 
 
 El evento de dominio que pide la consigna es **`ReservaVencida`**: lo publica Inventario y lo consume Ventas.
 
-### 2. Llamadas síncronas: tiempos y reintentos **[propuesta]**
+### 2. Llamadas síncronas: tiempos y reintentos
 
 | Llamada | Timeout | Reintentos | Cuándo se reintenta | Protección extra |
 |---|---|---|---|---|
@@ -87,10 +87,10 @@ Al aprobarse el pago (aviso de Mercado Pago o confirmación de la transferencia 
 | Aspecto | Decisión |
 |---|---|
 | Broker | RabbitMQ. Mensajes persistentes y colas durables. |
-| Publicación | **Transactional outbox:** el evento se guarda en la tabla outbox en la misma transacción que el cambio, y un proceso lo publica después **[propuesta: cada 1 s]**. Si RabbitMQ está caído, los eventos esperan en el outbox. |
+| Publicación | **Transactional outbox:** el evento se guarda en la tabla outbox en la misma transacción que el cambio, y un proceso lo publica después (cada 1 s). Si RabbitMQ está caído, los eventos esperan en el outbox. |
 | Garantía de entrega | **Al menos una vez.** Un evento puede llegar repetido. |
 | Consumidores | **Idempotentes:** guardan el id del mensaje en una tabla de procesados, en la misma transacción que su efecto. Si el id ya está, lo descartan. |
-| Mensajes fallidos | 3 reintentos con espera **[propuesta]**. Después van a una **cola de mensajes fallidos (DLQ)** por consumidor, donde quedan para revisarlos. La cantidad de mensajes en la DLQ es una métrica con alerta (ADR-011). |
+| Mensajes fallidos | 3 reintentos con espera. Después van a una **cola de mensajes fallidos (DLQ)** por consumidor, donde quedan para revisarlos. La cantidad de mensajes en la DLQ es una métrica con alerta (ADR-011). |
 | Formato | Sobre común: `id`, `tipo`, `version`, `ocurridoEn`, `correlationId` y `datos`. Agregar campos es compatible; quitar o cambiar uno exige una versión nueva del evento. |
 
 | Evento | Publica | Consume | Datos | Efecto |
@@ -104,8 +104,6 @@ Al aprobarse el pago (aviso de Mercado Pago o confirmación de la transferencia 
 Ventas no envía el mail dentro de la transacción de la venta. Guarda el mail pendiente en el **registro de mails**, en la misma transacción que el cambio de estado. Un proceso de Ventas lo envía después, con los reintentos del punto 2. Agotados los intentos, queda como fallido y la venta no se afecta (HU-20.5).
 
 Si el proceso se cae entre enviar el mail y marcarlo como enviado, al volver lo reenvía: puede llegar **un mail duplicado**. Es la limitación aceptada en HU-20.4.
-
-Con la opción B de la capacidad publicada, los emails de otros grupos usan el mismo mecanismo, en su propia tabla (ADR-008).
 
 ### 7. Correlación
 
@@ -144,30 +142,24 @@ Cada pedido lleva un identificador de correlación (`X-Correlation-Id`). Si no v
 ## Pendientes
 
 - **Resueltos en ADR-014:** el entorno local usa un simulador de Mercado Pago que envía el aviso firmado, y los mails van a Mailpit.
-- **`VarianteCreada`:** sin implementar. No hace falta para la consigna, que pide un evento de dominio (`ReservaVencida`), pero sí para HU-03.6.
-- **Valores de timeouts y reintentos:** se revisan con las pruebas de carga (ADR-013).
+- **`VarianteCreada`:** sin implementar. La consigna pide un evento de dominio (`ReservaVencida`) y no hace falta para que el sistema funcione: Inventario registra la variante con su primer ingreso, y hasta entonces figura con 0 unidades.
+- **Valores de timeouts y reintentos:** se probaron con caídas y demoras provocadas; con carga, solo hasta el límite que midió ADR-013.
 
-## Validación prevista (Entrega 2)
+## Validación
 
-- Test de integración: el mismo evento entregado dos veces produce un solo efecto.
-- Un mensaje que falla siempre termina en la DLQ y aparece en las métricas.
-- Con RabbitMQ detenido se puede comprar; al volver, los eventos del outbox se publican.
-- Con Inventario lento (por encima de 2 s), Ventas reintenta, no duplica la reserva y, agotados los intentos, muestra un error claro.
-- Los logs de una compra muestran el mismo identificador de correlación en todos los servicios.
+### Entrega 2
 
-## Validación (Entrega 2)
-
-Contrastado con el código de Inventario, el gateway y el mock de Ventas.
+Contrastado con el código de Inventario, el gateway y el mock de Ventas. Las filas "Confirmación", "Outbox" y "Consumo idempotente" quedaron superadas por la validación con Ventas real, más abajo.
 
 | Punto del ADR                                          | Resultado                                                                                                                                                                  |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Confirmación síncrona entre Ventas e Inventario        | **Implementada** en Inventario (`POST /v1/reservas/{id}/confirmar`). Falta Ventas real.                                                                                      |
-| Timeouts                                               | Gateway: 5 s de lectura y 1 s de conexión. Inventario: 4 s por pedido, 3 s de conexión y 5 s de lectura/escritura a la base. Gimnasio: 2 s. Mock de Ventas: 2 s por intento. |
+| Confirmación síncrona entre Ventas e Inventario        | **Implementada** en Inventario (`POST /v1/reservas/{id}/confirmar`).                                                                                                          |
+| Timeouts                                               | Gateway: 5 s de lectura y 1 s de conexión. Inventario: 4 s por pedido, 3 s de conexión y 5 s de lectura/escritura a la base. Gimnasio: 2 s (hoy 3 s, ADR-018). Mock de Ventas: 2 s por intento. |
 | Reintentos                                             | Mock de Ventas: 3 intentos con 0, 200 y 400 ms más variación, solo ante 502/503/504 o error de red, nunca ante 4xx. Gimnasio: reintentos persistidos en la base (5 s hasta 5 min). |
 | Idempotencia                                           | **Implementada** con encabezado `Idempotency-Key` y huella del pedido; clave reutilizada con otro cuerpo devuelve `409`.                                                      |
 | Identificador de correlación                           | **Implementado:** lo toma o genera el gateway (`$request_id`), lo propagan los servicios y se guarda en el outbox. Ver ADR-011.                                                |
-| Outbox                                                 | **Parcial:** se escribe en la misma transacción, pero **no hay publicador** a RabbitMQ y el outbox **no tiene columna `version`**; el sobre del evento se completa al publicar. |
-| Consumo idempotente y DLQ                              | **No implementados** (Inventario aún no consume eventos).                                                                                                                    |
+| Outbox                                                 | En la Entrega 2 era parcial (sin publicador). Hoy está **implementado**: se escribe en la misma transacción y un proceso publica a RabbitMQ. No tiene columna `version`; el sobre del evento la completa al publicar. |
+| Consumo idempotente y DLQ                              | En la Entrega 2 no estaban. Hoy están **implementados en Ventas**; Inventario no consume eventos.                                                                           |
 
 ### Validación con Ventas real (04/11/2026)
 
@@ -175,7 +167,7 @@ Contrastado con el código de Inventario, el gateway y el mock de Ventas.
 |---|---|
 | Confirmación síncrona | **Implementada:** tarea guardada con el pago y ejecutada por un proceso. Con la reserva vencida, la venta queda *A verificar*. |
 | Outbox | **Implementado:** un proceso de Inventario publica a RabbitMQ con confirmación del broker. Con RabbitMQ detenido se puede comprar y, al volver, el evento llega. Sigue sin columna `version`: el sobre la agrega al publicar. |
-| Consumo idempotente y DLQ | **Implementados** en Ventas. Un mensaje inválido terminó en `ventas.reserva-vencida.dlq`. La alerta sobre la DLQ sigue pendiente (ADR-011). |
+| Consumo idempotente y DLQ | **Implementados** en Ventas. Un mensaje inválido terminó en `ventas.reserva-vencida.dlq`. La alerta `MensajesEnColaDeFallidos` avisa de los mensajes en una DLQ (ADR-011). |
 | Reintentos del punto 2 | Implementados, dentro de los 4,5 s por pedido (ADR-014). |
 
 ### Respuesta tardía: Inventario colgado (05/11/2026)
@@ -196,4 +188,4 @@ Con las dos réplicas de Inventario congeladas (`docker compose pause inventario
 
 Sin réplicas que respondan, el gateway responde `503 NO_DISPONIBLE` en JSON con `Retry-After`, como el contrato, y no el `502` o `504` de nginx (ADR-010, `gateway/pruebas/errores.mjs`).
 
-**Problema detectado (resuelto por ADR-014):** los reintentos del mock de Ventas y los del gateway se suman, y el tiempo total de Ventas puede superar los 5 s del gateway (ADR-010). Hay que alinear los tiempos al implementar Ventas.
+**Problema detectado y resuelto por ADR-014:** los reintentos del mock de Ventas y los del gateway se sumaban, y el tiempo total podía superar los 5 s del gateway (ADR-010). Ventas real corta cada pedido a los 4,5 s.

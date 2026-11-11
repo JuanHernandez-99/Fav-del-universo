@@ -2,12 +2,12 @@
 
 |                             |                                                                                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**                  | **Aceptada con mediciones** (10/11/2026). Propuesta en la Entrega 2; ver "Cambios respecto de la propuesta". Falta confirmar el tamaño de la VM de Azure para cerrar los costos. |
+| **Estado**                  | **Aceptada con mediciones** (10/11/2026). Propuesta en la Entrega 2; ver "Cambios respecto de la propuesta". |
 | **Fecha**                   | 23/10/2026, actualizada el 10/11/2026                                                                                                                   |
 | **Decisión de la consigna** | D13 · Capacidad y costos                                                                                                                                |
 | **Relacionadas**            | [ADR-004](ADR-004-consistencia-y-concurrencia.md) (contención), [ADR-006](ADR-006-busqueda.md) (búsqueda), [ADR-011](ADR-011-observabilidad.md) (objetivo de servicio), [ADR-012](ADR-012-balanceo.md) (réplicas), [ADR-020](ADR-020-logs-y-track-id-modelo-catedra.md) (observabilidad actual) |
 
-> Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · **[completar]** dato que falta.
+> Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
 ## Contexto
 
@@ -47,7 +47,7 @@ El volumen real del cliente es chico: **entre 10 y 20 prendas por semana** (SPEC
 
 ### Escalones con dos réplicas de Catálogo y de Inventario
 
-| Pedidos/s pedidos | Logrados | Errores | p95 total | p95 compra | p95 búsqueda | Esperas por bloqueo | Corrida |
+| Pedidos/s (objetivo) | Logrados | Errores | p95 total | p95 compra | p95 búsqueda | Esperas por bloqueo | Corrida |
 |---|---|---|---|---|---|---|---|
 | 50 | 52 | 0 % | 24 ms | 45 ms | 34 ms | — | 1 |
 | 100 | 100 | 0 % | 23 ms | 48 ms | 22 ms | — | 1 |
@@ -119,21 +119,22 @@ Para FAV, el límite de cómputo no es el problema: 800 pedidos/s con 5 % de com
 
 | Componente | Precio | Costo mensual |
 |---|---|---|
-| VM **B2ms** (2 vCPU, 8 GB) | USD 0,116 por hora | USD 84,68 |
+| VM **B2as v2** (2 vCPU, 8 GB), la que usa el despliegue | USD 0,105 por hora | USD 76,65 (0,105 × 730) |
 | Disco del sistema Standard SSD E4 (32 GB) | USD 3,36 por mes | USD 3,36 |
 | IP pública estática estándar | USD 0,005 por hora | USD 3,65 |
 | Transferencia de salida | Primeros 100 GB del mes sin cargo | USD 0 con el volumen de FAV **[supuesto]** |
-| **Total** | | **USD 91,69 por mes** |
+| **Total** | 76,65 + 3,36 + 3,65 | **USD 83,66 por mes** |
 
 | Otros tamaños | Precio por hora | VM por mes | Por qué no |
 |---|---|---|---|
 | B2s (2 vCPU, 4 GB) | USD 0,0582 | USD 42,49 | Menos memoria que la que usa el sistema en reposo |
-| D2s v5 (2 vCPU, 8 GB) | USD 0,134 | USD 97,82 | Misma memoria que B2ms, más cara. Conviene solo con CPU alta todo el tiempo |
+| B2ms (2 vCPU, 8 GB) | USD 0,116 | USD 84,68 | Misma memoria que la B2as v2 y 10 % más cara. Con el disco y la IP, USD 91,69 por mes |
+| D2s v5 (2 vCPU, 8 GB) | USD 0,134 | USD 97,82 | Misma memoria que la B2as v2, más cara. Conviene solo con CPU alta todo el tiempo |
 | B4ms (4 vCPU, 16 GB) | USD 0,233 | USD 170,09 | El doble, sin una carga que lo justifique |
 
 - **Uso bajo y pico cuestan lo mismo:** con 10 a 20 prendas por semana, diciembre no obliga a cambiar de VM.
 - **Desasignar la VM** cuando no se usa deja de cobrar el cómputo; el disco y la IP siguen cobrando (`desplegar/README.md`).
-- **[completar]** El tamaño real de la VM que creó el grupo. Si fuera una B2s, corre riesgo de quedarse sin memoria.
+- La VM del grupo es una B2as v2, con la memoria que pide el sistema en reposo (3,7 GB de 8 GB).
 - **No medido:** la capacidad en la VM de 2 vCPU. Va a ser bastante menor que la de la notebook, pero con el volumen del cliente el margen sigue siendo muy grande.
 
 ## Cambios respecto de la propuesta
@@ -169,7 +170,6 @@ Para FAV, el límite de cómputo no es el problema: 800 pedidos/s con 5 % de com
 ## Pendientes
 
 - **Repetir la corrida de 800 pedidos/s con la observabilidad actual** (ADR-020). Por ahora solo se repitió la de 600 pedidos/s: p95 de 18 ms con los logs en MySQL.
-- **[completar]** Confirmar el tamaño de la VM de Azure y ajustar la tabla de costos.
 - Medir la espera del pool de conexiones, si la hipótesis 2 hiciera falta.
 
 ## Cómo repetirlo

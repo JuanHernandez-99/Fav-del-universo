@@ -1,8 +1,10 @@
 # SPEC — FAV Tienda Online
 
-> **Versión 0.11** · 05/11/2026 · Documento vivo: se actualiza con cada decisión.
+> **Versión 0.12** · 11/11/2026 · Documento vivo: se actualiza con cada decisión.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por el equipo, sin confirmar con el cliente · ~~tachado~~ descartado, se conserva el número para no romper referencias.
+>
+> **Cambios en 0.12:** se definen el alcance y la acumulación de las promociones según lo implementado en Catálogo (RN-05, HU-05.6) y se quita **[propuesta]** de lo que ya está implementado. HU-03.6 refleja que Inventario registra la variante con su primer ingreso. RNF-02 pasa de trazas a track id (ADR-020).
 >
 > **Cambios en 0.11** (ADR-017): se agrega HU-01.5: el comprador ve las unidades online disponibles. HU-08.4 y HU-08.5: motivos del ajuste y límite del físico.
 >
@@ -99,7 +101,7 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | RN-02 | Cada producto usa **un solo sistema de talles**: letras (XS, S, M, L, XL, XXL), numérico par (32, 34, 36, 38, 40, 42, 44, 46), numérico de 1 a 4 (1, 2, 3, 4) o talle único. Solo se aceptan valores del sistema elegido. | Equipo. Amplía lo indicado por el cliente (S–XL y 34–44) |
 | RN-03 | Un producto puede tener varias fotos, opcionalmente asociadas a un color. | Cliente |
 | RN-04 | Un producto puede estar publicado o no online, sin importar su stock. | Equipo |
-| RN-05 | Las promociones se gestionan aparte del precio base. En v1 hay dos tipos: (a) descuento porcentual y (b) descuento por medio de pago (por ejemplo, un porcentaje pagando en efectivo). Toda promoción tiene fecha de inicio y de fin. Valen online y en el local. Fuera de v1: 2x1 y promociones bancarias. | Cliente + equipo. **[?]** alcance (producto, categoría o toda la tienda) y si se acumulan |
+| RN-05 | Las promociones se gestionan aparte del precio base. En v1 hay dos tipos: (a) descuento porcentual y (b) descuento por medio de pago (por ejemplo, un porcentaje pagando en efectivo). Toda promoción tiene fecha de inicio y de fin. Valen online y en el local. Cada promoción alcanza a productos concretos, a una categoría o a toda la tienda. No se acumulan: si aplican varias, gana la de mayor porcentaje. Fuera de v1: 2x1 y promociones bancarias. | Cliente + equipo |
 | RN-06 | Una compra online usa solo el stock online. Una venta del local usa solo el stock físico. La venta del local no se bloquea si el stock físico registrado es insuficiente: se registra igual y el stock físico de esa variante puede quedar en negativo (RN-25). | Equipo |
 | RN-07 | Al pasar a pagar se reservan las unidades. Las unidades reservadas no están disponibles para nadie más. | Equipo |
 | RN-08 | La reserva de una compra con Mercado Pago se libera a los 20 minutos o por cancelación explícita. Cerrar la sesión no libera la reserva porque no es detectable. | Equipo |
@@ -108,18 +110,18 @@ El proyecto tiene un doble objetivo: cumplir el Trabajo Práctico Integrador de 
 | RN-11 | La compra sin cuenta exige como mínimo el email. El comprador registrado usa el email de su cuenta. Los datos de envío se incorporan cuando se implementen los envíos (RN-16). | Cliente + equipo |
 | RN-12 | Toda venta registra canal, monto cobrado y medio de pago. | Equipo |
 | RN-13 | No hay mínimo ni máximo de unidades ni de monto por compra. | Equipo |
-| RN-14 | Si una transferencia se confirma cuando la reserva ya venció, la venta no se confirma sola: pasa a *A verificar* y el administrador recibe un aviso. Se aplica lo mismo a un pago de Mercado Pago aprobado con la reserva vencida. | Cliente (transferencia). **[propuesta]** (Mercado Pago). **[?]** cómo se resuelve |
+| RN-14 | Si una transferencia se confirma cuando la reserva ya venció, la venta no se confirma sola: pasa a *A verificar* y el administrador recibe un aviso. Se aplica lo mismo a un pago de Mercado Pago aprobado con la reserva vencida. | Cliente (transferencia) y equipo (Mercado Pago). **[?]** cómo se resuelve |
 | ~~RN-15~~ | ~~Solo reciben promociones por mail quienes las aceptaron.~~ | Descartada junto con HU-22 |
 | RN-16 | Los envíos se implementan en una etapa posterior. En v1 la entrega se acuerda con el vendedor: el sistema no pide datos de envío, no calcula costos ni se integra con el correo. | Cliente |
-| RN-17 | Las categorías son una lista fija: tops, bodys, remeras, buzos, camperas, jeans, pantalones, polleras, shorts, vestidos, conjuntos, abanicos y accesorios. | Equipo. **[propuesta]** una categoría por producto |
-| RN-18 | Medios de pago por canal. **Online:** Mercado Pago o transferencia. **Local:** efectivo, transferencia o Mercado Pago. En el local el cobro ocurre fuera del sistema, que solo registra el medio usado. | Cliente + equipo. **[propuesta]** que el cobro con Mercado Pago en el local sea solo un registro |
+| RN-17 | Las categorías son una lista fija: tops, bodys, remeras, buzos, camperas, jeans, pantalones, polleras, shorts, vestidos, conjuntos, abanicos y accesorios. Cada producto tiene una sola categoría. | Equipo |
+| RN-18 | Medios de pago por canal. **Online:** Mercado Pago o transferencia. **Local:** efectivo, transferencia o Mercado Pago. En el local el cobro ocurre fuera del sistema, que solo registra el medio usado. | Cliente + equipo. **[?]** confirmar con el cliente cómo cobra con Mercado Pago en el local (§12) |
 | RN-19 | La venta online pasa por: *Pendiente de pago → Pagada → Entregada al correo → Entregada*. Los estados son visibles para el comprador. Los pasos posteriores al pago los actualiza el administrador a mano. Otros finales: *Cancelada*, *Vencida* y *A verificar*. | Cliente + equipo |
 | RN-20 | El comprador solo puede cancelar una compra pendiente de pago. Después del pago, cualquier cambio se gestiona por mail o teléfono. | Cliente |
 | RN-21 | El sistema no gestiona cambios, devoluciones, saldo a favor ni reclamos. La política de cambios y devoluciones del cliente y los datos de contacto se publican como página informativa. | Cliente + equipo. **[?]** datos de contacto |
 | RN-22 | En la venta online el precio lo calcula el servidor al comprar y el comprador no puede modificarlo. En la venta del local el sistema sugiere el monto con la promoción vigente para el medio de pago, y el administrador registra el monto efectivamente cobrado. | Equipo |
-| RN-23 | Hay un único rol de administración. En v1 se usa una sola cuenta de administrador, que el sistema crea al arrancar con los datos de su configuración. No se obtiene por el registro público (ADR-015). | Cliente. **[propuesta]** cómo se crea |
+| RN-23 | Hay un único rol de administración. En v1 se usa una sola cuenta de administrador, que el sistema crea al arrancar con los datos de su configuración. No se obtiene por el registro público (ADR-015). | Cliente |
 | RN-24 | El comprador sin cuenta no consulta el estado en el sitio: se entera por los mails de compra realizada y de pedido despachado, y para cualquier otra consulta se comunica con el local. No hay número de seguimiento en v1: el seguimiento del envío llega con la integración de envíos (RN-16). | Cliente |
-| RN-26 | La contraseña tiene como mínimo 8 caracteres, sin requisitos de mayúsculas, números ni símbolos (ADR-015). | **[propuesta]**, a confirmar con el cliente |
+| RN-26 | La contraseña tiene como mínimo 8 caracteres, sin requisitos de mayúsculas, números ni símbolos (ADR-015). | Equipo, a confirmar con el cliente (§12) |
 | RN-25 | Si el stock físico de una variante queda en negativo, el sistema la marca como *stock a corregir*. El administrador la ve en un filtro del panel (sin mail) y la corrige con un ajuste de stock (HU-08). El stock físico negativo no afecta al stock online ni a las compras de la web. | Equipo |
 
 ## 7. Estados de la venta online
@@ -143,28 +145,28 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 1. Dado un producto publicado, cuando el comprador entra al catálogo, entonces ve nombre, categoría, fotos, precio y los talles y colores de sus variantes.
 2. Dado un producto no publicado, cuando el comprador navega o busca, entonces no aparece.
 3. Dada una variante sin stock online disponible, entonces se muestra como "sin stock" y no se puede agregar al carrito.
-4. Dado un producto con una promoción vigente, entonces se muestra el precio original y el precio con promoción. **[?]** cómo se muestra una promoción condicionada al medio de pago.
-5. Cuando elige talle y color, entonces ve cuántas unidades online hay disponibles. **[propuesta]**
+4. Dado un producto con una promoción vigente, entonces se muestra el precio original y el precio con promoción. La tienda muestra el precio con las promociones vigentes para transferencia; el total final, según el medio de pago elegido, se confirma al comprar (ADR-017).
+5. Cuando elige talle y color, entonces ve cuántas unidades online hay disponibles.
 
 **HU-02 · Buscar, filtrar y ordenar.** Como comprador quiero buscar y filtrar productos, para encontrar rápido lo que busco. *(RN-02, RN-17)*
 1. Cuando el comprador busca por texto, entonces obtiene los productos publicados cuyo nombre o descripción coinciden.
 2. Cuando filtra por categoría, talle, color o rango de precio, entonces solo ve productos que cumplen todos los filtros aplicados.
 3. Cuando ordena por precio (ascendente o descendente) o por novedad, entonces los resultados respetan ese orden.
 4. Dados más resultados que el tamaño de página, cuando pasa de página, entonces no hay resultados repetidos ni salteados.
-5. Dado un cambio en un producto, cuando pasa el retraso máximo de 10 segundos **[propuesta]**, entonces la búsqueda lo refleja (ADR-006). El stock no se indexa: se consulta a Inventario al mostrar el resultado.
+5. Dado un cambio en un producto, cuando pasa el retraso máximo de 10 segundos, entonces la búsqueda lo refleja (ADR-006). El stock no se indexa: se consulta a Inventario al mostrar el resultado.
 
 **HU-03 · Alta y edición de productos (admin).** Como administrador quiero cargar y editar productos con sus variantes y fotos, para mantener la tienda actualizada. *(RN-01, RN-02, RN-03, RN-17)*
-1. Dado un producto nuevo, entonces queda no publicado por defecto. **[propuesta]**
+1. Dado un producto nuevo, entonces queda no publicado por defecto.
 2. Cuando se carga un talle que no pertenece al sistema de talles del producto, entonces se rechaza.
 3. Dado un producto de talle único, cuando se intenta cargar una segunda variante de talle para el mismo color, entonces se rechaza.
 4. Cuando se crean dos variantes con el mismo talle y color, entonces se rechaza.
 5. Cuando se asocian fotos a un color, entonces la ficha muestra esas fotos al elegirlo.
-6. Cuando se crea una variante, entonces queda registrada en Inventario con stock 0 en ambos canales.
+6. Cuando se crea una variante, entonces figura con stock 0 en ambos canales. Inventario la registra con su primer ingreso (el evento `VarianteCreada` no está implementado, ADR-005); hasta entonces el panel pide cargar primero un ingreso.
 
 **HU-04 · Publicar y despublicar.** Como administrador quiero decidir qué productos se ven en la web. *(RN-04)*
 1. Cuando publica un producto, entonces aparece en el catálogo y en la búsqueda.
 2. Cuando lo despublica, entonces deja de aparecer, sin cambiar su stock ni sus ventas anteriores.
-3. Dada una reserva en curso de un producto que se despublica, entonces la reserva sigue su curso. **[propuesta]**
+3. Dada una reserva en curso de un producto que se despublica, entonces la reserva sigue su curso.
 
 **HU-05 · Gestionar precios y promociones (admin).** Como administrador quiero manejar precios y promociones por separado, para hacer ofertas sin tocar el producto. *(RN-05, RN-22)*
 1. Cuando cambia el precio base, entonces las compras nuevas usan el precio nuevo y las ventas ya registradas conservan el suyo.
@@ -172,7 +174,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 3. Dada una promoción fuera de su vigencia, entonces no se aplica.
 4. Dada una promoción por medio de pago, entonces solo se aplica a ventas que usan ese medio.
 5. Dada una promoción vigente, entonces se aplica tanto online como en el local.
-6. **[?]** alcance de la promoción (producto, categoría o toda la tienda) y acumulación.
+6. Una promoción puede alcanzar a productos concretos, a una categoría o a toda la tienda. Dadas varias promociones aplicables, entonces gana la de mayor porcentaje: no se acumulan.
 
 ### Inventario
 
@@ -190,10 +192,10 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 
 **HU-08 · Ajustar stock (admin).** Como administrador quiero corregir el stock por pérdidas o fallas. *(RN-01)*
 1. Cuando ajusta el stock con un motivo, entonces se aplica y queda registrado.
-2. Cuando no indica un motivo, entonces se rechaza. **[propuesta]**
+2. Cuando no indica un motivo, entonces se rechaza.
 3. Cuando el ajuste dejaría el stock por debajo de lo reservado, entonces se rechaza.
-4. Los motivos son *pérdida*, *falla* y *corrección de conteo*, con una nota opcional. **[propuesta]**
-5. Cuando el ajuste dejaría el stock físico negativo, entonces se rechaza; sumar siempre se puede, y así se corrige un físico negativo (RN-25). **[propuesta]**
+4. Los motivos son *pérdida*, *falla* y *corrección de conteo*, con una nota opcional.
+5. Cuando el ajuste dejaría el stock físico negativo, entonces se rechaza; sumar siempre se puede, y así se corrige un físico negativo (RN-25).
 
 **HU-09 · Ver el stock y las variantes a corregir (admin).** Como administrador quiero ver el stock de cada variante y cuáles tienen el stock físico mal registrado, para decidir qué reponer y qué corregir. *(RN-01, RN-25 · ADR-001)*
 1. Cuando abre un producto en el panel, entonces ve cada variante (talle y color) con su stock online, su stock físico y las unidades reservadas.
@@ -218,7 +220,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 4. Cuando el pago es rechazado, entonces la reserva se libera.
 5. Cuando pasan 20 minutos sin pago, entonces la reserva se libera y la venta pasa a *Vencida*.
 6. Dado un aviso de pago repetido, entonces la venta no se confirma dos veces ni descuenta dos veces.
-7. Dado un pago aprobado con la reserva ya vencida, entonces la venta queda *A verificar* y el administrador recibe un aviso. **[propuesta]**
+7. Dado un pago aprobado con la reserva ya vencida, entonces la venta queda *A verificar* y el administrador recibe un aviso.
 8. Dado un reintento de "Comprar" por un error de red, entonces no se crean dos ventas ni dos reservas.
 9. Dado que Inventario no responde, cuando aprieta "Comprar", entonces ve un error claro y no queda ninguna venta a medias.
 
@@ -245,7 +247,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 
 **HU-23 · Actualizar el estado del pedido (admin).** Como administrador quiero avanzar el estado de un pedido pagado, para que el comprador sepa dónde está. *(RN-16, RN-19)*
 1. Dada una venta *Pagada*, cuando el administrador avanza el estado, entonces pasa a *Entregada al correo* y después a *Entregada*, en ese orden.
-2. Cuando intenta saltar un estado o retroceder, entonces se rechaza. **[propuesta]**
+2. Cuando intenta saltar un estado o retroceder, entonces se rechaza.
 3. Cuando el estado cambia, entonces el comprador lo ve en su pedido.
 
 ~~**HU-25 · Seguir un pedido sin cuenta.**~~ **Descartada.** No hay número de seguimiento en v1: el comprador sin cuenta se informa por mail o consultando al local (RN-24).
@@ -283,7 +285,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 6. Los mails se envían al email guardado en la venta al momento de comprar: el del invitado o el de la cuenta del comprador registrado.
 
 **HU-21 · Mails al administrador.** Como administrador quiero enterarme de las ventas y de lo que está pendiente.
-1. Cuando una venta pasa a *Pagada*, entonces recibe un mail de venta nueva. **[propuesta]** en ese momento.
+1. Cuando una venta pasa a *Pagada*, entonces recibe un mail de venta nueva.
 2. Cuando se crea una venta por transferencia, entonces recibe un mail de transferencia pendiente de confirmar.
 3. Cuando una venta queda *A verificar*, entonces recibe un aviso.
 
@@ -306,7 +308,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 **Flujo principal**
 1. El comprador, registrado o invitado, revisa el carrito y aprieta "Comprar". El frontend envía el contenido del carrito a Ventas.
 2. El invitado completa sus datos (como mínimo el email, RN-11). El registrado usa el email de su cuenta, que llega en el token. Elige Mercado Pago.
-3. Ventas obtiene de Catálogo el precio vigente de cada variante. **[propuesta]**
+3. Ventas obtiene de Catálogo el precio vigente de cada variante.
 4. Ventas le pide a Inventario reservar las unidades por 20 minutos (llamada síncrona, con timeout y clave de idempotencia).
 5. Ventas crea la venta en *Pendiente de pago* y guarda el email del comprador (ADR-014).
 6. Ventas crea el pago en Mercado Pago y redirige al comprador.
@@ -318,7 +320,7 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 **Flujos alternativos**
 - **4a.** No hay stock suficiente: se rechaza y el comprador ve "sin stock".
 - **4b.** Inventario no responde: timeout, reintento acotado y error claro al comprador. No se crea la venta y no queda una reserva a medias.
-- **7a.** El pago es rechazado: se libera la reserva. **[?]** Estado de la venta: **[propuesta]** *Cancelada* (ADR-014).
+- **7a.** El pago es rechazado: se libera la reserva. La venta pasa a *Cancelada* (ADR-014).
 - **7b.** No llega aviso en 20 minutos: la reserva vence, Inventario publica `ReservaVencida` y la venta pasa a *Vencida*.
 - **7c.** El pago llega con la reserva vencida: Inventario rechaza la confirmación y la venta queda *A verificar* (RN-14).
 - **8a.** Inventario no responde al confirmar: Ventas reintenta hasta que responda y la venta sigue *Pendiente de pago*. Si mientras tanto vence la reserva, sigue como 7c.
@@ -364,8 +366,8 @@ Fuente editable: [`docs/diagrams/estados.drawio`](docs/diagrams/estados.drawio).
 | ID | Requisito | Cómo se verifica | Origen |
 |---|---|---|---|
 | RNF-01 | **Resiliencia:** si un servicio o una dependencia falla, el resto del sistema sigue funcionando y el usuario ve un mensaje claro de lo que no está disponible. | Caída provocada de cada dependencia relevante, documentada en `docs/POSTMORTEM.md`. Comportamiento esperado en ARCHITECTURE.md, sección 8. | Cátedra |
-| RNF-02 | **Diagnóstico:** ante una falla se puede determinar qué pasó siguiendo la operación entre servicios, sin revisar cada componente a mano. | Logs estructurados con identificador de correlación y trazas del flujo de compra. | Cátedra |
-| RNF-03 | **Métricas con historial:** se mide todo (pedidos, errores por código HTTP, latencia, dependencias) y se puede consultar el pasado, por ejemplo cuántos errores 404 hubo la semana pasada, en un tablero. | Tablero con métricas históricas y al menos una alerta. **[propuesta]** retención de al menos dos semanas. | Cátedra |
+| RNF-02 | **Diagnóstico:** ante una falla se puede determinar qué pasó siguiendo la operación entre servicios, sin revisar cada componente a mano. | Logs estructurados con track id, que permite seguir una compra entre servicios en un tablero (ADR-020). | Cátedra |
+| RNF-03 | **Métricas con historial:** se mide todo (pedidos, errores por código HTTP, latencia, dependencias) y se puede consultar el pasado, por ejemplo cuántos errores 404 hubo la semana pasada, en un tablero. | Tablero con métricas históricas y al menos una alerta. Retención de 15 días (ADR-011). | Cátedra |
 | RNF-04 | **Comunicación:** toda llamada síncrona tiene timeout, manejo de errores y política de reintentos definidos. Todo mensaje asíncrono que no se puede procesar queda en una cola de mensajes fallidos. | Tests de integración y caídas provocadas. Valores en el D5. | Cátedra / consigna |
 | RNF-05 | **Caché y búsqueda con herramientas existentes:** se usan bibliotecas y motores existentes, no implementaciones propias. La caché se invalida ante cambios y se mide su aprovechamiento. | Métricas de aciertos de caché antes y después (D7). | Cátedra |
 | RNF-06 | **Picos de demanda:** el sistema se prueba con un escenario de pico (cambio de temporada, diciembre) y se documenta cómo se comporta y cuál es su principal límite. | Test de carga con resultados analizados (D13). | Cátedra / consigna |
@@ -386,7 +388,7 @@ El **grupo de proveedores** ve el catálogo de FAV y le hace pedidos para sí mi
 | `POST /v1/pedidos` | Aparta el stock y registra la venta, pendiente de pago por transferencia. | Ventas, que aparta el stock en Inventario |
 
 **HU-26 · Pedido de un grupo externo.** Como grupo de proveedores quiero hacerle un pedido a FAV, para comprar su ropa. *(RN-06, RN-09, RN-22)*
-1. Cuando todas las variantes alcanzan, entonces se aparta el stock **online [propuesta]** por 48 horas y la venta queda *Pendiente de pago* por transferencia, con el canal *grupo externo*.
+1. Cuando todas las variantes alcanzan, entonces se aparta el stock **online** por 48 horas y la venta queda *Pendiente de pago* por transferencia, con el canal *grupo externo*.
 2. Cuando una variante no alcanza, entonces no se aparta nada y se informa cuál falta.
 3. Cuando el pedido se repite con la misma clave de idempotencia, entonces se aplica una sola vez.
 4. Desde ahí sigue como una compra por transferencia (CU-02): el administrador confirma la transferencia o la venta vence a las 48 horas.
@@ -404,14 +406,13 @@ Fuera de la v1 **[propuesta]**: registrar las ventas que hace el gimnasio y calc
 
 Solo un rechazo definitivo del gimnasio devuelve las unidades al stock físico. El administrador ve el estado de cada reposición en el panel. Contrato: `docs/contracts/externos/gimnasio/`. La decisión se documenta en el ADR-018 (D9).
 
-**El gimnasio también consume a FAV:** ve el catálogo y la disponibilidad por variante, con su propia clave y sin hacer pedidos (`GET /v1/productos` y `GET /v1/disponibilidad`, contrato 1.1.0, ADR-008). **[?]** Confirmar con el grupo que les sirve el stock online **[propuesta]**.
+**El gimnasio también consume a FAV:** ve el catálogo y la disponibilidad por variante, con su propia clave y sin hacer pedidos (`GET /v1/productos` y `GET /v1/disponibilidad`, contrato 1.1.0, ADR-008). **[?]** Confirmar con el grupo que les sirve el stock online, que es el que devuelve la disponibilidad.
 
 ## 12. Pendientes
 
 ### Con el cliente
 | Tema | Afecta a |
 |---|---|
-| Alcance de las promociones (producto, categoría o toda la tienda) y si se acumulan | RN-05, HU-05 |
 | Cómo se resuelve una venta *A verificar* (reintegro o reasignación) | RN-14 |
 | Cómo cobra con Mercado Pago en el local (fuera del sistema o desde el sistema) | RN-18 |
 | Datos de contacto (mail y teléfono) | RN-21, HU-24 |
@@ -424,5 +425,4 @@ Solo un rechazo definitivo del gimnasio devuelve las unidades al stock físico. 
 ### Del equipo
 | Tema | Dónde se resuelve |
 |---|---|
-| Cómo se entrega y se rota la clave de cada grupo consumidor | D8 |
 | URL pública y clave del gimnasio, prueba conjunta y cómo se revisa una reposición en conflicto | D9 (ADR-018) |
