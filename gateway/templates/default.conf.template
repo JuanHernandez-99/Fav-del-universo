@@ -43,9 +43,15 @@ upstream frontend {
     keepalive 8;
 }
 
-# Correlation id: se respeta el del cliente; si no viene, se usa el id del pedido de nginx (ADR-005, punto 7).
-map $http_x_correlation_id $correlacion {
+# Correlation id (el track id de ADR-020): se respeta el del cliente; si no viene, se usa el id del pedido de nginx
+# (ADR-005, punto 7). X-Track-ID, el nombre del modelo de la cátedra, se acepta si no viene X-Correlation-Id.
+map $http_x_track_id $track_id_entrante {
     ""      $request_id;
+    default $http_x_track_id;
+}
+
+map $http_x_correlation_id $correlacion {
+    ""      $track_id_entrante;
     default $http_x_correlation_id;
 }
 
@@ -77,21 +83,9 @@ limit_req_zone $http_x_api_key zone=por_grupo:10m rate=60r/m;
 limit_req_zone $binary_remote_addr zone=por_ip_sesion:10m rate=30r/m;
 limit_req_status 429;
 
-# Trazas (ADR-011): un span por pedido, que se manda a Jaeger por OTLP/gRPC. Con "propagate", si el pedido trae
-# traceparent (Ventas, por la entrada interna) el gateway sigue esa traza; si no, abre una nueva. En los dos casos
-# la pasa al servicio, así el gateway queda como un paso más entre quien llama y la réplica que atiende.
-# Si Jaeger no responde, el gateway atiende igual y esos spans se pierden.
-otel_exporter {
-    endpoint jaeger:4317;
-}
-otel_service_name gateway;
-otel_trace on;
-otel_trace_context propagate;
-otel_span_name "$request_method $uri";
-otel_span_attr correlation_id $correlacion;
-
-# Log de acceso en JSON, con la réplica que atendió cada pedido (upstream_addr) y el trace_id para abrir su traza.
-log_format json escape=json '{"time":"$time_iso8601","servicio":"gateway","correlation_id":"$correlacion","trace_id":"$otel_trace_id",'
+# Log de acceso en JSON, con el track id y la réplica que atendió cada pedido (upstream_addr). Queda en stdout:
+# el gateway no escribe en app_logs (ADR-020).
+log_format json escape=json '{"time":"$time_iso8601","servicio":"gateway","correlation_id":"$correlacion",'
     '"metodo":"$request_method","ruta":"$uri","codigo":$status,"duracion_s":$request_time,'
     '"upstream":"$upstream_addr","upstream_codigo":"$upstream_status","upstream_duracion_s":"$upstream_response_time"}';
 
@@ -113,11 +107,13 @@ proxy_next_upstream_tries 2;
 server {
     listen 8080;
     access_log /dev/stdout json;
-    # El gateway siempre devuelve el correlation id, también en sus propios errores (401, 429).
+    # El gateway siempre devuelve el correlation id, también en sus propios errores (401, 429), con los dos nombres.
     proxy_hide_header X-Correlation-Id;
+    proxy_hide_header X-Track-ID;
     add_header X-Correlation-Id $correlacion always;
+    add_header X-Track-ID $correlacion always;
 
-    location = /healthz { access_log off; otel_trace off; return 200; }
+    location = /healthz { access_log off; return 200; }
 
     # Errores que genera el propio nginx, con el formato del contrato en lugar de su página HTML. Sin réplicas
     # que atiendan, responde 503 y se puede reintentar. Los errores de los servicios no pasan por acá
@@ -127,17 +123,19 @@ server {
 
     location @no_disponible {
         add_header X-Correlation-Id $correlacion always;
+        add_header X-Track-ID $correlacion always;
         add_header Retry-After 1 always;
         return 503 '{"type":"https://fav.example/errores/no-disponible","title":"Servicio no disponible","status":503,"detail":"Reintentar con la misma Idempotency-Key.","codigo":"NO_DISPONIBLE"}';
     }
 
     location @limite_excedido {
         add_header X-Correlation-Id $correlacion always;
+        add_header X-Track-ID $correlacion always;
         add_header Retry-After 2 always;
         return 429 '{"type":"https://fav.example/errores/limite-excedido","title":"Límite excedido","status":429,"detail":"Reintentar después de Retry-After.","codigo":"LIMITE_EXCEDIDO"}';
     }
 
-    # Capacidad publicada: catálogo y pedidos (contrato catalogo-pedidos-v1).
+    # Capacidad publicada: catálogo, disponibilidad y pedidos (contrato catalogo-pedidos-v1).
     location = /v1/productos {
         if ($grupo_valido = 0) {
             return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
@@ -178,6 +176,26 @@ server {
         proxy_pass http://ventas;
     }
 
+    # Consultar un pedido (contrato 1.3.0). Mismas reglas que /v1/pedidos: solo la clave que puede pedir y el
+    # mismo límite por grupo. Con la capacidad apagada responde el 404 del contrato, como la disponibilidad
+    # (Ventas tampoco registra la ruta). Una regex le gana al prefijo /v1/; /v1/pedidos/ sin id sigue cayendo ahí.
+    location ~ ^/v1/pedidos/[^/]+$ {
+        if ($grupo_puede_pedir = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        if ($capacidad_activa = 0) {
+            return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}';
+        }
+        limit_req zone=por_grupo burst=20 nodelay;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://ventas;
+    }
+
     # Validación del token: solo se llega por auth_request (ADR-016).
     location = /_auth/opcional {
         internal;
@@ -191,12 +209,14 @@ server {
 
     location @no_autenticado {
         add_header X-Correlation-Id $correlacion always;
+        add_header X-Track-ID $correlacion always;
         add_header WWW-Authenticate Bearer always;
         return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
     }
 
     location @no_autorizado {
         add_header X-Correlation-Id $correlacion always;
+        add_header X-Track-ID $correlacion always;
         return 403 '{"type":"https://fav.example/errores/no-autorizado","title":"No autorizado","status":403,"codigo":"NO_AUTORIZADO"}';
     }
 
@@ -285,7 +305,6 @@ server {
     # Lo demás es la tienda: mismo origen que la API, así que no hace falta CORS (ADR-017).
     location / {
         error_page 502 503 504 = @tienda_no_disponible; # acá llega una persona: se le responde una página
-        otel_trace off; # archivos de la tienda (HTML, JS, imágenes): una traza por archivo solo taparía las de la API
         proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Correlation-Id $correlacion;
@@ -295,6 +314,7 @@ server {
     location @tienda_no_disponible {
         default_type "text/html; charset=utf-8";
         add_header X-Correlation-Id $correlacion always;
+        add_header X-Track-ID $correlacion always;
         add_header Retry-After 5 always;
         return 503 '<!doctype html><html lang="es-AR"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>FAV del universo</title><body style="font-family:Georgia,serif;text-align:center;padding:4rem 1rem;background:#fbf7f0;color:#261f2e"><h1>La tienda no está disponible en este momento</h1><p>Es un problema de nuestro lado. Probá de nuevo en un rato.</p></body></html>';
     }

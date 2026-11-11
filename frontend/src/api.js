@@ -145,6 +145,14 @@ export const buscarProductosAdmin = (token, q, opciones) =>
 export const consultarStockAdmin = (token, ids, opciones) =>
   pedir(`/inventario/v1/stock?variantes=${ids.map(encodeURIComponent).join(',')}`, { ...opciones, headers: conToken(token) });
 
+// Stock de muchas variantes: Inventario acepta hasta 200 ids por consulta, así que se pide en tandas.
+export async function consultarStockEnTandas(token, ids, opciones) {
+  const tandas = [];
+  for (let i = 0; i < ids.length; i += MAXIMO_POR_CONSULTA) tandas.push(ids.slice(i, i + MAXIMO_POR_CONSULTA));
+  const respuestas = await Promise.all(tandas.map((tanda) => consultarStockAdmin(token, tanda, opciones)));
+  return respuestas.flatMap((r) => r.items);
+}
+
 export const sugerirMontoLocal = (token, medioPago, variantes, opciones) =>
   pedir(`/ventas/v1/admin/ventas-local/sugerencia?${new URLSearchParams({ medioPago, variantes })}`, { ...opciones, headers: conToken(token) });
 

@@ -109,6 +109,9 @@ type Venta struct {
 	VenceEn           *time.Time
 	CreadaEn          time.Time
 	ActualizadaEn     time.Time
+	// TrackID es el del pedido que creó la venta (ADR-020). El pago, las tareas y los mails lo siguen usando,
+	// así una compra se ve completa en los logs aunque sus pasos lleguen en pedidos distintos.
+	TrackID string
 }
 
 func TotalDe(items []Item) int64 {
@@ -312,6 +315,7 @@ type Tarea struct {
 	VentaID  string
 	Tipo     TipoTarea
 	Intentos int
+	TrackID  string // el de la venta
 }
 
 // EsperaTarea crece con cada intento, hasta un minuto: la tarea se reintenta hasta que Inventario responda.
@@ -340,6 +344,7 @@ type Mail struct {
 	Asunto       string
 	Cuerpo       string
 	Intentos     int
+	TrackID      string // el de la venta
 }
 
 // MaxIntentosMail: el primer envío más 5 reintentos (ADR-005, punto 2). Agotados, queda como fallido (HU-20.5).

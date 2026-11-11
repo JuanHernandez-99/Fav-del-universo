@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -18,10 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/XSAM/otelsql"
 	_ "github.com/go-sql-driver/mysql"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/usuarios/internal/claves"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/usuarios/internal/handler"
@@ -63,19 +59,12 @@ func correr() error {
 		nivel = slog.LevelDebug
 	}
 	observabilidad.ConfigurarLogs(servicio, instancia, nivel)
+	// Además de stdout, cada línea de INFO o más va a app_logs en mysql-logs (ADR-020). Se cierra última: guarda lo pendiente.
+	cerrarLogsMySQL := observabilidad.IniciarLogsMySQL(servicio, instancia)
+	defer cerrarLogsMySQL()
 
 	ctx, detener := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer detener()
-
-	cerrarTrazas, err := observabilidad.ConfigurarTrazas(ctx, servicio, instancia)
-	if err != nil {
-		return fmt.Errorf("configurando trazas: %w", err)
-	}
-	defer func() {
-		ctxCierre, cancelar := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancelar()
-		_ = cerrarTrazas(ctxCierre)
-	}()
 
 	clave, err := claves.LeerPrivada(rutaPrivada())
 	if err != nil {
@@ -134,16 +123,7 @@ func abrirBase() (*sql.DB, error) {
 		os.Getenv("USUARIOS_DB_USER"), os.Getenv("USUARIOS_DB_PASSWORD"),
 		variable("USUARIOS_DB_HOST", "mysql-usuarios:3306"), variable("USUARIOS_DB_NAME", "usuarios"))
 
-	db, err := otelsql.Open("mysql", dsn,
-		otelsql.WithAttributes(semconv.DBSystemMySQL),
-		otelsql.WithSpanOptions(otelsql.SpanOptions{
-			OmitConnResetSession: true,
-			OmitConnPrepare:      true,
-			OmitRows:             true,
-			SpanFilter: func(ctx context.Context, _ otelsql.Method, _ string, _ []driver.NamedValue) bool {
-				return trace.SpanContextFromContext(ctx).IsValid()
-			},
-		}))
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
 	}

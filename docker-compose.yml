@@ -5,7 +5,7 @@
 # también, igual que Usuarios. Mercado Pago y el gimnasio están simulados.
 #
 # Puertos publicados:
-#   8080  gateway (capacidad publicada y panel)     16686  Jaeger (trazas)
+#   8080  gateway (capacidad publicada y panel)     3310   MySQL de logs (solo desde esta máquina)
 #   9090  Prometheus (métricas)                      3307   MySQL de Inventario (tests)
 #   8095  mock del gimnasio (admin de WireMock)      3308   MySQL de Ventas (tests)
 #   8096  simulador de Mercado Pago                  8025   Mailpit (bandeja de mails)
@@ -13,8 +13,12 @@
 #   3309  MySQL de Usuarios (tests)                  9200   Elasticsearch (solo desde esta máquina)
 #   3000  Grafana (tablero, solo desde esta máquina) 9093   Alertmanager (solo desde esta máquina)
 
-x-otel: &otel
-  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+# Logs en MySQL (ADR-020): los servicios escriben en app_logs de mysql-logs. Arrancan aunque esté caído.
+x-logs: &logs
+  LOGS_MYSQL_ACTIVO: ${LOGS_MYSQL_ACTIVO:-true}
+  LOGS_MYSQL_HOST: mysql-logs:3306
+  LOGS_MYSQL_USUARIO: logs_escritor
+  LOGS_MYSQL_PASSWORD: ${LOGS_MYSQL_ESCRITOR_PASSWORD:-cambiar}
 
 services:
   # ---------- Inventario (real) ----------
@@ -22,7 +26,7 @@ services:
     build: ./services/inventario
     deploy: { replicas: 2 } # ADR-012
     environment:
-      <<: *otel
+      <<: *logs
       INVENTARIO_DB_HOST: mysql-inventario:3306
       INVENTARIO_DB_NAME: ${INVENTARIO_DB_NAME:-inventario}
       INVENTARIO_DB_USER: ${INVENTARIO_DB_USER:-inventario}
@@ -56,7 +60,7 @@ services:
     build: ./services/catalogo
     deploy: { replicas: 2 } # ADR-012
     environment:
-      <<: *otel
+      <<: *logs
       MONGO_HOST: mongo-catalogo:27017
       ELASTICSEARCH_URL: ${ELASTICSEARCH_URL-http://elasticsearch:9200} # vacía: busca en MongoDB (ADR-006)
       MEMCACHED_ADDR: ${MEMCACHED_ADDR-memcached:11211}
@@ -132,7 +136,7 @@ services:
   ventas:
     build: ./services/ventas
     environment:
-      <<: *otel
+      <<: *logs
       VENTAS_DB_HOST: mysql-ventas:3306
       CAPACIDAD_PUBLICA_ACTIVA: ${CAPACIDAD_PUBLICA_ACTIVA:-true}
       VENTAS_DB_NAME: ${VENTAS_DB_NAME:-ventas}
@@ -195,7 +199,7 @@ services:
   usuarios:
     build: ./services/usuarios
     environment:
-      <<: *otel
+      <<: *logs
       USUARIOS_DB_HOST: mysql-usuarios:3306
       USUARIOS_DB_NAME: ${USUARIOS_DB_NAME:-usuarios}
       USUARIOS_DB_USER: ${USUARIOS_DB_USER:-usuarios}
@@ -232,7 +236,7 @@ services:
 
   # ---------- Gateway ----------
   gateway:
-    image: nginx:1.28-alpine-otel # trae el módulo de OpenTelemetry: el gateway aparece en las trazas (ADR-011)
+    image: nginx:1.28-alpine # trae njs, que valida el token (ADR-016)
     environment:
       CAPACIDAD_API_KEY: ${CAPACIDAD_API_KEY:-clave-grupo-proveedores}
       CAPACIDAD_API_KEY_GIMNASIO: ${CAPACIDAD_API_KEY_GIMNASIO:-clave-grupo-gimnasio}
@@ -270,10 +274,25 @@ services:
       - ./mocks/gimnasio-consignacion/mappings:/home/wiremock/mappings:ro
     ports: ["8095:8080"]
 
-  # ---------- Observabilidad (ADR-011) ----------
-  jaeger:
-    image: jaegertracing/all-in-one:1.62.0
-    ports: ["16686:16686"]
+  # ---------- Observabilidad (ADR-011 y ADR-020) ----------
+  # Logs de los servicios (ADR-020): infraestructura de observabilidad, como Prometheus, no datos de negocio.
+  # 001 crea app_logs y 002 los usuarios (los servicios solo insertan; Grafana solo lee), al crear el volumen.
+  mysql-logs:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${LOGS_MYSQL_ROOT_PASSWORD:-cambiar}
+      MYSQL_DATABASE: logs
+      LOGS_MYSQL_ESCRITOR_PASSWORD: ${LOGS_MYSQL_ESCRITOR_PASSWORD:-cambiar}
+      LOGS_MYSQL_LECTOR_PASSWORD: ${LOGS_MYSQL_LECTOR_PASSWORD:-cambiar}
+    ports: ["127.0.0.1:3310:3306"]
+    volumes:
+      - mysql-logs-data:/var/lib/mysql
+      - ./observabilidad/mysql-logs:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   prometheus:
     image: prom/prometheus:v3.5.0
@@ -298,6 +317,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/tableros/fav-general.json
+      LOGS_MYSQL_LECTOR_PASSWORD: ${LOGS_MYSQL_LECTOR_PASSWORD:-cambiar} # datasource de logs, solo lectura
     volumes:
       - ./observabilidad/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observabilidad/grafana/tableros:/var/lib/grafana/tableros:ro
@@ -314,5 +334,6 @@ volumes:
   mysql-inventario-data:
   mysql-ventas-data:
   mysql-usuarios-data:
+  mysql-logs-data:
   jwt-privada:
   jwt-publica:

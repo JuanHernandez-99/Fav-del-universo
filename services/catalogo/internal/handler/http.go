@@ -72,7 +72,7 @@ func NuevoRouter(s *service.Servicio, opcionesRouter ...Opcion) http.Handler {
 		mux.HandleFunc("GET /v1/productos", h.listarCatalogoPublico)
 	}
 
-	// Traza, correlation id y log por pedido (ADR-011), y adentro las métricas. Van pegados al router porque él
+	// Track id y log por pedido (ADR-020), y adentro las métricas. Van pegados al router porque él
 	// completa la ruta registrada (r.Pattern) en el mismo pedido que recibe: los dos la usan.
 	return observabilidad.Middleware(metricas.Middleware(mux))
 }

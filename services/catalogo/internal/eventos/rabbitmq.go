@@ -18,6 +18,9 @@ import (
 
 	"github.com/google/uuid"
 	amqp "github.com/rabbitmq/amqp091-go"
+
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/observabilidad"
 )
 
 const (
@@ -101,14 +104,19 @@ func NuevoPublicador(urlBroker string, esperaReintento time.Duration) *Publicado
 }
 
 // Publicar devuelve nil solo si el broker ya guardó el mensaje. Recién ahí se marca el producto como publicado.
-func (p *Publicador) Publicar(ctx context.Context, productoID string, version int) error {
+// El evento lleva el track id del pedido que hizo el cambio (ADR-020); si no hay, uno propio.
+func (p *Publicador) Publicar(ctx context.Context, c modelo.CambioProducto) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if err := p.asegurarConexion(); err != nil {
 		return err
 	}
 	id := uuid.NewString()
-	cuerpo, err := json.Marshal(sobre{id, Tipo, versionEvento, time.Now().UTC(), "evento-" + id, datos{productoID, version}})
+	correlacion := c.Correlacion
+	if correlacion == "" {
+		correlacion = "evento-" + id
+	}
+	cuerpo, err := json.Marshal(sobre{id, Tipo, versionEvento, time.Now().UTC(), correlacion, datos{c.ID, c.Version}})
 	if err != nil {
 		return err
 	}
@@ -116,7 +124,7 @@ func (p *Publicador) Publicar(ctx context.Context, productoID string, version in
 	defer cancelar()
 	confirmacion, err := p.ch.PublishWithDeferredConfirmWithContext(ctx, Exchange, Tipo, false, false, amqp.Publishing{
 		ContentType: "application/json", DeliveryMode: amqp.Persistent, MessageId: id, Type: Tipo,
-		CorrelationId: "evento-" + id, AppId: "catalogo", Timestamp: time.Now().UTC(), Body: cuerpo,
+		CorrelationId: correlacion, AppId: "catalogo", Timestamp: time.Now().UTC(), Body: cuerpo,
 	})
 	if err != nil {
 		p.cerrar()
@@ -243,6 +251,10 @@ func (c *Consumidor) decidir(ctx context.Context, cuerpo []byte, mensajeID strin
 	if err := json.Unmarshal(cuerpo, &e); err != nil || e.ID == "" || e.Datos.ProductoID == "" {
 		slog.ErrorContext(ctx, "mensaje no procesable: va a la cola de fallidos", "mensaje_id", mensajeID, "error", err)
 		return ColaFallidos, amqp.Table{"x-motivo": "no procesable"}
+	}
+	if e.CorrelationID != "" {
+		// Los logs de la indexación llevan el track id del pedido que cambió el producto (ADR-020).
+		ctx = observabilidad.ConCorrelationID(ctx, e.CorrelationID)
 	}
 	err := c.manejador(ctx, e.Datos.ProductoID)
 	if err == nil {

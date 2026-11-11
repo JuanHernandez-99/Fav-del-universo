@@ -22,6 +22,41 @@ export function filasDeStock(variantes, stocks) {
     });
 }
 
+// Qué cantidades se ven en la lista. "Online" incluye lo disponible, que es el online menos lo reservado.
+export const VISTAS_CANTIDADES = [['todo', 'Todo'], ['fisico', 'Físico'], ['online', 'Online'], ['reservado', 'Reservado']];
+const COLUMNAS = {
+  online: ['online', 'Online'], reservado: ['reservado', 'Reservado'],
+  disponibleOnline: ['disponibleOnline', 'Disponible online'], fisico: ['fisico', 'Físico'],
+};
+export function columnasDe(vista) {
+  if (vista === 'fisico') return [COLUMNAS.fisico];
+  if (vista === 'online') return [COLUMNAS.online, COLUMNAS.disponibleOnline];
+  if (vista === 'reservado') return [COLUMNAS.reservado];
+  return [COLUMNAS.online, COLUMNAS.reservado, COLUMNAS.disponibleOnline, COLUMNAS.fisico];
+}
+
+// El stock de un producto es la suma de sus variantes. Si alguna tiene el físico negativo, el producto se marca.
+export function totalesDe(filas) {
+  const total = { online: 0, reservado: 0, disponibleOnline: 0, fisico: 0, stockACorregir: false };
+  for (const f of filas) {
+    for (const campo of ['online', 'reservado', 'disponibleOnline', 'fisico']) total[campo] += f[campo];
+    total.stockACorregir ||= f.stockACorregir;
+  }
+  return total;
+}
+
+// Tocar una columna ordena de mayor a menor; otra vez, de menor a mayor; la tercera, saca el orden.
+export function siguienteOrden(actual, campo) {
+  if (actual?.campo !== campo) return { campo, sentido: 'desc' };
+  return actual.sentido === 'desc' ? { campo, sentido: 'asc' } : null;
+}
+
+// Ordena productos por el total de una cantidad. Con el mismo total, por nombre, para que el orden no salte.
+export function ordenarPorStock(productos, { campo, sentido }) {
+  const signo = sentido === 'asc' ? 1 : -1;
+  return [...productos].sort((a, b) => signo * (a.total[campo] - b.total[campo]) || a.nombre.localeCompare(b.nombre));
+}
+
 // El pedido a Inventario según el tipo de movimiento. En el ajuste la cantidad lleva signo: negativa resta.
 export function pedidoDe({ tipo, varianteId, canal, origen, cantidad, sentido, motivo, nota }) {
   const n = Number(cantidad);

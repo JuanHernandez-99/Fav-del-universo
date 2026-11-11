@@ -96,14 +96,14 @@ export default function Producto() {
     <article className="ficha">
       <div className="ficha-galeria">
         <div className="ficha-foto">
-          <FotoPrenda foto={foto?.url} categoria={producto.categoria} color={colorActual} nombre={`${producto.nombre}, color ${colorActual}`} prioridad />
+          <FotoPrenda foto={foto?.url} categoria={producto.categoria} color={colorActual} nombre={`${producto.nombre}, color ${colorActual}`} semilla={producto.productoId} prioridad />
           {producto.promocion && <span className="etiqueta etiqueta-promo">−{producto.promocion.porcentaje}%</span>}
         </div>
         {fotos.length > 1 && (
           <div className="ficha-miniaturas">
             {fotos.map((f, i) => (
               <button key={f.url} type="button" aria-label={`Ver foto ${i + 1}`} aria-pressed={i === fotoElegida} onClick={() => setFotoElegida(i)}>
-                <FotoPrenda foto={f.url} categoria={producto.categoria} color={colorActual} nombre="" />
+                <FotoPrenda foto={f.url} categoria={producto.categoria} color={colorActual} nombre="" semilla={producto.productoId} />
               </button>
             ))}
           </div>

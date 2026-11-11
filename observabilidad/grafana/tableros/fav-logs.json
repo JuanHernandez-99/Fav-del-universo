@@ -1,0 +1,655 @@
+{
+  "uid": "fav-logs",
+  "title": "FAV · Logs",
+  "tags": [
+    "fav"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "description": "Logs de los servicios guardados en mysql-logs (ADR-020). Pegar un track id (X-Correlation-Id de la respuesta) para seguir un pedido entre servicios.",
+  "links": [
+    {
+      "title": "FAV · Estado general",
+      "type": "link",
+      "url": "/d/fav-general/fav-estado-general",
+      "icon": "dashboard",
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "textbox",
+        "name": "track_id",
+        "label": "Track id",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "description": "El X-Correlation-Id (o X-Track-ID) que devuelve el gateway. Vacío: las últimas líneas."
+      },
+      {
+        "type": "custom",
+        "name": "servicio",
+        "label": "Servicio",
+        "query": "catalogo,inventario,ventas,usuarios",
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "catalogo",
+            "value": "catalogo"
+          },
+          {
+            "selected": false,
+            "text": "inventario",
+            "value": "inventario"
+          },
+          {
+            "selected": false,
+            "text": "ventas",
+            "value": "ventas"
+          },
+          {
+            "selected": false,
+            "text": "usuarios",
+            "value": "usuarios"
+          }
+        ]
+      },
+      {
+        "type": "custom",
+        "name": "nivel",
+        "label": "Nivel",
+        "query": "info,warn,error",
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "All",
+            "value": "$__all"
+          },
+          {
+            "selected": false,
+            "text": "info",
+            "value": "info"
+          },
+          {
+            "selected": false,
+            "text": "warn",
+            "value": "warn"
+          },
+          {
+            "selected": false,
+            "text": "error",
+            "value": "error"
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Logs por servicio",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+      },
+      "description": "Todas las líneas por minuto, de cada servicio y nivel elegidos. Muestra que los servicios están escribiendo aunque no haya advertencias ni errores.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql-logs"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval, 0), stage AS metric, COUNT(*) AS value\nFROM app_logs\nWHERE $__timeFilter(created_at) AND stage IN (${servicio:sqlstring}) AND level IN (${nivel:sqlstring})\nGROUP BY 1, 2\nORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            },
+            "lineWidth": 1
+          },
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Sin logs en este rango"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Advertencias y errores por servicio",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 7
+      },
+      "description": "Líneas warn y error por minuto, de cada servicio. No depende del track id.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql-logs"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval, 0), CONCAT(stage, ' · ', level) AS metric, COUNT(*) AS value\nFROM app_logs\nWHERE $__timeFilter(created_at) AND level IN ('warn', 'error') AND stage IN (${servicio:sqlstring})\nGROUP BY 1, 2\nORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            },
+            "lineWidth": 1
+          },
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Sin advertencias ni errores"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Logs (más viejo arriba)",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 20
+      },
+      "description": "Máximo 500 líneas. Con track id, todas las líneas de ese pedido en todos los servicios, en orden.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql-logs"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "-- Con track id: todas sus líneas, sin importar el rango de tiempo. Sin track id: las últimas 500 del rango.\nSELECT hora AS `Hora`, servicio AS `Servicio`, replica AS `Réplica`, nivel AS `Nivel`, mensaje AS `Mensaje`, track_id AS `Track id`, atributos AS `Atributos`\nFROM (\n  (SELECT id, created_at AS hora, stage AS servicio, instancia AS replica, level AS nivel, message AS mensaje, track_id, atributos FROM app_logs\n   WHERE ${track_id:sqlstring} <> '' AND track_id = ${track_id:sqlstring} AND stage IN (${servicio:sqlstring}) AND level IN (${nivel:sqlstring})\n   ORDER BY created_at DESC, id DESC LIMIT 500)\n  UNION ALL\n  (SELECT id, created_at AS hora, stage AS servicio, instancia AS replica, level AS nivel, message AS mensaje, track_id, atributos FROM app_logs\n   WHERE ${track_id:sqlstring} = '' AND $__timeFilter(created_at) AND stage IN (${servicio:sqlstring}) AND level IN (${nivel:sqlstring})\n   ORDER BY created_at DESC, id DESC LIMIT 500)\n) lineas\nORDER BY hora, id"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true,
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hora"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:YYYY-MM-DD HH:mm:ss.SSS"
+              },
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Servicio"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Réplica"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Nivel"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "info": {
+                        "color": "text",
+                        "index": 0
+                      },
+                      "warn": {
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "error": {
+                        "color": "red",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mensaje"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Track id"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 280
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Flujo del track id",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 34,
+        "w": 24,
+        "h": 4
+      },
+      "description": "Tiempo entre la primera y la última línea del track id, cuántas líneas tiene y por cuántos servicios pasó. Incluye las esperas ajenas al sistema, como el comprador pagando en Mercado Pago. No depende de los filtros de servicio y nivel.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql-logs"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT TIMESTAMPDIFF(MICROSECOND, MIN(created_at), MAX(created_at)) / 1000 AS `Duración del flujo`, COUNT(*) AS `Líneas`, COUNT(DISTINCT stage) AS `Servicios`\nFROM app_logs\nWHERE ${track_id:sqlstring} <> '' AND track_id = ${track_id:sqlstring}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "Pegá un track id",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Duración del flujo"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Tiempos del flujo (pegá un track id)",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 16
+      },
+      "description": "Solo con un track id. Cada línea muestra cuánto pasó desde la primera línea del flujo y desde la anterior. Los tiempos se miden sobre todo el flujo, aunque se filtre por servicio o nivel. Es tiempo entre líneas de log, no lo que tardó cada llamada. Si la pantalla no alcanza, la tabla se desliza a lo ancho. Un atributo largo se ve completo haciendo clic en la celda.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql-logs"
+          },
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "-- Solo con track id. Los tiempos se calculan sobre todas sus líneas y después se filtra por servicio y nivel.\nSELECT hora AS `Hora`, servicio AS `Servicio`, replica AS `Réplica`, nivel AS `Nivel`, mensaje AS `Mensaje`, desde_inicio AS `Desde inicio`, desde_anterior AS `Desde anterior`, atributos AS `Atributos`\nFROM (\n  SELECT id, created_at AS hora, stage AS servicio, instancia AS replica, level AS nivel, message AS mensaje, atributos,\n    TIMESTAMPDIFF(MICROSECOND, MIN(created_at) OVER (), created_at) / 1000 AS desde_inicio,\n    TIMESTAMPDIFF(MICROSECOND, LAG(created_at) OVER (ORDER BY created_at, id), created_at) / 1000 AS desde_anterior\n  FROM app_logs\n  WHERE ${track_id:sqlstring} <> '' AND track_id = ${track_id:sqlstring}\n) flujo\nWHERE servicio IN (${servicio:sqlstring}) AND nivel IN (${nivel:sqlstring})\nORDER BY hora, id\nLIMIT 500"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true,
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Hora"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time:YYYY-MM-DD HH:mm:ss.SSS"
+              },
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Servicio"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Réplica"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Nivel"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "info": {
+                        "color": "text",
+                        "index": 0
+                      },
+                      "warn": {
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "error": {
+                        "color": "red",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Mensaje"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Desde inicio"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Desde anterior"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "custom.width",
+                "value": 140
+              },
+              {
+                "id": "noValue",
+                "value": "—"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Atributos"
+            },
+            "properties": [
+              {
+                "id": "custom.minWidth",
+                "value": 200
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ]
+}

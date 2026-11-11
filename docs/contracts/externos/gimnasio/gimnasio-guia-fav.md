@@ -1,6 +1,8 @@
 # Integración con FAV: stock y reposiciones del gimnasio
 
-**Contrato:** [OpenAPI FAV 1.0.0](openapi-fav-v1.yaml). **Responsable:** microservicio Tienda del gimnasio.
+> Guía escrita por el grupo del gimnasio, no por FAV. Lo que dice sobre el cliente de FAV (por ejemplo, que trata todo `4xx` como rechazo) quedó superado por el [ADR-018](../../../adr/ADR-018-consumo-del-gimnasio-contrato-real.md). Sus referencias a `ADR-022` y a `EVIDENCIA-TIENDA` apuntan a documentos de su repositorio, que no están acá.
+
+**Contrato:** [OpenAPI 1.0.0](gimnasio-consignaciones-1.0.0.openapi.yaml). **Responsable:** microservicio Tienda del gimnasio.
 
 **Estado:** endpoints implementados y verificados localmente con PostgreSQL real. URL pública, aceptación de FAV y prueba conjunta pendientes. Los ejemplos no acreditan una conexión con el grupo. La consulta del catálogo externo `GET /api/v1/tienda/productos` sigue respondiendo `503 INTEGRACION_PENDIENTE`; el stock local funciona independientemente.
 

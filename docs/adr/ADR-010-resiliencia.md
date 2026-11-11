@@ -2,10 +2,10 @@
 
 |                             |                                                                                                                                                                                                                                                                                          |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**                  | Aceptada (primera versión) · Entrega 2. Cubre Inventario y la entrada por el gateway. Ensayo de caídas en [`docs/POSTMORTEM.md`](../POSTMORTEM.md) (09/11/2026); falta la jornada de fallas controladas.                                                                                                                       |
+| **Estado**                  | Aceptada · Entrega 2. Detalla Inventario y la entrada por el gateway; los mecanismos de Ventas están en ADR-005 y ADR-014. Ensayo de caídas en [`docs/POSTMORTEM.md`](../POSTMORTEM.md) (09/11/2026); falta la jornada de fallas controladas.                                                                                                                       |
 | **Fecha**                   | 23/10/2026                                                                                                                                                                                                                                                                               |
 | **Decisión de la consigna** | D10 · Resiliencia                                                                                                                                                                                                                                                                        |
-| **Relacionadas**            | [ADR-004](ADR-004-consistencia-y-concurrencia.md) (idempotencia), [ADR-005](ADR-005-comunicacion.md) (timeouts y reintentos), [ADR-009](ADR-009-consumo-del-gimnasio.md) (gimnasio), [ADR-011](ADR-011-observabilidad.md) (métricas y alertas), [ADR-012](ADR-012-balanceo.md) (réplicas) |
+| **Relacionadas**            | [ADR-004](ADR-004-consistencia-y-concurrencia.md) (idempotencia), [ADR-005](ADR-005-comunicacion.md) (timeouts y reintentos), [ADR-018](ADR-018-consumo-del-gimnasio-contrato-real.md) (gimnasio), [ADR-011](ADR-011-observabilidad.md) (métricas y alertas), [ADR-012](ADR-012-balanceo.md) (réplicas) |
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: forma parte del diseño pero todavía no está implementado.
 
@@ -21,7 +21,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | --------------------------------------------------- | ----------------------------------------------------- |
 | MySQL de Inventario                                 | Todo el estado del servicio                           |
 | Gimnasio (HTTP, de otro grupo)                      | Consultar su stock y enviar reposiciones              |
-| RabbitMQ                                            | Publicar `ReservaVencida` (_previsto_)                |
+| RabbitMQ                                            | Publicar `ReservaVencida`                             |
 | Gateway (nginx)                                     | Único camino de entrada y balanceo                    |
 | Quien llama: Ventas y el panel                      | Origen de los pedidos                                 |
 
@@ -42,7 +42,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | **Deadline / timeout** | Gateway → servicio | 5 s de lectura y envío, 1 s para conectar | Que el gateway no espere indefinidamente |
 | | Inventario, cada pedido HTTP | 4 s (menor que el del gateway) | Que Inventario corte antes de que el gateway ya haya desistido |
 | | Inventario → MySQL | 3 s para conectar, 5 s de lectura y escritura, y el contexto del pedido | Que una base lenta no retenga el pedido |
-| | Inventario → gimnasio | 2 s | Que un gimnasio lento no retenga recursos |
+| | Inventario → gimnasio | 3 s (ADR-018) | Que un gimnasio lento no retenga recursos |
 | **Reintento con idempotencia** | Ventas → Inventario | 2 s por intento, hasta 2 reintentos (200 ms y 400 ms más aleatoriedad), solo ante timeout, conexión rechazada, 502, 503 o 504; nunca ante `4xx` | Superar fallas transitorias sin duplicar la reserva (misma `Idempotency-Key`) |
 | | Inventario → gimnasio | Persistido en la base, espera de 5 s duplicándose hasta 5 min | Que una reposición no se pierda si el gimnasio no responde |
 | **Circuit breaker** | Inventario → gimnasio | Se abre tras 5 fallas seguidas; 30 s abierto; una llamada de prueba | Fallar rápido en lugar de esperar el timeout en cada consulta |
@@ -67,7 +67,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | **El gimnasio**                        | Todo lo de FAV, incluidas las reservas                                                               | Ver su stock y enviarle reposiciones                                           | Timeout, circuit breaker y reintento persistido. Las reposiciones pendientes se envían al volver              |
 | **El gateway**                         | Nada desde afuera. Los servicios entre sí siguen funcionando                                         | Toda entrada al sistema                                                        | **Sin protección:** hay una sola instancia (ver Consecuencias)                                                  |
 | **Quien llama es lento y reintenta**   | Inventario                                                                                           | —                                                                              | Idempotencia: el reintento devuelve la misma reserva                                                          |
-| **RabbitMQ** (_previsto_)              | Todo lo síncrono                                                                                     | Los efectos asíncronos se demoran                                              | Outbox: los eventos esperan en la tabla y se publican cuando vuelve                                           |
+| **RabbitMQ**                           | Todo lo síncrono                                                                                     | Los efectos asíncronos se demoran                                              | Outbox: los eventos esperan en la tabla y se publican cuando vuelve                                           |
 
 ### Qué se comunica al que llama
 
@@ -101,18 +101,17 @@ Los errores usan el formato Problem Details con un `codigo` estable, y distingue
 **Negativas aceptadas y problemas conocidos**
 
 - **El gateway es una sola instancia.** Es un punto único de falla. El apunte lo marca como anti-patrón. Se acepta en esta entrega; para la presentación final se evalúa una segunda instancia (el límite de pedidos es por instancia: con dos, habría que coordinarlo o aceptar la aproximación).
-- **El presupuesto de tiempo no se propaga de punta a punta.** El mock de Ventas llama a Inventario con 2 s por intento y hasta 3 intentos: en el peor caso, con Inventario colgado (no caído), son unos 6,6 s. El gateway corta la llamada del consumidor a los 5 s, así que este recibiría el `504` genérico de nginx en lugar del `503 NO_DISPONIBLE` con Problem Details que promete el contrato. El mock cancela sus reintentos al detectar que la conexión se cerró, pero la respuesta ya se perdió. Si Inventario está caído (conexión rechazada), los tres intentos terminan en menos de un segundo y el consumidor sí recibe el `503` del contrato. Hay que alinear los tiempos (un deadline total menor al del gateway) cuando se implemente Ventas. **Resuelto el 04/11/2026:** Ventas corta cada pedido a los 4,5 s, reintentos incluidos ([ADR-014](ADR-014-pagos-mails-y-orden-de-la-compra.md)). Con Inventario detenido se comprobó el `503` del contrato en menos de 5 s. Con Inventario colgado (lento, no caído), el 05/11/2026: `503 NO_DISPONIBLE` a los 4,5 s, sin venta ni reserva de más (ver ADR-005, "Validación").
+- **El presupuesto de tiempo se alinea con un tope total (resuelto el 04/11/2026).** Con el mock de Ventas, los reintentos a Inventario (2 s por intento, hasta 3 intentos) sumaban unos 6,6 s con Inventario colgado, más que los 5 s del gateway: el consumidor recibía el `504` de nginx en lugar del `503 NO_DISPONIBLE` del contrato. Ventas real corta cada pedido a los 4,5 s, reintentos incluidos ([ADR-014](ADR-014-pagos-mails-y-orden-de-la-compra.md)). Se comprobó el `503` del contrato con Inventario detenido (menos de 5 s) y con Inventario colgado (a los 4,5 s, sin venta ni reserva de más; ver ADR-005, "Validación").
 - **Reintentos en dos lugares.** El gateway reintenta contra la otra réplica ante error de conexión, timeout o `502` (hasta 2 intentos), y Ventas reintenta además hasta 2 veces. Es seguro por la idempotencia, pero amplifica la carga durante una degradación. nginx no reenvía un `POST` que ya llegó a una réplica.
 - **La verificación de réplicas es pasiva.** Una réplica con la base caída sigue en el reparto porque su `503` no cuenta como falla para nginx. Se decidió así a propósito: ese `503` también lo usa Inventario para avisar que el gimnasio no está disponible, y contarlo sacaba del reparto a réplicas sanas.
 - **El circuito del gimnasio es por réplica.** Cada réplica abre el suyo con su propia muestra.
 - **Sin bulkhead para las consultas al gimnasio del panel**, que corren en el hilo del pedido (con timeout de 3 s).
-- ~~El rechazo definitivo ante cualquier `4xx` del gimnasio puede devolver stock por error de configuración (ADR-009).~~ Resuelto en el ADR-018.
-- **Sin cola de mensajes fallidos todavía:** llega con RabbitMQ.
+
+El rechazo ante cualquier `4xx` del gimnasio (riesgo del ADR-009) se resolvió en el ADR-018. Los mensajes fallidos de `ReservaVencida` van a `ventas.reserva-vencida.dlq`, con la alerta `MensajesEnColaDeFallidos` (ADR-011).
 
 ## Pendientes
 
 - **Jornada de fallas controladas,** con el gimnasio real y una compra completa.
-- Mensajes fallidos (DLQ) cuando exista el consumidor de `ReservaVencida`.
 - Segunda instancia del gateway.
 
 ## Validación

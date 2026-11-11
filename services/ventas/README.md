@@ -2,7 +2,7 @@
 
 Ventas online y del local, sus estados, los pagos (Mercado Pago y transferencia) y los mails.
 
-> Estado: **funcionando**, con Mercado Pago simulado y mails en Mailpit ([ADR-014](../../docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)). **[propuesta]** marca lo no confirmado.
+> Estado: **funcionando**, con Mercado Pago simulado y mails en Mailpit ([ADR-014](../../docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)).
 
 | | |
 |---|---|
@@ -52,16 +52,17 @@ curl -X POST localhost:8080/ventas/v1/admin/ventas/{id}/avanzar -H "$A"
 curl localhost:8080/ventas/v1/admin/ventas-local -H "$A" -H "$J" -H "Idempotency-Key: local-0001" \
   -d '{"medioPago":"EFECTIVO","monto":14000,"items":[{"varianteId":"var-jean-mom-celeste-38","cantidad":1}]}'
 
-# Pedido de un grupo externo (contrato catalogo-pedidos-v1)
+# Pedido de un grupo externo (contrato catalogo-pedidos-v1) y su estado (reemplazar {pedidoId})
 curl localhost:8080/v1/pedidos -H "X-API-Key: clave-grupo-proveedores" -H "$J" -H "Idempotency-Key: pedido-0001" \
   -d '{"items":[{"varianteId":"var-remera-basica-blanca-m","cantidad":3}]}'
+curl localhost:8080/v1/pedidos/{pedidoId} -H "X-API-Key: clave-grupo-proveedores"
 ```
 
 **Caídas:** `docker compose stop mercadopago-simulador`, `stop inventario` o `stop rabbitmq`.
 
 ## API
 
-Por el gateway, con el prefijo `/ventas`, salvo `/v1/pedidos`.
+Por el gateway, con el prefijo `/ventas`, salvo `/v1/pedidos` y `/v1/pedidos/{id}`.
 
 | Método y ruta | Quién la usa | Qué hace |
 |---|---|---|
@@ -76,6 +77,7 @@ Por el gateway, con el prefijo `/ventas`, salvo `/v1/pedidos`.
 | `POST /v1/admin/ventas-local` | Administrador | Registra la venta con el monto cobrado |
 | `GET /v1/admin/ventas-local/sugerencia?medioPago=&variantes=a:2,b:1` | Administrador | Monto con la promoción vigente |
 | `POST /v1/pedidos` | Grupo externo | Capacidad publicada ([contrato](../../docs/contracts/catalogo-pedidos-v1.openapi.yaml)) |
+| `GET /v1/pedidos/{id}` | Grupo externo | Estado vigente del pedido (contrato 1.3.0). Solo ventas con canal *grupo externo*; las demás dan `404 PEDIDO_INEXISTENTE` |
 | `GET /healthz`, `/readyz`, `/metrics` | Internas | No se exponen por el gateway |
 
 Los errores siguen RFC 9457 con un `codigo` estable. A los del contrato se suman `VENTA_NO_ENCONTRADA`, `TRANSICION_INVALIDA`, `PAGO_NO_DISPONIBLE` y `NO_AUTORIZADO`.
@@ -105,7 +107,7 @@ Cada pedido tiene 4,5 s en total, por debajo de los 5 s del gateway ([ADR-014](.
 
 ## Observabilidad
 
-Logs JSON con `correlation_id`, trazas a Jaeger y métricas en Prometheus: `http_pedidos_total`, `http_duracion_segundos`, `dependencia_llamadas_total`, `circuit_breaker_estado`, `proceso_elementos_total` y `mensajes_consumidos_total`.
+Logs JSON con `correlation_id` (el track id), también en `app_logs` de `mysql-logs` ([ADR-020](../../docs/adr/ADR-020-logs-y-track-id-modelo-catedra.md)). La venta guarda el track id de la compra: el aviso de pago, la confirmación de una transferencia, las tareas y los mails lo siguen usando, así una compra se ve completa en "FAV · Logs". Métricas en Prometheus: `http_pedidos_total`, `http_duracion_segundos`, `dependencia_llamadas_total`, `circuit_breaker_estado`, `proceso_elementos_total` y `mensajes_consumidos_total`.
 
 ## Tests
 
@@ -129,7 +131,7 @@ Los tests de integración usan la base `ventas_test`, no la del servicio.
 | `VENTAS_DB_HOST`, `_NAME`, `_USER`, `_PASSWORD` | `mysql-ventas:3306`, `ventas` | Conexión a MySQL |
 | `CATALOGO_URL`, `INVENTARIO_URL` | `http://gateway:8081/catalogo`, `http://gateway:8081` | Pasan por el balanceo |
 | `RABBITMQ_URL` | — | Sin valor, las ventas no pasan a *Vencida* |
-| `CAPACIDAD_PUBLICA_ACTIVA` | activa | Con `false`, apaga `POST /v1/pedidos` ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)) |
+| `CAPACIDAD_PUBLICA_ACTIVA` | activa | Con `false`, apaga `POST /v1/pedidos` y `GET /v1/pedidos/{id}` ([ADR-008](../../docs/adr/ADR-008-contrato-propio.md)) |
 | `MERCADOPAGO_URL`, `_ACCESS_TOKEN`, `_WEBHOOK_SECRET`, `_URL_AVISO`, `_TIMEOUT_MS` | simulador, —, —, gateway, `5000` | Proveedor de pagos |
 | `SMTP_DIRECCION`, `SMTP_TIMEOUT_MS`, `MAIL_FROM`, `MAIL_ADMIN` | `mailpit:1025`, `10000`, `ventas@fav.example`, `admin@fav.example` | Mails |
 | `TRANSFERENCIA_ALIAS`, `TRANSFERENCIA_TITULAR` | ficticios | **[?]** Los define el cliente |

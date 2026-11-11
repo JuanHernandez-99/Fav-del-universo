@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/observabilidad"
 )
 
 const mensajeValido = `{"id":"m1","tipo":"ProductoCambiado","version":1,"datos":{"productoId":"remera-basica","version":3}}`
@@ -45,5 +47,19 @@ func TestMotorCaidoNoGastaReintentos(t *testing.T) {
 	_, cabeceras := c.decidir(context.Background(), []byte(mensajeValido), "m1", 2)
 	if intentosDe(cabeceras) != 2 {
 		t.Fatalf("intentos: %d", intentosDe(cabeceras))
+	}
+}
+
+// La indexación usa el track id que trae el evento: el del pedido que cambió el producto (ADR-020).
+func TestLaIndexacionLlevaElTrackIDDelEvento(t *testing.T) {
+	var recibido string
+	c := NuevoConsumidor("", func(ctx context.Context, _ string) error {
+		recibido = observabilidad.CorrelationID(ctx)
+		return nil
+	}, 0)
+	cuerpo := `{"id":"m1","tipo":"ProductoCambiado","version":1,"correlationId":"alta-remera-7","datos":{"productoId":"remera-basica","version":3}}`
+	c.decidir(context.Background(), []byte(cuerpo), "m1", 0)
+	if recibido != "alta-remera-7" {
+		t.Fatalf("track id en la indexación = %q, esperaba alta-remera-7", recibido)
 	}
 }

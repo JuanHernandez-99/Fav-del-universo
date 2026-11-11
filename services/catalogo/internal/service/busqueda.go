@@ -152,13 +152,13 @@ func (s *Servicio) IniciarReconstruccion() (bool, error) {
 
 // PublicarCambios es el outbox de Catálogo: busca productos con una versión sin publicar, llama a publicar y
 // recién entonces la marca. Si el proceso se cae en el medio, el evento se publica de nuevo (al menos una vez).
-func (s *Servicio) PublicarCambios(ctx context.Context, limite int, publicar func(ctx context.Context, id string, version int) error) (int, error) {
+func (s *Servicio) PublicarCambios(ctx context.Context, limite int, publicar func(ctx context.Context, c modelo.CambioProducto) error) (int, error) {
 	pendientes, err := s.repo.ProductosSinPublicar(ctx, limite)
 	if err != nil {
 		return 0, err
 	}
 	for i, c := range pendientes {
-		if err := publicar(ctx, c.ID, c.Version); err != nil {
+		if err := publicar(ctx, c); err != nil {
 			return i, err
 		}
 		if err := s.repo.MarcarPublicado(ctx, c.ID, c.Version); err != nil {

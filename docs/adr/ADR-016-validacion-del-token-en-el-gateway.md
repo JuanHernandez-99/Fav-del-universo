@@ -68,9 +68,9 @@ La consigna pide un punto de entrada único con autenticación. ADR-001 decidió
 
 ## Pendientes
 
-- **Dónde guarda el token el frontend:** se decide con el frontend.
 - **Comparar el costo de validar** en las pruebas de carga (ADR-013).
-- **Mantener los puertos de los servicios cerrados en la nube.** **[?]** Se resuelve con el despliegue.
+
+Resueltos: el frontend guarda el token en `sessionStorage` ([ADR-017](ADR-017-frontend.md)), y en la nube el Compose no publica los puertos de los servicios (`docker-compose.cloud.yml`; lo comprueba `desplegar/verificar.sh`).
 
 ## Validación
 

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { cantidadValida, explicarRechazo, filasDeStock, pedidoDe } from './stock.js';
+import {
+  cantidadValida, columnasDe, explicarRechazo, filasDeStock, ordenarPorStock, pedidoDe, siguienteOrden, totalesDe,
+} from './stock.js';
 
 describe('stock por variante (HU-09.1)', () => {
   const variantes = [
@@ -15,6 +17,49 @@ describe('stock por variante (HU-09.1)', () => {
 
   it('una variante sin ingresos figura en 0 y sin registrar', () => {
     expect(filasDeStock(variantes, [])[0]).toMatchObject({ registrada: false, online: 0, fisico: 0, stockACorregir: false });
+  });
+});
+
+describe('lista de stock por producto', () => {
+  it('suma las variantes y marca el producto si alguna tiene el físico negativo', () => {
+    const filas = [
+      { online: 5, reservado: 2, disponibleOnline: 3, fisico: 4, stockACorregir: false },
+      { online: 1, reservado: 0, disponibleOnline: 1, fisico: -1, stockACorregir: true },
+    ];
+    expect(totalesDe(filas)).toEqual({ online: 6, reservado: 2, disponibleOnline: 4, fisico: 3, stockACorregir: true });
+    expect(totalesDe([])).toMatchObject({ online: 0, fisico: 0, stockACorregir: false });
+  });
+
+  it.each([
+    ['todo', ['online', 'reservado', 'disponibleOnline', 'fisico']],
+    ['fisico', ['fisico']],
+    ['online', ['online', 'disponibleOnline']],
+    ['reservado', ['reservado']],
+    ['cualquiera', ['online', 'reservado', 'disponibleOnline', 'fisico']],
+  ])('la vista "%s" muestra %j', (vista, campos) => {
+    expect(columnasDe(vista).map(([campo]) => campo)).toEqual(campos);
+  });
+});
+
+describe('orden por columna', () => {
+  it('desc, después asc, después sin orden; otra columna empieza en desc', () => {
+    const primero = siguienteOrden(null, 'fisico');
+    expect(primero).toEqual({ campo: 'fisico', sentido: 'desc' });
+    const segundo = siguienteOrden(primero, 'fisico');
+    expect(segundo).toEqual({ campo: 'fisico', sentido: 'asc' });
+    expect(siguienteOrden(segundo, 'fisico')).toBeNull();
+    expect(siguienteOrden(segundo, 'reservado')).toEqual({ campo: 'reservado', sentido: 'desc' });
+  });
+
+  it('ordena productos por el total y desempata por nombre', () => {
+    const productos = [
+      { nombre: 'Remera Luna', total: { disponibleOnline: 3 } },
+      { nombre: 'Buzo Cometa', total: { disponibleOnline: 10 } },
+      { nombre: 'Jean Órbita', total: { disponibleOnline: 3 } },
+    ];
+    const nombres = (o) => ordenarPorStock(productos, o).map((p) => p.nombre);
+    expect(nombres({ campo: 'disponibleOnline', sentido: 'desc' })).toEqual(['Buzo Cometa', 'Jean Órbita', 'Remera Luna']);
+    expect(nombres({ campo: 'disponibleOnline', sentido: 'asc' })).toEqual(['Jean Órbita', 'Remera Luna', 'Buzo Cometa']);
   });
 });
 

@@ -60,10 +60,11 @@ El sistema necesita una tienda y un panel web. La tecnología es libre (ARCHITEC
 - **El total final recién se ve después de reservar,** porque una promoción puede depender del medio de pago y no hay una ruta pública que lo calcule antes. Si no le conviene, el comprador puede cancelar.
 - **Las opciones del filtro de color** salen de los primeros 100 productos, porque el color es texto libre y no hay una ruta de colores.
 - **Los talles y las categorías** están repetidos en el frontend (RN-02, RN-17), porque no hay una ruta pública que los liste.
+- **Ordenar el stock del panel por una cantidad trae todos los productos** de los filtros, porque Catálogo pagina sin conocer el stock. Con el catálogo de FAV son pocas consultas; con uno mucho más grande sería lento.
 
 ## Pendientes
 
-- Las fotos reales: sin foto, o si no carga, se muestra una silueta de la prenda en el color elegido.
+- Las fotos reales: sin foto, o si no carga, se muestra una ilustración de la prenda en el color elegido (dos por categoría).
 
 ## Validación
 

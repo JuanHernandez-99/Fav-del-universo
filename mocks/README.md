@@ -11,4 +11,4 @@ Mock del contrato de la capacidad publicada por FAV ([ADR-008](../docs/adr/ADR-0
 | Carpeta | Simula | Puerto |
 |---|---|---|
 | [`mercadopago-simulador`](mercadopago-simulador) | Mercado Pago ([ADR-014](../docs/adr/ADR-014-pagos-mails-y-orden-de-la-compra.md)) | 8096 |
-| [`gimnasio-consignacion`](gimnasio-consignacion) | La API del gimnasio ([ADR-009](../docs/adr/ADR-009-consumo-del-gimnasio.md)) | 8095 |
+| [`gimnasio-consignacion`](gimnasio-consignacion) | La API del gimnasio ([ADR-018](../docs/adr/ADR-018-consumo-del-gimnasio-contrato-real.md)) | 8095 |

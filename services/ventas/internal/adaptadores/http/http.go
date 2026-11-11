@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/aplicacion"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/dominio"
@@ -41,7 +39,7 @@ type Opcion func(*opciones)
 
 type opciones struct{ sinCapacidadPublica bool }
 
-// SinCapacidadPublica apaga POST /v1/pedidos, para cuando el sistema pase al cliente (ADR-008).
+// SinCapacidadPublica apaga POST /v1/pedidos y GET /v1/pedidos/{id}, para cuando el sistema pase al cliente (ADR-008).
 func SinCapacidadPublica() Opcion { return func(o *opciones) { o.sinCapacidadPublica = true } }
 
 func NuevoRouter(s *aplicacion.Servicio, transferencia DatosTransferencia, opcionesRouter ...Opcion) http.Handler {
@@ -76,6 +74,7 @@ func NuevoRouter(s *aplicacion.Servicio, transferencia DatosTransferencia, opcio
 	// Capacidad publicada (contrato catalogo-pedidos-v1, ADR-008): adaptador aparte, en pedidos.go.
 	if !o.sinCapacidadPublica {
 		mux.HandleFunc("POST /v1/pedidos", h.crearPedido)
+		mux.HandleFunc("GET /v1/pedidos/{id}", h.consultarPedido) // desde el contrato 1.3.0
 	}
 
 	return observabilidad.Middleware(mux)
@@ -187,7 +186,6 @@ func (h *Handler) comprar(w http.ResponseWriter, r *http.Request) {
 		escribirError(w, r, err)
 		return
 	}
-	trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("venta_id", v.ID))
 	escribirJSON(w, http.StatusCreated, h.aJSON(v))
 }
 

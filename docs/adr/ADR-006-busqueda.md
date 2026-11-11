@@ -65,7 +65,7 @@ Solo la búsqueda **con texto** usa el motor (`GET /v1/tienda/productos?q=...`).
 - **Orden:** relevancia (por defecto), novedad, precio y nombre. Siempre se desempata por `productoId`, para que un resultado no se repita entre páginas.
 - **Paginación:** por número de página (`from` y `size`), hasta el resultado 10.000. Más allá responde `400`.
 
-### Retraso máximo tolerable **[propuesta]**
+### Retraso máximo tolerable
 
 **10 segundos** entre el cambio y su aparición en la búsqueda, con todo funcionando. Medido: hasta 1,9 s (ver Validación). Con una dependencia caída no aplica: el cambio queda pendiente y aparece cuando vuelve.
 
@@ -80,7 +80,7 @@ Solo la búsqueda **con texto** usa el motor (`GET /v1/tienda/productos?q=...`).
 | Un producto despublicado aparece   | No se muestra: lo filtra la lectura en Mongo. Al abrirlo, Catálogo responde `404`.                                       |
 | Un mensaje no se puede procesar    | Tras 3 reintentos, a `catalogo.indexador.dlq`. Uno inválido va directo.                                                  |
 
-**Sin `ELASTICSEARCH_URL`,** la búsqueda usa el índice de texto de Mongo (plan B). Sirve para un entorno sin el motor, como el despliegue de la capacidad, que no lo usa.
+**Sin `ELASTICSEARCH_URL`,** la búsqueda usa el índice de texto de Mongo (plan B). Sirve para un entorno sin el motor. El Compose local y el de la nube sí lo incluyen.
 
 ## Cambios respecto de la propuesta
 
@@ -134,11 +134,11 @@ Además, Solr no agrega nada a lo que pide la consigna, y migrar obligaría a re
 | Índice sincronizado, sin que un evento repetido o viejo pise un dato nuevo | Versionado externo (`version_type=external`) | `TestVersionadoExterno` y prueba por el gateway |
 | Mecanismo de reconstrucción | Índice nuevo y cambio de alias, sin cortar la búsqueda | 87 consultas durante el cambio, ninguna falló |
 | Filtros relevantes | `nested`: talle y color tienen que coincidir en la misma variante | `TestFiltros` |
-| Retraso máximo definido | 10 s **[propuesta]** | Peor caso medido: 1,9 s |
+| Retraso máximo definido | 10 s | Peor caso medido: 1,9 s |
 
 **Si la cátedra lo exigiera, el cambio es acotado:** el servicio usa la interfaz `Indice`, y solo Catálogo depende del motor, en `internal/busqueda`.
 
-**Costo aceptado:** unos 260 MiB más de memoria que Solr, que pesan en el despliegue (ADR-013).
+**Costo aceptado:** unos 280 MiB más de memoria que Solr (1 GiB contra 745 MiB), que pesan en el despliegue (ADR-013).
 
 **Sin probar con Solr:** carga real, retraso de indexación, y el flujo completo con RabbitMQ y el gateway.
 
@@ -152,7 +152,7 @@ Además, Solr no agrega nada a lo que pide la consigna, y migrar obligaría a re
 
 **Negativas aceptadas**
 
-- **Una pieza más que operar:** unos 980 MiB de memoria en reposo.
+- **Una pieza más que operar:** alrededor de 1 GiB de memoria en reposo.
 - **Frescura eventual:** hay una ventana en la que el índice no refleja la edición.
 - **Buscar lee también Mongo** o la caché (ADR-007). Si Mongo cae, lo que no esté en la caché no responde.
 - **El total puede incluir uno de más** si un producto se despublicó y todavía no salió del índice.
@@ -164,8 +164,8 @@ Además, Solr no agrega nada a lo que pide la consigna, y migrar obligaría a re
 
 ## Pendientes
 
-- **Métricas y alerta** de la cola de fallidos y del retraso (ADR-011). Hoy el retraso queda en el log `retraso_ms`.
-- **Confirmar el retraso máximo** de 10 s con el cliente, si hace falta. **[propuesta]**
+- **Métrica del retraso de indexación.** Hoy queda solo en el log `retraso_ms`. La cola de fallidos `catalogo.indexador.dlq` ya está cubierta por la alerta `MensajesEnColaDeFallidos` (ADR-011), que mira todas las colas `*.dlq`.
+- **Confirmar el retraso máximo** de 10 s con el cliente, si hace falta.
 
 ## Validación
 

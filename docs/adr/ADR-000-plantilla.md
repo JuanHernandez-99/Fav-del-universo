@@ -1,6 +1,6 @@
 # ADR-000 · Plantilla
 
-> Copiar este archivo como `ADR-XXX-titulo-corto.md`. El número coincide con la decisión de la consigna (ADR-001 = D1, …, ADR-013 = D13); las decisiones adicionales empiezan en ADR-014.
+> Copiar este archivo como `ADR-XXX-titulo-corto.md`. El número coincide con la decisión de la consigna (ADR-001 = D1, …, ADR-013 = D13); las decisiones adicionales empiezan en ADR-014. Si una decisión se reemplaza, el ADR nuevo toma el número siguiente (por ejemplo, ADR-018 reemplaza a ADR-009, que era D9).
 >
 > **[?]** El enunciado menciona un formato de ADR en una "sección 8" que no está en el PDF. Usamos esta plantilla mientras lo consultamos con la cátedra.
 >

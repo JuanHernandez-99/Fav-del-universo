@@ -9,6 +9,8 @@
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar.
 
+> **Lectura:** donde este ADR dice Redis, hoy corre Memcached ([ADR-019](ADR-019-cache-con-memcached.md)); el diseño es el mismo. Las mediciones son las hechas con Redis; las de Memcached están en ADR-019.
+
 ## Contexto
 
 La consigna pide caché en un flujo de lectura relevante, elegida por una **necesidad observable** y con **medición comparativa antes y después**. También pide justificar qué se guarda, cómo se invalida, cuánto dura, qué pasa si falla y con qué se mide.

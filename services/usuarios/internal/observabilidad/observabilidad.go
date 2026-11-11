@@ -1,6 +1,6 @@
-// Package observabilidad configura logs estructurados, trazas y métricas (ADR-011).
-// Cada línea de log lleva el servicio, el correlation_id y el trace_id del pedido,
-// para seguir una operación entre servicios y saltar del log a la traza.
+// Package observabilidad configura los logs estructurados, el track id (ADR-020) y las métricas (ADR-011).
+// Cada línea de log lleva el servicio y el correlation_id (el track id) del pedido, para seguir una operación
+// entre servicios; las de INFO o más también van a app_logs (logs_mysql.go).
 package observabilidad
 
 import (
@@ -15,18 +15,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
-	"go.opentelemetry.io/otel/trace"
 )
 
 const HeaderCorrelacion = "X-Correlation-Id"
+
+// HeaderTrackID es el nombre del modelo de la cátedra (ADR-020). Se acepta de entrada si no viene X-Correlation-Id.
+const HeaderTrackID = "X-Track-ID"
 
 type claveCorrelacion struct{}
 
@@ -53,9 +47,6 @@ func (m manejadorConContexto) Handle(ctx context.Context, r slog.Record) error {
 	if id := CorrelationID(ctx); id != "" {
 		r.AddAttrs(slog.String("correlation_id", id))
 	}
-	if sc := trace.SpanContextFromContext(ctx); sc.IsValid() {
-		r.AddAttrs(slog.String("trace_id", sc.TraceID().String()), slog.String("span_id", sc.SpanID().String()))
-	}
 	return m.Handler.Handle(ctx, r)
 }
 
@@ -65,29 +56,6 @@ func (m manejadorConContexto) WithAttrs(attrs []slog.Attr) slog.Handler {
 
 func (m manejadorConContexto) WithGroup(nombre string) slog.Handler {
 	return manejadorConContexto{m.Handler.WithGroup(nombre)}
-}
-
-// ---------- Trazas ----------
-
-// ConfigurarTrazas exporta las trazas por OTLP/HTTP (a Jaeger en el entorno local).
-// Sin endpoint configurado no exporta, pero igual propaga el contexto de la traza.
-func ConfigurarTrazas(ctx context.Context, servicio, instancia string) (func(context.Context) error, error) {
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-
-	recurso := resource.NewWithAttributes(semconv.SchemaURL,
-		semconv.ServiceName(servicio), semconv.ServiceInstanceID(instancia))
-	opciones := []sdktrace.TracerProviderOption{sdktrace.WithResource(recurso)}
-
-	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") != "" {
-		exportador, err := otlptracehttp.New(ctx) // toma el endpoint de la variable de entorno estándar
-		if err != nil {
-			return nil, err
-		}
-		opciones = append(opciones, sdktrace.WithBatcher(exportador))
-	}
-	proveedor := sdktrace.NewTracerProvider(opciones...)
-	otel.SetTracerProvider(proveedor)
-	return proveedor.Shutdown, nil
 }
 
 // ---------- Métricas ----------
@@ -107,16 +75,18 @@ var (
 
 // ---------- Middleware HTTP ----------
 
-// Middleware toma o genera el correlation id, abre el span del pedido, registra métricas
+// Middleware toma el track id del pedido (o genera uno), lo devuelve en la respuesta, registra métricas
 // y escribe una línea de log por pedido.
 func Middleware(siguiente http.Handler) http.Handler {
-	conMetricas := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get(HeaderCorrelacion)
+		if id == "" {
+			id = r.Header.Get(HeaderTrackID)
+		}
 		if id == "" || len(id) > 100 {
 			id = uuid.NewString()
 		}
 		ctx := ConCorrelationID(r.Context(), id)
-		trace.SpanFromContext(ctx).SetAttributes(attribute.String("correlation_id", id))
 		w.Header().Set(HeaderCorrelacion, id)
 
 		rw := &respuestaRegistrada{ResponseWriter: w, codigo: http.StatusOK}
@@ -130,11 +100,8 @@ func Middleware(siguiente http.Handler) http.Handler {
 		ruta := pedido.Pattern
 		if ruta == "" {
 			ruta = "sin_ruta"
-		} else {
-			trace.SpanFromContext(ctx).SetName(ruta)
-			if _, sinMetodo, ok := strings.Cut(ruta, " "); ok {
-				ruta = sinMetodo
-			}
+		} else if _, sinMetodo, ok := strings.Cut(ruta, " "); ok {
+			ruta = sinMetodo
 		}
 		if ruta == "/metrics" || ruta == "/healthz" || ruta == "/readyz" {
 			return // las sondas no ensucian los logs ni las métricas
@@ -148,8 +115,6 @@ func Middleware(siguiente http.Handler) http.Handler {
 		}
 		slog.Log(ctx, nivel, "pedido http", "metodo", r.Method, "ruta", ruta, "codigo", rw.codigo, "duracion_ms", duracion.Milliseconds())
 	})
-	return otelhttp.NewHandler(conMetricas, "http",
-		otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string { return r.Method + " " + r.URL.Path }))
 }
 
 type respuestaRegistrada struct {

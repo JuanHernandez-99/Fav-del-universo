@@ -2,10 +2,10 @@
 
 |                             |                                                                                                                                                                                                                                                                                                       |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Estado**                  | Aceptada · Entrega 2. Implementada y verificada en Inventario; el resto de los servicios sigue _previsto_.                                                                                                                                                                                            |
+| **Estado**                  | Aceptada · Entrega 2. Implementada en los cuatro servicios: hexagonal en Inventario y Ventas, capas en Catálogo y Usuarios.                                                                                                                                                                                            |
 | **Fecha**                   | 23/10/2026                                                                                                                                                                                                                                                                                            |
 | **Decisión de la consigna** | D2 · Arquitectura interna de los servicios                                                                                                                                                                                                                                                            |
-| **Relacionadas**            | [ADR-001](ADR-001-limites-de-los-servicios.md) (límites), [ADR-003](ADR-003-persistencia.md) (persistencia), [ADR-004](ADR-004-consistencia-y-concurrencia.md) (concurrencia), [ADR-009](ADR-009-consumo-del-gimnasio.md) (adaptador del gimnasio), [ADR-012](ADR-012-balanceo.md) (réplicas) |
+| **Relacionadas**            | [ADR-001](ADR-001-limites-de-los-servicios.md) (límites), [ADR-003](ADR-003-persistencia.md) (persistencia), [ADR-004](ADR-004-consistencia-y-concurrencia.md) (concurrencia), [ADR-018](ADR-018-consumo-del-gimnasio-contrato-real.md) (adaptador del gimnasio), [ADR-012](ADR-012-balanceo.md) (réplicas) |
 
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido, sin confirmar · _previsto_: forma parte del diseño pero todavía no está implementado.
 
@@ -15,7 +15,7 @@ La consigna pide que el sistema aplique **dos estilos o patrones de arquitectura
 
 Los cuatro servicios tienen problemas de distinta naturaleza (ARCHITECTURE §4):
 
-- **Inventario** tiene las reglas más críticas: no vender de más, reservar todo o nada, transferir sin dejar stock negativo y las transiciones de la reserva. Además consume la capacidad de un gimnasio cuyo contrato no controlamos (ADR-009) y recibe pedidos por varias entradas (Ventas, el panel y procesos periódicos).
+- **Inventario** tiene las reglas más críticas: no vender de más, reservar todo o nada, transferir sin dejar stock negativo y las transiciones de la reserva. Además consume la capacidad de un gimnasio cuyo contrato no controlamos (ADR-018) y recibe pedidos por varias entradas (Ventas, el panel y procesos periódicos).
 - **Ventas** tiene el ciclo de estados de la venta y depende de varios sistemas externos (Mercado Pago, el proveedor de mail, RabbitMQ, Catálogo e Inventario).
 - **Catálogo** y **Usuarios** tienen pocas reglas: altas, ediciones y lecturas, y emisión del token.
 
@@ -36,7 +36,7 @@ Los cuatro servicios tienen problemas de distinta naturaleza (ARCHITECTURE §4):
 | **Catálogo**   | Capas: Handler → Service → Repository     | Implementado     |
 | **Usuarios**   | Capas                                     | Implementado     |
 
-Las razones de cada estilo están en ARCHITECTURE §4. Este ADR registra cómo quedó aplicado en Inventario, que es el único servicio real de esta entrega.
+Las razones de cada estilo están en ARCHITECTURE §4. Este ADR registra cómo quedó aplicado en Inventario; Ventas sigue el mismo esquema de carpetas (`dominio`, `aplicacion`, `puertos`, `adaptadores`).
 
 ### Estructura de Inventario
 
@@ -52,7 +52,7 @@ services/inventario/
     │   ├── procesos/               entrada: vencimiento de reservas y envío de reposiciones
     │   ├── mysql/                  salida: implementa Repositorio (transacciones y actualizaciones condicionales)
     │   └── gimnasio/               salida: implementa Gimnasio (capa anticorrupción, circuit breaker)
-    └── observabilidad/             transversal: logs, trazas y métricas
+    └── observabilidad/             transversal: logs, track id y métricas
 ```
 
 **Regla de dependencias:** `dominio` ← `aplicacion` ← `adaptadores`, y los adaptadores implementan los `puertos` que declara el núcleo. Comprobado sobre el código:
@@ -82,17 +82,17 @@ La carrera la decide la base, no el núcleo: el puerto del repositorio expresa *
 ### Por qué se puede probar sin infraestructura
 
 - El dominio se prueba sin base ni red (`dominio/reserva_test.go`).
-- El servicio de aplicación recibe sus dependencias por constructor (`NuevoServicio(repo, gimnasio)`), así que se puede probar con repositorio y gimnasio falsos. **Falta escribir esos tests** (ver Pendientes).
+- El servicio de aplicación recibe sus dependencias por constructor (`NuevoServicio(repo, gimnasio)`), así que se prueba con repositorio y gimnasio falsos (`aplicacion/servicio_test.go`).
 - Los adaptadores se prueban contra una dependencia real: `adaptadores/mysql/repositorio_test.go` corre contra un MySQL (ADR-004).
 
 ## Alternativas consideradas
 
 | Alternativa                                                    | Por qué se descartó                                                                                                                                                                                                                            |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Capas para Inventario**                                      | Las reglas críticas quedarían repartidas entre el servicio y el repositorio, y el servicio quedaría atado a MySQL y al contrato del gimnasio. Cambiar el proveedor del gimnasio (cuyo contrato todavía no existe) tocaría la lógica de negocio. |
+| **Capas para Inventario**                                      | Las reglas críticas quedarían repartidas entre el servicio y el repositorio, y el servicio quedaría atado a MySQL y al contrato del gimnasio. Cambiar el proveedor del gimnasio tocaría la lógica de negocio. |
 | **Hexagonal para Catálogo y Usuarios**                         | No hay reglas con invariantes fuertes ni proveedores externos que puedan cambiar. Los puertos agregarían piezas sin una variación que proteger.                                                                                                |
 | **Un único estilo en todos los servicios**                     | No cumple la consigna (dos estilos) y obliga a pagar el costo de los puertos donde no hace falta o a dejar sin protección donde sí.                                                                                                            |
-| **Gin como framework HTTP** (el que se usó en clase)           | Gin es válido, pero lo que aportaría ya se resuelve sin él. Desde Go 1.22, el router estándar resuelve método y parámetros (`GET /v1/reservas/{id}`), y las métricas usan esa misma ruta como etiqueta. Las trazas (`otelhttp`) y los middlewares se apoyan en la interfaz estándar `http.Handler`. Evita una dependencia, y la capa HTTP queda en el adaptador o en el handler, sin afectar a las reglas de negocio. **Costo aceptado:** leer el JSON y validarlo se escribe a mano, y Gin lo trae resuelto. |
+| **Gin como framework HTTP** (el que se usó en clase)           | Gin es válido, pero lo que aportaría ya se resuelve sin él. Desde Go 1.22, el router estándar resuelve método y parámetros (`GET /v1/reservas/{id}`), y las métricas usan esa misma ruta como etiqueta. Los middlewares (logs, métricas y track id) se apoyan en la interfaz estándar `http.Handler`. Evita una dependencia, y la capa HTTP queda en el adaptador o en el handler, sin afectar a las reglas de negocio. **Costo aceptado:** leer el JSON y validarlo se escribe a mano, y Gin lo trae resuelto. |
 | **DDD táctico completo (agregados, repositorios por agregado)**| El tamaño del dominio no lo justifica. Se toma lo útil (reglas en el núcleo, transiciones como métodos) sin el resto de la ceremonia.                                                                                                           |
 | **CQRS o Event Sourcing en Inventario**                        | Las lecturas de stock son por id y de bajo volumen. Event Sourcing complicaría las operaciones críticas sin resolver un problema que hoy exista.                                                                                                |
 
@@ -101,7 +101,7 @@ La carrera la decide la base, no el núcleo: el puerto del repositorio expresa *
 **Positivas**
 
 - Las reglas críticas están en un paquete sin dependencias externas y son fáciles de leer y de probar.
-- El contrato supuesto del gimnasio queda aislado en un paquete (`adaptadores/gimnasio`): cuando llegue el real, cambia solo ese paquete.
+- El contrato del gimnasio queda aislado en un paquete (`adaptadores/gimnasio`): si cambia, cambia solo ese paquete.
 - La entrada HTTP y los procesos periódicos comparten los mismos casos de uso.
 
 **Negativas aceptadas**
@@ -115,12 +115,10 @@ La carrera la decide la base, no el núcleo: el puerto del repositorio expresa *
 
 ## Pendientes
 
-- **Tests de la capa `aplicacion` con repositorio y gimnasio falsos.** Hoy el núcleo se cubre con tests de dominio y con los de integración contra MySQL. Los de integración usan el repositorio real y no reemplazan a los unitarios del servicio de aplicación.
 - **Sacar las etiquetas `json` del dominio** y mover el formato al adaptador HTTP.
-- Hexagonal en Inventario y Ventas y capas en Catálogo y Usuarios cubren los dos estilos que pide la consigna.
 
 ## Validación
 
 - La regla de dependencias se verificó sobre las importaciones de cada paquete (tabla de arriba).
-- Los tests de dominio y los 7 de integración contra MySQL real (ADR-004) pasan.
+- Hay tests de dominio, de `aplicacion` (con dobles) y de integración contra MySQL real (ADR-004).
 - **[propuesta]** Agregar una comprobación automática en CI que falle si `dominio` importa algo que no sea la biblioteca estándar.

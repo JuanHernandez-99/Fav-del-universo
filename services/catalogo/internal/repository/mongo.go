@@ -14,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/modelo"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/catalogo/internal/observabilidad"
 )
 
 type Repositorio struct {
@@ -28,12 +29,11 @@ type Repositorio struct {
 const indiceVariantes = "variantes_id_unico"
 
 // Conectar arma el cliente. No abre la conexión todavía: el driver conecta recién en la primera
-// operación, por eso quien llama debe usar Ping para saber si la base responde. extras agrega opciones
-// del driver, como el monitor que abre un span por consulta (ADR-011).
-func Conectar(uri, base string, extras ...*options.ClientOptions) (*Repositorio, error) {
-	cliente, err := mongo.Connect(append([]*options.ClientOptions{options.Client().
+// operación, por eso quien llama debe usar Ping para saber si la base responde.
+func Conectar(uri, base string) (*Repositorio, error) {
+	cliente, err := mongo.Connect(options.Client().
 		ApplyURI(uri).
-		SetServerSelectionTimeout(3 * time.Second)}, extras...)...)
+		SetServerSelectionTimeout(3 * time.Second))
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (r *Repositorio) AgregarVariante(ctx context.Context, productoID string, v 
 	}
 	cambio := bson.D{
 		{Key: "$push", Value: bson.D{{Key: "variantes", Value: v}}},
-		{Key: "$set", Value: bson.D{{Key: "actualizadoEn", Value: ahora}}},
+		{Key: "$set", Value: bson.D{{Key: "actualizadoEn", Value: ahora}, correlacionDelCambio(ctx)}},
 		{Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}}, // ADR-006: todo cambio sube la versión
 	}
 	res, err := r.productos.UpdateOne(ctx, filtro, cambio)
@@ -212,7 +212,7 @@ func (r *Repositorio) ProductosPublicados(ctx context.Context) ([]modelo.Product
 func (r *Repositorio) ProductosSinPublicar(ctx context.Context, limite int) ([]modelo.CambioProducto, error) {
 	cursor, err := r.productos.Find(ctx,
 		bson.D{{Key: "$expr", Value: bson.D{{Key: "$gt", Value: bson.A{"$version", bson.D{{Key: "$ifNull", Value: bson.A{"$publicadoVersion", 0}}}}}}}},
-		options.Find().SetProjection(bson.D{{Key: "version", Value: 1}}).SetLimit(int64(limite)))
+		options.Find().SetProjection(bson.D{{Key: "version", Value: 1}, {Key: "correlacionCambio", Value: 1}}).SetLimit(int64(limite)))
 	if err != nil {
 		return nil, err
 	}
@@ -267,6 +267,7 @@ func (r *Repositorio) ActualizarProducto(ctx context.Context, id string, version
 		{Key: "categoria", Value: d.Categoria},
 		{Key: "precioBase", Value: d.PrecioBase},
 		{Key: "actualizadoEn", Value: ahora},
+		correlacionDelCambio(ctx),
 	}
 	// Es un reemplazo completo de los datos editables: un opcional que no vino se quita del documento.
 	unset := bson.D{}
@@ -309,7 +310,7 @@ func (r *Repositorio) Publicar(ctx context.Context, id string, ahora time.Time) 
 	var p modelo.Producto
 	err := r.productos.FindOneAndUpdate(ctx,
 		bson.D{{Key: "_id", Value: id}, {Key: "publicado", Value: false}},
-		cambioDePublicacion(true, ahora),
+		cambioDePublicacion(ctx, true, ahora),
 		options.FindOneAndUpdate().SetReturnDocument(options.After),
 	).Decode(&p)
 	if errors.Is(err, mongo.ErrNoDocuments) {
@@ -323,7 +324,7 @@ func (r *Repositorio) Publicar(ctx context.Context, id string, ahora time.Time) 
 func (r *Repositorio) Despublicar(ctx context.Context, id string, ahora time.Time) error {
 	res, err := r.productos.UpdateOne(ctx,
 		bson.D{{Key: "_id", Value: id}, {Key: "publicado", Value: true}},
-		cambioDePublicacion(false, ahora))
+		cambioDePublicacion(ctx, false, ahora))
 	if err != nil || res.MatchedCount == 1 {
 		return err
 	}
@@ -335,9 +336,9 @@ func (r *Repositorio) Despublicar(ctx context.Context, id string, ahora time.Tim
 	return nil
 }
 
-func cambioDePublicacion(publicado bool, ahora time.Time) bson.D {
+func cambioDePublicacion(ctx context.Context, publicado bool, ahora time.Time) bson.D {
 	return bson.D{
-		{Key: "$set", Value: bson.D{{Key: "publicado", Value: publicado}, {Key: "actualizadoEn", Value: ahora}}},
+		{Key: "$set", Value: bson.D{{Key: "publicado", Value: publicado}, {Key: "actualizadoEn", Value: ahora}, correlacionDelCambio(ctx)}},
 		{Key: "$inc", Value: bson.D{{Key: "version", Value: 1}}},
 	}
 }
@@ -351,6 +352,7 @@ func (r *Repositorio) existeProducto(ctx context.Context, id string) (bool, erro
 // hay carrera entre "leer" y "escribir" (sección 13). Una clave duplicada (E11000) se traduce según
 // el índice que la rechazó.
 func (r *Repositorio) InsertarProducto(ctx context.Context, p modelo.Producto) error {
+	p.CorrelacionCambio = observabilidad.CorrelationID(ctx)
 	_, err := r.productos.InsertOne(ctx, p)
 	if mongo.IsDuplicateKeyError(err) {
 		switch {
@@ -449,4 +451,10 @@ func (r *Repositorio) PromocionesVigentes(ctx context.Context, ahora time.Time) 
 		return nil, err
 	}
 	return promociones, nil
+}
+
+// correlacionDelCambio guarda en el producto el track id del pedido que lo cambió (ADR-020). El evento que avisa
+// ese cambio sale después, desde el outbox, y lo lleva: así los logs de la indexación tienen el mismo track id.
+func correlacionDelCambio(ctx context.Context) bson.E {
+	return bson.E{Key: "correlacionCambio", Value: observabilidad.CorrelationID(ctx)}
 }

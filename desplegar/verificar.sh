@@ -33,6 +33,7 @@ if [ -z "$variante" ]; then
   falla "No se pudo leer una variante del catálogo"
 else
   espera "GET /v1/disponibilidad con la clave del gimnasio" 200 "$URL/v1/disponibilidad?variantes=$variante" -H "X-API-Key: $CAPACIDAD_API_KEY_GIMNASIO"
+  espera "GET /v1/pedidos/{id} de un id inexistente" 404 "$URL/v1/pedidos/00000000-0000-4000-8000-000000000000" -H "X-API-Key: $CAPACIDAD_API_KEY"
   cuerpo="{\"referenciaExterna\":\"verificar-despliegue\",\"items\":[{\"varianteId\":\"$variante\",\"cantidad\":1}]}"
   clave="verificar-$(date +%s)-$RANDOM"
   pedir() { "${CURL[@]}" -X POST "$URL/v1/pedidos" -H "X-API-Key: $1" -H "Content-Type: application/json" -H "Idempotency-Key: $clave" -d "$cuerpo" -w '\n%{http_code}'; }
@@ -43,6 +44,9 @@ else
   id1=$(grep -o '"pedidoId":"[^"]*"' <<<"$primera"); id2=$(grep -o '"pedidoId":"[^"]*"' <<<"$segunda")
   if [ "$c1" = 201 ] && [ "$c2" = 201 ] && [ -n "$id1" ] && [ "$id1" = "$id2" ]; then
     ok "POST /v1/pedidos 201, y el reintento con la misma Idempotency-Key devuelve el mismo pedido ($id1)"
+    pedido=$(cut -d'"' -f4 <<<"$id1")
+    espera "GET /v1/pedidos/{id} del pedido recién creado" 200 "$URL/v1/pedidos/$pedido" -H "X-API-Key: $CAPACIDAD_API_KEY"
+    espera "GET /v1/pedidos/{id} con la clave del gimnasio" 401 "$URL/v1/pedidos/$pedido" -H "X-API-Key: $CAPACIDAD_API_KEY_GIMNASIO"
   elif [ "$c1" = 409 ] && grep -q STOCK_INSUFICIENTE <<<"$primera"; then
     ok "POST /v1/pedidos responde 409 STOCK_INSUFICIENTE: funciona, pero la variante $variante no tiene stock online"
   else
@@ -56,7 +60,7 @@ c=$(codigo -X POST "$URL/checkout/preferences" -H "Content-Type: application/jso
 espera "Consultar pagos del simulador desde afuera" 404 "$URL/v1/payments/1"
 
 echo "Puertos cerrados desde afuera"
-for p in 3307 3308 3309 5672 15672 8025 8095 8096 8080 9090 9093 9200 3000 16686; do
+for p in 3307 3308 3309 5672 15672 8025 8095 8096 8080 9090 9093 9200 3000 3310; do
   if timeout 3 bash -c "</dev/tcp/$DOMINIO/$p" 2>/dev/null; then falla "Puerto $p abierto"; else ok "Puerto $p cerrado"; fi
 done
 

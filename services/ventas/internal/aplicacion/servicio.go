@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/dominio"
+	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/observabilidad"
 	"github.com/JuanHernandez-99/Fav-del-universo/services/ventas/internal/puertos"
 )
 
@@ -231,6 +232,7 @@ func (s *Servicio) AvisoPago(ctx context.Context, firma, pedidoID, pagoID string
 	if pago.Estado == puertos.PagoPendiente {
 		return nil // todavía sin resultado: llegará otro aviso
 	}
+	ctx = s.conTrackIDDeLaVenta(ctx, pago.VentaID, "aviso de pago recibido", "pago_id", pago.ID)
 	err = s.repo.RegistrarAvisoPago(ctx, pago.ID, pago.VentaID, func(v *dominio.Venta) ([]dominio.TipoTarea, []dominio.Mail, error) {
 		if pago.Estado == puertos.PagoAprobado {
 			tareas, mails := s.aplicarPago(v)
@@ -248,7 +250,22 @@ func (s *Servicio) AvisoPago(ctx context.Context, firma, pedidoID, pagoID string
 		slog.WarnContext(ctx, "aviso de pago de una venta inexistente", "pago_id", pago.ID, "venta_id", pago.VentaID)
 		return nil
 	}
+	if err == nil {
+		slog.InfoContext(ctx, "aviso de pago aplicado", "venta_id", pago.VentaID, "pago_id", pago.ID, "estado_pago", pago.Estado)
+	}
 	return err
+}
+
+// conTrackIDDeLaVenta pasa a usar el track id con el que se creó la venta (ADR-020): el pago y lo que dispara
+// llegan en otro pedido, con otro id. Antes deja una línea con el id del pedido que llegó, para unir los dos.
+// Si la venta no existe o no tiene track id, sigue con el del pedido.
+func (s *Servicio) conTrackIDDeLaVenta(ctx context.Context, ventaID, mensaje string, atributos ...any) context.Context {
+	v, err := s.repo.ObtenerVenta(ctx, ventaID)
+	if err != nil || v.TrackID == "" || v.TrackID == observabilidad.CorrelationID(ctx) {
+		return ctx
+	}
+	slog.InfoContext(ctx, mensaje, append([]any{"venta_id", ventaID, "track_id_venta", v.TrackID}, atributos...)...)
+	return observabilidad.ConCorrelationID(ctx, v.TrackID)
 }
 
 func (s *Servicio) aplicarPago(v *dominio.Venta) ([]dominio.TipoTarea, []dominio.Mail) {
@@ -263,13 +280,19 @@ func (s *Servicio) aplicarPago(v *dominio.Venta) ([]dominio.TipoTarea, []dominio
 
 // ConfirmarTransferencia es la acción del administrador (HU-15). Aplicarla dos veces no tiene efecto.
 func (s *Servicio) ConfirmarTransferencia(ctx context.Context, id string) (dominio.Venta, error) {
-	return s.repo.ModificarVenta(ctx, id, func(v *dominio.Venta) ([]dominio.TipoTarea, []dominio.Mail, error) {
+	// La acción del admin queda con su propio id; el pago y lo que dispara, con el de la venta (ADR-020).
+	ctx = s.conTrackIDDeLaVenta(ctx, id, "transferencia confirmada por el administrador")
+	v, err := s.repo.ModificarVenta(ctx, id, func(v *dominio.Venta) ([]dominio.TipoTarea, []dominio.Mail, error) {
 		if v.Medio != dominio.MedioTransferencia || v.Canal == dominio.CanalLocal {
 			return nil, nil, fmt.Errorf("%w: la venta no espera una transferencia", dominio.ErrTransicionInvalida)
 		}
 		tareas, mails := s.aplicarPago(v)
 		return tareas, mails, nil
 	})
+	if err == nil {
+		slog.InfoContext(ctx, "pago por transferencia registrado", "venta_id", id, "estado", v.Estado)
+	}
+	return v, err
 }
 
 // Avanzar lleva un pedido pagado hacia Entregada, sin saltar estados (HU-23).
@@ -372,6 +395,19 @@ func (s *Servicio) ListarVentas(ctx context.Context, f puertos.FiltroVentas) ([]
 	return s.repo.ListarVentas(ctx, f)
 }
 
+// PedidoExterno devuelve un pedido de grupo externo (contrato catalogo-pedidos-v1 1.3.0). Una venta de otro
+// canal responde igual que una inexistente, para no revelar que existe.
+func (s *Servicio) PedidoExterno(ctx context.Context, id string) (dominio.Venta, error) {
+	v, err := s.repo.ObtenerVenta(ctx, id)
+	if err != nil {
+		return dominio.Venta{}, err
+	}
+	if v.Canal != dominio.CanalGrupoExterno {
+		return dominio.Venta{}, dominio.ErrVentaNoEncontrada
+	}
+	return v, nil
+}
+
 // CompraDe devuelve una compra solo si es del comprador (HU-14.1).
 func (s *Servicio) CompraDe(ctx context.Context, id, compradorID string) (dominio.Venta, error) {
 	v, err := s.repo.ObtenerVenta(ctx, id)
@@ -437,6 +473,9 @@ func (s *Servicio) confirmarReserva(ctx context.Context, v dominio.Venta) error 
 			}
 			return nil, dominio.MailsAlPagar(*v, s.emailAdmin), nil
 		})
+		if err == nil {
+			slog.InfoContext(ctx, "reserva confirmada: la venta queda pagada", "venta_id", v.ID, "reserva_id", v.ReservaID)
+		}
 		return err
 	case errors.Is(err, dominio.ErrReservaVencida), errors.Is(err, dominio.ErrReservaLiberada), errors.Is(err, dominio.ErrReservaNoEncontrada):
 		slog.WarnContext(ctx, "pago con la reserva no vigente: la venta queda a verificar", "venta_id", v.ID, "reserva_id", v.ReservaID, "motivo", err)
@@ -470,6 +509,7 @@ func (s *Servicio) TomarMails(ctx context.Context, limite int) ([]dominio.Mail, 
 func (s *Servicio) EnviarMail(ctx context.Context, m dominio.Mail) (bool, error) {
 	err := s.mailer.Enviar(ctx, m)
 	if err == nil {
+		slog.InfoContext(ctx, "mail enviado", "mail_id", m.ID, "tipo", m.Tipo, "venta_id", m.VentaID)
 		return true, s.repo.MarcarMailEnviado(ctx, m.ID)
 	}
 	intentos := m.Intentos + 1
