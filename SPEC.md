@@ -385,13 +385,17 @@ El **grupo de proveedores** ve el catálogo de FAV y le hace pedidos para sí mi
 | Operación | Qué hace | Servicio |
 |---|---|---|
 | `GET /v1/productos` | Devuelve los productos publicados con sus variantes (talle y color) y el precio vigente. No informa stock. | Catálogo |
+| `GET /v1/disponibilidad` | Unidades del stock online sin reservar por variante (contrato 1.1.0). | Inventario |
 | `POST /v1/pedidos` | Aparta el stock y registra la venta, pendiente de pago por transferencia. | Ventas, que aparta el stock en Inventario |
+| `GET /v1/pedidos/{pedidoId}` | Devuelve el pedido con su estado vigente (contrato 1.3.0). | Ventas |
 
 **HU-26 · Pedido de un grupo externo.** Como grupo de proveedores quiero hacerle un pedido a FAV, para comprar su ropa. *(RN-06, RN-09, RN-22)*
 1. Cuando todas las variantes alcanzan, entonces se aparta el stock **online** por 48 horas y la venta queda *Pendiente de pago* por transferencia, con el canal *grupo externo*.
 2. Cuando una variante no alcanza, entonces no se aparta nada y se informa cuál falta.
 3. Cuando el pedido se repite con la misma clave de idempotencia, entonces se aplica una sola vez.
 4. Desde ahí sigue como una compra por transferencia (CU-02): el administrador confirma la transferencia o la venta vence a las 48 horas.
+5. Cuando el grupo consulta su pedido, entonces ve el estado vigente: `PENDIENTE_DE_PAGO`, `PAGADO` (también si la venta ya se despachó o entregó), `VENCIDO` o `A_VERIFICAR`.
+6. Cuando consulta un id que no es de un pedido de grupo externo (una compra online, una venta del local o un id inexistente), entonces recibe `404 PEDIDO_INEXISTENTE`, sin revelar si existe.
 
 Contrato: `docs/contracts/catalogo-pedidos-v1.openapi.yaml`. Uso, errores y ejemplos en `docs/contracts/README.md`. La decisión se justifica en el ADR-008 (D8).
 

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: FAV · Catálogo y pedidos para otros grupos
-  version: 1.2.0
+  version: 1.3.0
   description: |
     Capacidad que FAV, una tienda de ropa, ofrece a otros grupos.
 
@@ -10,12 +10,17 @@ info:
     2. **Consultar la disponibilidad** por variante (desde la versión 1.1.0).
     3. **Hacer un pedido**: FAV aparta el stock y registra la venta, que queda **pendiente de pago por
        transferencia**. El pedido lo hace el grupo para sí mismo; no se envían datos de clientes finales.
-       La clave del grupo del gimnasio no habilita esta operación.
+    4. **Consultar un pedido** con su estado vigente (desde la versión 1.3.0).
 
-    **Cómo sigue un pedido después de crearlo (fuera de esta API):** el grupo transfiere el total a FAV.
-    Cuando FAV verifica la transferencia, la venta pasa a pagada y el stock se descuenta definitivamente.
-    Si no se confirma el pago antes de `pago.venceEn` (48 horas), el pedido vence y el stock se libera.
-    Consultar el estado de un pedido no está incluido en la v1.
+    La clave del grupo del gimnasio no habilita las operaciones de pedidos (3 y 4).
+
+    **Cómo sigue un pedido después de crearlo:**
+    1. El grupo transfiere el total a los datos de `pago.datosTransferencia`. El pago ocurre fuera de esta API.
+    2. FAV verifica la transferencia: el pedido pasa a `PAGADO` y el stock se descuenta definitivamente.
+    3. Si FAV no verifica el pago antes de `pago.venceEn` (48 horas), el pedido pasa a `VENCIDO` y el stock se libera.
+    4. El grupo se entera consultando `GET /v1/pedidos/{pedidoId}` (FAV no envía avisos).
+
+    Ver `EstadoPedido` para el significado de cada estado.
 
     Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por FAV, sin confirmar.
 servers:
@@ -134,6 +139,21 @@ paths:
                         mensaje: indicar entre 1 y 200 ids separados por coma
         '401':
           $ref: '#/components/responses/NoAutenticado'
+        '404':
+          description: |
+            `NO_ENCONTRADO`: FAV apagó temporalmente esta operación. No reintentar enseguida; consultar
+            al contacto (ver README).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              examples:
+                noEncontrado:
+                  value:
+                    type: https://fav.example/errores/no-encontrado
+                    title: No encontrado
+                    status: 404
+                    codigo: NO_ENCONTRADO
         '429':
           $ref: '#/components/responses/LimiteExcedido'
         '500':
@@ -158,6 +178,9 @@ paths:
         - **Idempotencia:** el header `Idempotency-Key` es obligatorio. Repetir el pedido con la misma
           clave y el mismo cuerpo devuelve la misma respuesta, sin crear otro pedido. La misma clave con
           otro cuerpo devuelve `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`.
+        - La respuesta siempre informa `estado: PENDIENTE_DE_PAGO`, también en una repetición: es la
+          respuesta del alta. El estado vigente se consulta con `GET /v1/pedidos/{pedidoId}`.
+        - Guardar el `pedidoId` de la respuesta: es el que se usa para consultar el pedido.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -231,6 +254,79 @@ paths:
                     status: 409
                     detail: La Idempotency-Key ya se usó con un pedido distinto.
                     codigo: CLAVE_IDEMPOTENCIA_REUTILIZADA
+        '429':
+          $ref: '#/components/responses/LimiteExcedido'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
+        '503':
+          $ref: '#/components/responses/NoDisponible'
+
+  /v1/pedidos/{pedidoId}:
+    parameters:
+      - $ref: '#/components/parameters/CorrelationId'
+      - name: pedidoId
+        in: path
+        required: true
+        description: El `pedidoId` que devolvió `POST /v1/pedidos`.
+        schema:
+          type: string
+          maxLength: 100
+        example: 7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f
+    get:
+      tags: [Pedidos]
+      operationId: consultarPedido
+      summary: Consultar un pedido
+      description: |
+        *(Nuevo en 1.3.0.)* Devuelve el pedido con su **estado vigente** (ver `EstadoPedido`). Mismo esquema
+        que la respuesta de `POST /v1/pedidos`; lo único que cambia con el tiempo es `estado`.
+
+        Es una lectura: no modifica nada y se puede repetir sin riesgo. No lleva `Idempotency-Key`.
+
+        **Cómo usarla:** mientras el pedido esté `PENDIENTE_DE_PAGO`, consultarlo cada tanto (se sugiere
+        no más de una vez por minuto por pedido **[propuesta]**), y dejar de consultar cuando llegue a
+        `PAGADO`. Las consultas cuentan para el límite de uso del grupo.
+
+        Solo se pueden consultar pedidos hechos con esta API. Un id que no existe, o que corresponde a otra
+        venta de FAV, responde `404 PEDIDO_INEXISTENTE`.
+      responses:
+        '200':
+          description: El pedido con su estado vigente.
+          headers:
+            X-Correlation-Id:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pedido'
+              examples:
+                pendiente:
+                  $ref: '#/components/examples/Pedido'
+                pagado:
+                  $ref: '#/components/examples/PedidoPagado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          description: |
+            - `PEDIDO_INEXISTENTE`: no hay un pedido con ese `pedidoId`. No reintentar.
+            - `NO_ENCONTRADO`: FAV apagó temporalmente las operaciones de pedidos. Consultar al contacto.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problema'
+              examples:
+                pedidoInexistente:
+                  value:
+                    type: https://fav.example/errores/pedido-inexistente
+                    title: Pedido inexistente
+                    status: 404
+                    detail: No hay un pedido con ese pedidoId.
+                    codigo: PEDIDO_INEXISTENTE
+                noEncontrado:
+                  value:
+                    type: https://fav.example/errores/no-encontrado
+                    title: No encontrado
+                    status: 404
+                    codigo: NO_ENCONTRADO
         '429':
           $ref: '#/components/responses/LimiteExcedido'
         '500':
@@ -385,11 +481,7 @@ components:
         referenciaExterna:
           type: string
         estado:
-          type: string
-          enum: [PENDIENTE_DE_PAGO]
-          description: |
-            Al crearse, el pedido siempre queda `PENDIENTE_DE_PAGO`. Los estados siguientes
-            (pagado o vencido) se resuelven fuera de esta API en la v1.
+          $ref: '#/components/schemas/EstadoPedido'
         items:
           type: array
           items:
@@ -405,6 +497,26 @@ components:
         creadoEn:
           type: string
           format: date-time
+
+    EstadoPedido:
+      type: string
+      enum: [PENDIENTE_DE_PAGO, PAGADO, VENCIDO, A_VERIFICAR]
+      description: |
+        - `PENDIENTE_DE_PAGO`: el stock está apartado hasta `pago.venceEn`, esperando que FAV verifique la
+          transferencia. Es el estado con el que se crea **siempre** el pedido.
+        - `PAGADO`: FAV verificó la transferencia y el stock se descontó. Es definitivo. La entrega se
+          coordina por el contacto (ver README).
+        - `VENCIDO`: pasaron las 48 horas sin que FAV verifique el pago y el stock se liberó. Para volver a
+          comprar, hacer un pedido nuevo con otra `Idempotency-Key`. Solo cambia si FAV recibe una
+          transferencia tardía: entonces pasa a `A_VERIFICAR`.
+        - `A_VERIFICAR`: FAV recibió el pago cuando el pedido ya había vencido. FAV lo revisa a mano y se
+          comunica por el contacto **[?]** (reintegro o nueva reserva).
+
+        Los estados solo avanzan: `PENDIENTE_DE_PAGO` → `PAGADO`, `VENCIDO` o `A_VERIFICAR`; `VENCIDO` →
+        `A_VERIFICAR`.
+
+        **En una versión menor pueden agregarse estados.** Un estado que el consumidor no conoce se trata
+        como "en revisión": no tomar ninguna acción automática y consultar por el contacto.
 
     ItemPedidoConPrecio:
       type: object
@@ -464,6 +576,7 @@ components:
             - CLAVE_IDEMPOTENCIA_REUTILIZADA
             - VARIANTE_INEXISTENTE
             - NO_ENCONTRADO
+            - PEDIDO_INEXISTENTE
             - LIMITE_EXCEDIDO
             - ERROR_INTERNO
             - NO_DISPONIBLE
@@ -601,6 +714,29 @@ components:
         pedidoId: 7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f
         referenciaExterna: OC-2026-0457
         estado: PENDIENTE_DE_PAGO
+        items:
+          - varianteId: var-remera-basica-blanca-m
+            cantidad: 3
+            precioUnitario: 15000
+            subtotal: 45000
+          - varianteId: var-jean-mom-celeste-38
+            cantidad: 1
+            precioUnitario: 42000
+            subtotal: 42000
+        total: 87000
+        moneda: ARS
+        pago:
+          medio: TRANSFERENCIA
+          venceEn: '2026-10-18T15:00:00Z'
+          datosTransferencia:
+            alias: FAV.ALIAS
+            titular: Cielo Stellantis
+        creadoEn: '2026-10-16T15:00:00Z'
+    PedidoPagado:
+      value:
+        pedidoId: 7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f
+        referenciaExterna: OC-2026-0457
+        estado: PAGADO
         items:
           - varianteId: var-remera-basica-blanca-m
             cantidad: 3

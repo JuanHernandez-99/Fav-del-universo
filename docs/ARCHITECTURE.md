@@ -148,6 +148,7 @@ El grupo de proveedores ve el catálogo de FAV y le hace pedidos para sí mismo,
 | `GET /v1/productos` | Catálogo | Productos publicados con sus variantes y el precio vigente. No informa stock. |
 | `GET /v1/disponibilidad` | Inventario | Unidades online sin reservar por variante. También para el grupo del gimnasio, con su clave (contrato 1.1.0). |
 | `POST /v1/pedidos` | Ventas | Pide el precio a Catálogo, aparta el stock online en Inventario por 48 horas (todo o nada) y registra la venta *Pendiente de pago* por transferencia. Desde ahí sigue como una compra por transferencia (CU-02). |
+| `GET /v1/pedidos/{pedidoId}` | Ventas | Estado vigente del pedido (contrato 1.3.0): `PENDIENTE_DE_PAGO`, `PAGADO`, `VENCIDO` o `A_VERIFICAR`. Solo ventas del canal *grupo externo*. FAV no envía avisos: el grupo consulta. |
 
 Contrato: [`catalogo-pedidos-v1.openapi.yaml`](contracts/catalogo-pedidos-v1.openapi.yaml). Uso, errores y ejemplos en [`contracts/README.md`](contracts/README.md). Se justifica en el **ADR-008 (D8)**.
 

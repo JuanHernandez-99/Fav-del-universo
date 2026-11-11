@@ -3,7 +3,8 @@
 services:
   mock-catalogo-pedidos-v1:
     image: stoplight/prism:5
-    command: mock -h 0.0.0.0 -p 4010 /contracts/catalogo-pedidos-v1.openapi.yaml
+    # -m false: la imagen prism:5 actual se cae en modo multiproceso (TypeError ... 'isPrimary').
+    command: mock -m false -h 0.0.0.0 -p 4010 /contracts/catalogo-pedidos-v1.openapi.yaml
     volumes:
       - ../../docs/contracts:/contracts:ro
     ports:

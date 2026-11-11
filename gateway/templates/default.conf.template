@@ -135,7 +135,7 @@ server {
         return 429 '{"type":"https://fav.example/errores/limite-excedido","title":"Límite excedido","status":429,"detail":"Reintentar después de Retry-After.","codigo":"LIMITE_EXCEDIDO"}';
     }
 
-    # Capacidad publicada: catálogo y pedidos (contrato catalogo-pedidos-v1).
+    # Capacidad publicada: catálogo, disponibilidad y pedidos (contrato catalogo-pedidos-v1).
     location = /v1/productos {
         if ($grupo_valido = 0) {
             return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
@@ -167,6 +167,26 @@ server {
         }
         limit_req zone=por_grupo burst=20 nodelay;
         # proxy_set_header en una location anula los heredados: se repiten los comunes.
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Correlation-Id $correlacion;
+        proxy_set_header X-User-Id "";
+        proxy_set_header X-User-Email "";
+        proxy_set_header X-User-Role "";
+        proxy_pass http://ventas;
+    }
+
+    # Consultar un pedido (contrato 1.3.0). Mismas reglas que /v1/pedidos: solo la clave que puede pedir y el
+    # mismo límite por grupo. Con la capacidad apagada responde el 404 del contrato, como la disponibilidad
+    # (Ventas tampoco registra la ruta). Una regex le gana al prefijo /v1/; /v1/pedidos/ sin id sigue cayendo ahí.
+    location ~ ^/v1/pedidos/[^/]+$ {
+        if ($grupo_puede_pedir = 0) {
+            return 401 '{"type":"https://fav.example/errores/no-autenticado","title":"No autenticado","status":401,"codigo":"NO_AUTENTICADO"}';
+        }
+        if ($capacidad_activa = 0) {
+            return 404 '{"type":"https://fav.example/errores/no-encontrado","title":"No encontrado","status":404,"codigo":"NO_ENCONTRADO"}';
+        }
+        limit_req zone=por_grupo burst=20 nodelay;
         proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Correlation-Id $correlacion;

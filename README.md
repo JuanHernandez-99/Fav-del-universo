@@ -44,6 +44,7 @@ Detalle, diagramas, comunicaciones y comportamiento ante fallas: [`docs/ARCHITEC
 |---|---|---|
 | Ver el catálogo | `GET /v1/productos` | Catálogo |
 | Hacer un pedido | `POST /v1/pedidos` | Ventas (aparta el stock en Inventario) |
+| Consultar un pedido | `GET /v1/pedidos/{pedidoId}` | Ventas (estado vigente, desde el contrato 1.3.0) |
 
 Contrato: [`catalogo-pedidos-v1.openapi.yaml`](docs/contracts/catalogo-pedidos-v1.openapi.yaml). Cómo usarla, errores y ejemplos: [`docs/contracts/README.md`](docs/contracts/README.md). Mock para probarla: [`mocks/catalogo-pedidos-v1`](mocks/catalogo-pedidos-v1).
 

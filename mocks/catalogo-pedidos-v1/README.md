@@ -26,10 +26,13 @@ Más ejemplos en [`docs/contracts/README.md`](../../docs/contracts/README.md).
 
   | Header | Respuesta |
   |---|---|
+  | `Prefer: example=pagado` (en `GET /v1/pedidos/{pedidoId}`) | El pedido en estado `PAGADO` |
+  | `Prefer: code=404` (en `GET /v1/pedidos/{pedidoId}`) | `PEDIDO_INEXISTENTE` |
+  | `Prefer: code=404` (en `GET /v1/disponibilidad`) | `NO_ENCONTRADO` |
   | `Prefer: code=409` | `STOCK_INSUFICIENTE` |
   | `Prefer: code=409, example=claveReutilizada` | `CLAVE_IDEMPOTENCIA_REUTILIZADA` |
   | `Prefer: code=400, example=varianteInexistente` | `VARIANTE_INEXISTENTE` |
   | `Prefer: code=429` | `LIMITE_EXCEDIDO` |
   | `Prefer: code=503` | `NO_DISPONIBLE` |
 
-- **No guarda estado:** no aparta stock, no controla la idempotencia y devuelve siempre el mismo pedido. Eso lo hace el servicio real.
+- **No guarda estado:** no aparta stock, no controla la idempotencia y devuelve siempre el mismo pedido, para cualquier `pedidoId`. El estado del pedido no avanza: para ver `PAGADO`, usar `Prefer: example=pagado`. Eso lo hace el servicio real.
