@@ -89,13 +89,19 @@ button:disabled { cursor: not-allowed; }
 .portada h1 { max-width: 12ch; font-size: clamp(2.8rem, 6vw, 4.9rem); font-weight: 400; line-height: 1; }
 .portada h1 em { font-weight: 300; color: var(--acento); }
 .portada-texto { max-width: 44ch; margin: 1.1rem 0 0; font-size: clamp(1rem, 1.4vw, 1.14rem); color: #4a585d; }
-.portada-astro { position: absolute; right: max(-5rem, -6vw); top: 50%; width: clamp(260px, 32vw, 460px); transform: translateY(-50%); fill: none; stroke: var(--acento); stroke-width: 1.2; opacity: .85; }
-.portada-astro circle:first-child { fill: color-mix(in srgb, var(--acento) 14%, transparent); }
-.portada-astro circle:last-child { fill: var(--acento); stroke: none; }
+/* Alineado al borde derecho del contenido (el mismo ancho que el título), no al de la ventana. */
+.portada-astro { position: absolute; right: max(var(--margen), (100% - var(--ancho)) / 2 + var(--margen)); top: 50%; width: clamp(260px, 32vw, 460px); transform: translateY(-50%); fill: none; stroke: var(--acento); stroke-width: 1.2; opacity: .85; }
+.astro-planeta { fill: color-mix(in srgb, var(--acento) 14%, transparent); }
 /* La luna recorre el anillo: el recorrido es la misma elipse del SVG (rx 188, ry 46, girada -24°), en unidades del viewBox.
    Sin soporte de offset-path queda quieta en su lugar. */
-.astro-luna { transform-origin: 42px 262px; offset-path: path('M 28.3 276.5 A 188 46 -24 1 1 371.7 123.5 A 188 46 -24 1 1 28.3 276.5'); offset-rotate: 0deg; animation: orbita 24s linear infinite; }
+.astro-luna { fill: var(--acento); stroke: none; transform-origin: 42px 262px; offset-path: path('M 28.3 276.5 A 188 46 -24 1 1 371.7 123.5 A 188 46 -24 1 1 28.3 276.5'); offset-rotate: 0deg; }
+/* La luna tiene dos copias: la primera mitad del recorrido es la trasera del anillo (se ve la copia enmascarada),
+   la segunda es la delantera (se ve la copia de encima). */
+.astro-luna-detras { animation: orbita 24s linear infinite, luna-detras 24s step-end infinite; }
+.astro-luna-delante { animation: orbita 24s linear infinite, luna-delante 24s step-end infinite; }
 @keyframes orbita { to { offset-distance: 100%; } }
+@keyframes luna-detras { 0% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes luna-delante { 0% { opacity: 0; } 50%, 100% { opacity: 1; } }
 .cabecera-busqueda { max-width: var(--ancho); margin: auto; padding: clamp(2.2rem, 5vw, 3.8rem) var(--margen) .4rem; }
 .cabecera-busqueda p { font-size: .78rem; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--tinta-suave); }
 .cabecera-busqueda h1 { margin-top: .4rem; font-size: clamp(2.4rem, 5.6vw, 4.2rem); font-weight: 400; }
@@ -255,12 +261,11 @@ button:disabled { cursor: not-allowed; }
 .cuenta-email { max-width: 13rem; overflow: hidden; color: var(--tinta-suave); text-overflow: ellipsis; white-space: nowrap; }
 
 .acceso { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: calc(100vh - 4.6rem); }
-.acceso-lateral { position: relative; display: flex; align-items: flex-end; overflow: hidden; padding: clamp(2rem, 5vw, 4rem); background: radial-gradient(90% 130% at 82% 18%, #f1e1d3 0%, var(--crema-logo) 58%); color: var(--noche); }
+.acceso-lateral { position: relative; display: flex; flex-direction: column; gap: 2rem; overflow: hidden; padding: clamp(2rem, 5vw, 4rem); background: radial-gradient(90% 130% at 82% 18%, #f1e1d3 0%, var(--crema-logo) 58%); color: var(--noche); }
 .acceso-lateral p { position: relative; max-width: 11ch; font: 400 clamp(2.4rem, 4.6vw, 4.1rem)/1.02 var(--serif); letter-spacing: -.015em; }
 .acceso-lateral em { font-weight: 300; color: var(--acento); }
-.acceso-astro { position: absolute; left: 50%; top: 7%; width: min(92%, 480px); transform: translateX(-50%); fill: none; stroke: var(--acento); stroke-width: 1.2; opacity: .85; }
-.acceso-astro circle:first-child { fill: color-mix(in srgb, var(--acento) 14%, transparent); }
-.acceso-astro circle:last-child { fill: var(--acento); stroke: none; }
+/* En el flujo, arriba del título: el margen automático lo centra en el espacio libre y empuja el título abajo, sin pisarlo. */
+.acceso-astro { position: relative; flex: none; width: min(75%, 340px); margin: auto; fill: none; stroke: var(--acento); stroke-width: 1.2; opacity: .85; }
 .acceso-formulario { display: flex; flex-direction: column; justify-content: center; width: min(100%, 27rem); margin: auto; padding: 2.5rem var(--margen); }
 .acceso-formulario h1 { font-size: clamp(2.2rem, 4vw, 3.2rem); font-weight: 400; }
 .acceso-bajada { margin: .7rem 0 1.6rem; color: var(--tinta-suave); }
@@ -559,7 +564,7 @@ a.panel-fila:hover { background: var(--papel); }
   .panel-fila > :nth-child(5) { grid-column: 1; grid-row: 1; }
   .panel-fila > :nth-child(4) { grid-column: 2; grid-row: 1; }
   .panel-fila > :nth-child(1), .panel-fila > :nth-child(2), .panel-fila > :nth-child(3) { grid-column: 1 / -1; color: var(--tinta-suave); font-size: .84rem; }
-  .portada-astro { opacity: .35; }
+  .portada-astro { right: max(-5rem, -6vw); opacity: .35; }
 }
 @media (max-width: 640px) {
   .encabezado-interior { flex-wrap: wrap; justify-content: space-between; gap: .6rem 1rem; }

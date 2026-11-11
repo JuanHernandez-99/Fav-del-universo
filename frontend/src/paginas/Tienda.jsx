@@ -23,10 +23,20 @@ function Cabecera({ filtros }) {
         <h1>Ropa con <em>órbita</em> propia.</h1>
         <p className="portada-texto">Tu talle, tu color, tu estilo.<br />Comprá online, con cuenta o sin ella.</p>
       </div>
+      {/* El anillo va en dos mitades: la trasera (y la luna mientras la recorre) se dibuja antes que el planeta y con una
+          máscara que la borra donde el planeta la tapa; la delantera va encima. */}
       <svg className="portada-astro" viewBox="0 0 400 400" aria-hidden="true">
-        <circle cx="200" cy="200" r="104" />
-        <ellipse cx="200" cy="200" rx="188" ry="46" transform="rotate(-24 200 200)" />
-        <circle className="astro-luna" cx="42" cy="262" r="9" />
+        <mask id="portada-detras" maskUnits="userSpaceOnUse" x="0" y="0" width="400" height="400">
+          <rect width="400" height="400" fill="#fff" stroke="none" />
+          <circle cx="200" cy="200" r="104" fill="#000" stroke="none" />
+        </mask>
+        <g mask="url(#portada-detras)">
+          <path d="M 12 200 A 188 46 0 0 1 388 200" transform="rotate(-24 200 200)" />
+          <circle className="astro-luna astro-luna-detras" cx="42" cy="262" r="9" />
+        </g>
+        <circle className="astro-planeta" cx="200" cy="200" r="104" />
+        <path d="M 388 200 A 188 46 0 0 1 12 200" transform="rotate(-24 200 200)" />
+        <circle className="astro-luna astro-luna-delante" cx="42" cy="262" r="9" />
       </svg>
     </section>
   );
