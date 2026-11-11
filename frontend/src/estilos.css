@@ -461,7 +461,17 @@ a.panel-fila:hover { background: var(--papel); }
 .stock .local-buscador { margin-bottom: 1.4rem; }
 .stock-producto { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem 1rem; margin: .4rem 0 .9rem; font-size: 1.6rem; }
 .stock-producto .boton-texto { font-size: .86rem; }
-.stock-fila { grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)); }
+.stock-fila { grid-template-columns: minmax(0, 1.6fr) repeat(var(--columnas, 4), minmax(0, 1fr)); }
+.stock-volver { margin-bottom: 1rem; }
+.stock-fila-producto small { color: var(--tinta-suave); }
+.stock-fila-producto .resultado-estado { margin-left: .5rem; padding: .1rem .5rem; font-size: .7rem; }
+.stock-desplegar { padding: 0; background: none; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.stock-desplegar::before { content: '▸'; display: inline-block; width: 1.1em; transition: transform .15s; }
+.stock-desplegar[aria-expanded='true']::before { transform: rotate(90deg); }
+.stock-desplegar:hover strong { text-decoration: underline; }
+.stock-variante { background: var(--papel); font-size: .86rem; }
+.stock-variante > :first-child { padding-left: 1.1em; }
+.stock-acciones { padding: .55rem 1.1rem .8rem 2.2rem; background: var(--papel); border-top: 1px solid var(--linea); font-size: .86rem; }
 .stock-fila > span:not(:first-child) { font-variant-numeric: tabular-nums; }
 .stock-fila.resaltada { background: #fbf0d6; }
 .stock-sin-registrar { color: var(--tinta-suave); }

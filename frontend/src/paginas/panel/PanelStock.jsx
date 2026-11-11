@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
-  buscarProductosAdmin, consultarStockAdmin, detallesDeVariantes, ErrorApi, moverStock, obtenerProductoAdmin, stockACorregir,
+  buscarProductosAdmin, consultarStockAdmin, consultarStockEnTandas, detallesDeVariantes, ErrorApi, listarProductosAdmin,
+  moverStock, obtenerProductoAdmin, stockACorregir,
 } from '../../api.js';
 import { claveDelPedido, olvidarClave } from '../../compra/compra.js';
 import { nombreCategoria } from '../../dominio.js';
 import { useSesion } from '../../sesion/contexto.jsx';
-import { cantidadValida, CANALES_STOCK, explicarRechazo, filasDeStock, MOTIVOS, pedidoDe } from './stock.js';
+import {
+  cantidadValida, CANALES_STOCK, columnasDe, explicarRechazo, filasDeStock, MOTIVOS, pedidoDe, totalesDe, VISTAS_CANTIDADES,
+} from './stock.js';
 
 const talleLegible = (t) => (t === 'U' ? 'Único' : t);
 
@@ -126,7 +129,7 @@ function Movimiento({ token, filas, inicial, alTerminar, fallo }) {
   );
 }
 
-function PorProducto({ token, productoId, varianteInicial, fallo, alElegir }) {
+function PorProducto({ token, productoId, varianteInicial, fallo, alVolver }) {
   const [producto, setProducto] = useState(null);
   const [filas, setFilas] = useState(null);
   const [error, setError] = useState('');
@@ -150,7 +153,7 @@ function PorProducto({ token, productoId, varianteInicial, fallo, alElegir }) {
 
   return (
     <>
-      <Buscar token={token} alElegir={alElegir} />
+      <button type="button" className="boton-texto stock-volver" onClick={alVolver}>← Volver a la lista</button>
       {error && <p className="aviso" role="alert">{error} <button type="button" className="boton-texto" onClick={cargar}>Reintentar</button></p>}
       {!producto && !error && <div className="mis-compras-esqueleto" aria-busy="true" aria-label="Cargando el stock" />}
       {producto && filas && (
@@ -172,6 +175,138 @@ function PorProducto({ token, productoId, varianteInicial, fallo, alElegir }) {
           </div>
           {mensaje && <p className="panel-mensaje local-registrada" role="status">{mensaje}</p>}
           <Movimiento token={token} filas={filas} inicial={inicial} fallo={fallo} alTerminar={async (m) => { await cargar(); setMensaje(m); }} />
+        </>
+      )}
+    </>
+  );
+}
+
+const TAMANO = 20;
+const FILTROS_PUBLICADO = [['', 'Todos'], ['true', 'Publicados'], ['false', 'Sin publicar']];
+
+// Una celda de cantidad. El físico negativo se marca para corregir (RN-25).
+function Cantidad({ campo, titulo, fila }) {
+  const marcar = campo === 'fisico' && fila.stockACorregir;
+  return (
+    <span role="cell" data-titulo={titulo} className={marcar ? 'stock-negativo' : ''}>
+      {fila[campo]}{marcar && <span className="resultado-estado mal">A corregir</span>}
+    </span>
+  );
+}
+
+// Todos los productos con su stock: Catálogo da la página de productos y sus variantes; Inventario, el stock de esas variantes.
+function Listado({ token, fallo, alMover }) {
+  const [parametros, setParametros] = useSearchParams();
+  const q = parametros.get('q') ?? '';
+  const publicado = parametros.get('publicado') ?? '';
+  const vista = parametros.get('cantidades') ?? 'todo';
+  const pagina = Number(parametros.get('pagina') ?? 1);
+  const columnas = columnasDe(vista);
+  const [texto, setTexto] = useState(q);
+  const [resultado, setResultado] = useState(null);
+  const [error, setError] = useState(false);
+  const [reintento, setReintento] = useState(0);
+  const [abiertos, setAbiertos] = useState(() => new Set());
+
+  useEffect(() => {
+    const control = new AbortController();
+    setResultado(null);
+    setError(false);
+    (async () => {
+      try {
+        const r = await listarProductosAdmin(token, { q, publicado, pagina, tamano: TAMANO }, { signal: control.signal });
+        const ids = r.items.flatMap((p) => p.variantes.map((v) => v.varianteId));
+        const stocks = ids.length ? await consultarStockEnTandas(token, ids, { signal: control.signal }) : [];
+        if (control.signal.aborted) return;
+        setResultado({ ...r, items: r.items.map((p) => ({ ...p, filas: filasDeStock(p.variantes, stocks) })) });
+      } catch (e) {
+        if (!control.signal.aborted && !fallo(e)) setError(true);
+      }
+    })();
+    return () => control.abort();
+  }, [token, q, publicado, pagina, fallo, reintento]);
+
+  const cambiar = (nombre, valor) => {
+    const nuevos = new URLSearchParams(parametros);
+    if (valor) nuevos.set(nombre, valor); else nuevos.delete(nombre);
+    if (nombre !== 'pagina' && nombre !== 'cantidades') nuevos.delete('pagina');
+    setParametros(nuevos);
+  };
+  const alternar = (id) => setAbiertos((a) => {
+    const nuevos = new Set(a);
+    if (!nuevos.delete(id)) nuevos.add(id);
+    return nuevos;
+  });
+  const ancho = { '--columnas': columnas.length };
+
+  return (
+    <>
+      <div className="panel-buscar">
+        <form role="search" onSubmit={(e) => { e.preventDefault(); cambiar('q', texto.trim()); }}>
+          <input type="search" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Buscar por nombre o descripción" aria-label="Buscar un producto en el stock" />
+        </form>
+      </div>
+      <nav className="panel-filtros" aria-label="Publicación">
+        {FILTROS_PUBLICADO.map(([id, nombre]) => (
+          <button key={id} type="button" aria-pressed={publicado === id} onClick={() => cambiar('publicado', id)}>{nombre}</button>
+        ))}
+      </nav>
+      <nav className="panel-filtros" aria-label="Cantidades a mostrar">
+        {VISTAS_CANTIDADES.map(([id, nombre]) => (
+          <button key={id} type="button" aria-pressed={vista === id} onClick={() => cambiar('cantidades', id === 'todo' ? '' : id)}>{nombre}</button>
+        ))}
+      </nav>
+
+      {error && <p className="aviso" role="alert">No pudimos cargar el stock. Si Inventario o Catálogo no responden, probá en un rato. <button type="button" className="boton-texto" onClick={() => setReintento((n) => n + 1)}>Reintentar</button></p>}
+      {!resultado && !error && <div className="mis-compras-esqueleto" aria-busy="true" aria-label="Cargando el stock" />}
+      {resultado?.items.length === 0 && <p className="panel-vacio">No hay productos con esos filtros.</p>}
+
+      {resultado?.items.length > 0 && (
+        <>
+          <p className="resultado-total">{resultado.total} {resultado.total === 1 ? 'producto' : 'productos'} · tocá uno para ver sus variantes</p>
+          <div className="panel-tabla" role="table" aria-label="Stock por producto">
+            <div className="panel-fila stock-fila panel-fila-titulos" role="row" style={ancho}>
+              <span role="columnheader">Producto</span>
+              {columnas.map(([campo, titulo]) => <span key={campo} role="columnheader">{titulo}</span>)}
+            </div>
+            {resultado.items.map((p) => {
+              const abierto = abiertos.has(p.productoId);
+              const total = totalesDe(p.filas);
+              return (
+                <Fragment key={p.productoId}>
+                  <div className="panel-fila stock-fila stock-fila-producto" role="row" style={ancho}>
+                    <span role="cell">
+                      <button type="button" className="stock-desplegar" aria-expanded={abierto} onClick={() => alternar(p.productoId)}><strong>{p.nombre}</strong></button>
+                      <small> · {nombreCategoria(p.categoria)} · {p.variantes.length} {p.variantes.length === 1 ? 'variante' : 'variantes'}</small>
+                      {!p.publicado && <span className="resultado-estado neutro">Sin publicar</span>}
+                    </span>
+                    {columnas.map(([campo, titulo]) => <Cantidad key={campo} campo={campo} titulo={titulo} fila={total} />)}
+                  </div>
+                  {abierto && (
+                    <>
+                      {p.filas.length === 0 && <div className="stock-acciones" role="row"><span role="cell">Este producto no tiene variantes.</span></div>}
+                      {p.filas.map((f) => (
+                        <div key={f.varianteId} className="panel-fila stock-fila stock-variante" role="row" style={ancho}>
+                          <span role="cell">{f.color} · {talleLegible(f.talle)}{!f.registrada && <small className="stock-sin-registrar"> sin ingresos</small>}</span>
+                          {columnas.map(([campo, titulo]) => <Cantidad key={campo} campo={campo} titulo={titulo} fila={f} />)}
+                        </div>
+                      ))}
+                      <div className="stock-acciones" role="row">
+                        <span role="cell"><button type="button" className="boton-texto" onClick={() => alMover(p.productoId)}>Mover stock de {p.nombre}</button></span>
+                      </div>
+                    </>
+                  )}
+                </Fragment>
+              );
+            })}
+          </div>
+          {resultado.paginas > 1 && (
+            <nav className="paginas" aria-label="Páginas">
+              <button type="button" disabled={pagina <= 1} onClick={() => cambiar('pagina', String(pagina - 1))} aria-label="Página anterior">←</button>
+              <span className="paginas-grupo">{pagina} de {resultado.paginas}</span>
+              <button type="button" disabled={pagina >= resultado.paginas} onClick={() => cambiar('pagina', String(pagina + 1))} aria-label="Página siguiente">→</button>
+            </nav>
+          )}
         </>
       )}
     </>
@@ -234,18 +369,28 @@ export default function PanelStock() {
     return false;
   }, [cerrar]);
 
+  // Los filtros de la lista quedan en la URL mientras se mueve el stock de un producto: al volver, la lista sigue igual.
+  const sinProducto = () => {
+    const nuevos = new URLSearchParams(parametros);
+    nuevos.delete('producto');
+    nuevos.delete('variante');
+    nuevos.delete('vista');
+    return nuevos;
+  };
+  const mover = (p) => { const nuevos = sinProducto(); nuevos.set('producto', p); setParametros(nuevos); };
+
   return (
     <div className="stock">
       <h1 className="promo-titulo">Stock</h1>
       <nav className="panel-filtros" aria-label="Vista">
-        <button type="button" aria-pressed={vista === 'producto'} onClick={() => setParametros(productoId ? { producto: productoId } : {})}>Por producto</button>
+        <button type="button" aria-pressed={vista === 'producto'} onClick={() => setParametros(sinProducto())}>Todos los productos</button>
         <button type="button" aria-pressed={vista === 'a-corregir'} onClick={() => setParametros({ vista: 'a-corregir' })}>Stock a corregir</button>
       </nav>
       {vista === 'a-corregir'
         ? <ACorregir token={sesion.token} fallo={fallo} alCorregir={(p, v) => setParametros({ producto: p, variante: v })} />
         : productoId
-          ? <PorProducto key={productoId} token={sesion.token} productoId={productoId} varianteInicial={parametros.get('variante')} fallo={fallo} alElegir={(p) => setParametros({ producto: p })} />
-          : <><Buscar token={sesion.token} alElegir={(p) => setParametros({ producto: p })} /><p className="panel-vacio">Buscá un producto para ver y mover su stock.</p></>}
+          ? <PorProducto key={productoId} token={sesion.token} productoId={productoId} varianteInicial={parametros.get('variante')} fallo={fallo} alVolver={() => setParametros(sinProducto())} />
+          : <Listado token={sesion.token} fallo={fallo} alMover={mover} />}
     </div>
   );
 }
