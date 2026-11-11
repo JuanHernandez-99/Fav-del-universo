@@ -150,7 +150,14 @@ button:disabled { cursor: not-allowed; }
 .etiqueta-agotado { right: .7rem; background: var(--tinta); color: var(--papel); }
 .silueta { display: grid; place-items: center; width: 100%; height: 100%; background: linear-gradient(160deg, #f6f0e6, #e8decd); }
 .silueta svg { width: 66%; max-height: 80%; filter: drop-shadow(0 12px 14px rgb(3 63 77 / .17)); }
-.silueta path { stroke: rgb(3 63 77 / .22); stroke-width: 1; }
+.silueta .base { stroke: rgb(3 63 77 / .22); stroke-width: 1; }
+.silueta .sombra { fill: #000; opacity: .16; }
+.silueta .luz { fill: #fff; opacity: .24; }
+.silueta .linea, .silueta .costura { fill: none; stroke: rgb(0 0 0 / .3); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.silueta .costura { stroke-width: 1.2; stroke-dasharray: 4 3; }
+.silueta.oscura .sombra { opacity: .32; }
+.silueta.oscura .luz { opacity: .14; }
+.silueta.oscura .linea, .silueta.oscura .costura { stroke: rgb(255 255 255 / .38); }
 .tarjeta-esqueleto { aspect-ratio: 3 / 4.35; border-radius: 6px; background: linear-gradient(100deg, var(--papel-oscuro) 40%, #faf4ea 50%, var(--papel-oscuro) 60%) 0 0 / 240% 100%; animation: brillo 1.4s linear infinite; }
 @keyframes brillo { to { background-position: -240% 0; } }
 .paginas { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: .3rem; margin-top: 3rem; }

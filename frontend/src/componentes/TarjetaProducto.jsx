@@ -13,7 +13,7 @@ export default function TarjetaProducto({ producto, disponibilidad, prioridad })
     <article className={`tarjeta${sinStock ? ' tarjeta-sin-stock' : ''}`}>
       <Link to={`/producto/${producto.productoId}`} className="tarjeta-enlace">
         <div className="tarjeta-foto">
-          <FotoPrenda foto={producto.fotos[0]?.url} categoria={producto.categoria} color={colores[0]} nombre={producto.nombre} prioridad={prioridad} />
+          <FotoPrenda foto={producto.fotos[0]?.url} categoria={producto.categoria} color={colores[0]} nombre={producto.nombre} semilla={producto.productoId} prioridad={prioridad} />
           {producto.promocion && <span className="etiqueta etiqueta-promo">−{producto.promocion.porcentaje}%</span>}
           {sinStock && <span className="etiqueta etiqueta-agotado">Sin stock</span>}
         </div>

@@ -40,7 +40,7 @@ export default function Carrito() {
           {revisados.map((item) => (
             <li key={item.varianteId} className={`carrito-linea${item.problema && item.problema !== 'SIN_DATOS' ? ' con-problema' : ''}`}>
               <Link to={`/producto/${item.productoId}`} className="carrito-foto" tabIndex={-1} aria-hidden="true">
-                <FotoPrenda foto={item.foto} categoria={item.categoria} color={item.color} nombre="" />
+                <FotoPrenda foto={item.foto} categoria={item.categoria} color={item.color} nombre="" semilla={item.productoId} />
               </Link>
               <div className="carrito-datos">
                 <h2><Link to={`/producto/${item.productoId}`}>{item.nombre}</Link></h2>
