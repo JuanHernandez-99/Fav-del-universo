@@ -115,6 +115,6 @@ Cada servicio tiene **su propia instancia** de base de datos, en su propio conte
 **Diferencias con lo previsto**
 
 - La tabla de **mensajes procesados** (consumo idempotente de eventos) **todavía no existe**: Inventario aún no consume eventos.
-- El Compose usa **MySQL 8.4**; los tests corrieron en **8.0**. Repetirlos contra 8.4.
-- **MongoDB (Catálogo) no se validó:** el servicio no está implementado.
+- El Compose usa **MySQL 8.4**. Los tests corrieron primero en **8.0** y el 04/11/2026 se repitieron contra 8.4 (ADR-004).
+- **MongoDB (Catálogo):** implementado, con tests de integración contra MongoDB real (`services/catalogo/internal/repository/mongo_test.go`).
 - El `outbox` se escribe en la misma transacción y un proceso lo publica a RabbitMQ (04/11/2026).

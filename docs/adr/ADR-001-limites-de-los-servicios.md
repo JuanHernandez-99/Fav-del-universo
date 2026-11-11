@@ -156,7 +156,7 @@ En las dos, el consumidor externo depende de un solo servicio y la capacidad es 
 
 - Ningún servicio accede a la base de otro (RNF-08): se revisa en Docker Compose y en el código.
 - Una compra se completa con Usuarios detenido, usando una sesión ya iniciada.
-- Las trazas del flujo de compra muestran solo las dependencias de la tabla de relaciones.
+- El seguimiento de una compra por su track id (ADR-020) muestra solo las dependencias de la tabla de relaciones.
 
 ## Validación (Entrega 2)
 

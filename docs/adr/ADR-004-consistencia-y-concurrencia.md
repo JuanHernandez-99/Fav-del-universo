@@ -120,7 +120,6 @@ La venta no usa `UPDATE … WHERE estado = …`, como se preveía: bloquea la fi
 ## Pendientes
 
 - **Política de limpieza** de claves de idempotencia y del outbox ya publicado.
-- **Ajustes de stock** (HU-08): todavía no existen en Inventario.
 
 ## Validación
 

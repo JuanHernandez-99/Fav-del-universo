@@ -21,7 +21,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | --------------------------------------------------- | ----------------------------------------------------- |
 | MySQL de Inventario                                 | Todo el estado del servicio                           |
 | Gimnasio (HTTP, de otro grupo)                      | Consultar su stock y enviar reposiciones              |
-| RabbitMQ                                            | Publicar `ReservaVencida` (_previsto_)                |
+| RabbitMQ                                            | Publicar `ReservaVencida`                             |
 | Gateway (nginx)                                     | Único camino de entrada y balanceo                    |
 | Quien llama: Ventas y el panel                      | Origen de los pedidos                                 |
 
@@ -67,7 +67,7 @@ ARCHITECTURE §8 describe el comportamiento esperado de todo el sistema. Este AD
 | **El gimnasio**                        | Todo lo de FAV, incluidas las reservas                                                               | Ver su stock y enviarle reposiciones                                           | Timeout, circuit breaker y reintento persistido. Las reposiciones pendientes se envían al volver              |
 | **El gateway**                         | Nada desde afuera. Los servicios entre sí siguen funcionando                                         | Toda entrada al sistema                                                        | **Sin protección:** hay una sola instancia (ver Consecuencias)                                                  |
 | **Quien llama es lento y reintenta**   | Inventario                                                                                           | —                                                                              | Idempotencia: el reintento devuelve la misma reserva                                                          |
-| **RabbitMQ** (_previsto_)              | Todo lo síncrono                                                                                     | Los efectos asíncronos se demoran                                              | Outbox: los eventos esperan en la tabla y se publican cuando vuelve                                           |
+| **RabbitMQ**                           | Todo lo síncrono                                                                                     | Los efectos asíncronos se demoran                                              | Outbox: los eventos esperan en la tabla y se publican cuando vuelve                                           |
 
 ### Qué se comunica al que llama
 
@@ -107,7 +107,7 @@ Los errores usan el formato Problem Details con un `codigo` estable, y distingue
 - **El circuito del gimnasio es por réplica.** Cada réplica abre el suyo con su propia muestra.
 - **Sin bulkhead para las consultas al gimnasio del panel**, que corren en el hilo del pedido (con timeout de 3 s).
 - ~~El rechazo definitivo ante cualquier `4xx` del gimnasio puede devolver stock por error de configuración (ADR-009).~~ Resuelto en el ADR-018.
-- **Sin cola de mensajes fallidos todavía:** llega con RabbitMQ.
+- ~~Sin cola de mensajes fallidos todavía.~~ Resuelto: Ventas manda a `ventas.reserva-vencida.dlq` los mensajes inválidos y los que fallan después de 3 reintentos, y la alerta `MensajesEnColaDeFallidos` avisa (ADR-011).
 
 ## Pendientes
 

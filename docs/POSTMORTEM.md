@@ -61,9 +61,9 @@ Pedidos recibidos por cada ruta, a unos 2 por segundo cada una. Antes de las ca�
 | Una réplica | `ReplicaCaidaInventario` | 57 s |
 | MySQL | `ErroresDelServidor` | 99 s |
 
-**Las tres caídas se detectaron por alerta, sin mirar cada componente.** Los logs permitieron seguir el problema de MySQL: hay 194 líneas `error inesperado`, con `correlation_id` y `trace_id`, y muestran errores como `invalid connection`.
+**Las tres caídas se detectaron por alerta, sin mirar cada componente.** Los logs permitieron seguir el problema de MySQL: hay 194 líneas `error inesperado`, con su `correlation_id`, y muestran errores como `invalid connection`.
 
-> **Nota (10/11/2026):** desde [ADR-020](adr/ADR-020-logs-y-track-id-modelo-catedra.md) no hay Jaeger ni `trace_id`. El seguimiento se hace por track id (el `correlation_id`) en el tablero "FAV · Logs" de Grafana, que lee la tabla `app_logs`. Si este ensayo se repitiera, esas líneas de error se buscarían ahí. Con MySQL de Inventario caído, `mysql-logs` sigue funcionando, porque es otra base.
+> **Nota (10/11/2026):** desde [ADR-020](adr/ADR-020-logs-y-track-id-modelo-catedra.md), el seguimiento se hace por track id (el `correlation_id`) en el tablero "FAV · Logs" de Grafana, que lee la tabla `app_logs`. Si este ensayo se repitiera, esas líneas de error se buscarían ahí. Con MySQL de Inventario caído, `mysql-logs` sigue funcionando, porque es otra base.
 
 ## Respuesta
 

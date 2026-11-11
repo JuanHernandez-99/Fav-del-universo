@@ -2,7 +2,7 @@
 
 Tienda para el comprador y panel para el administrador. React con Vite ([ADR-017](../docs/adr/ADR-017-frontend.md)).
 
-> Estado: **en curso**. Están el catálogo, la búsqueda, los filtros, la ficha, el carrito, el registro, el inicio de sesión la compra con los dos medios de pago, "Mis compras" y en el panel, las ventas (confirmar transferencias y avanzar pedidos) la venta del local y los productos (alta, edición, variantes, fotos y publicación), las promociones, el stock (ingresos, transferencias, ajustes y stock a corregir) y el gimnasio (su stock, reposiciones y el estado de cada una). La política de cambios está publicada, sin el texto ni los contactos del cliente: se completan en `src/paginas/politica.js`.
+> Estado: **en curso**. Están el catálogo, la búsqueda, los filtros, la ficha, el carrito, el registro, el inicio de sesión la compra con los dos medios de pago, "Mis compras" y en el panel, las ventas (confirmar transferencias y avanzar pedidos) la venta del local y los productos (alta, edición, variantes, fotos y publicación), las promociones, el stock (todos los productos, con filtros, orden por cantidad y sus variantes; ingresos, transferencias, ajustes y stock a corregir) y el gimnasio (su stock, reposiciones y el estado de cada una). La política de cambios está publicada, sin el texto ni los contactos del cliente: se completan en `src/paginas/politica.js`.
 
 - **El carrito vive en el navegador** y se envía completo a Ventas al comprar ([ADR-001](../docs/adr/ADR-001-limites-de-los-servicios.md)).
 - **Habla solo con el gateway**, en el mismo origen. Todas las llamadas están en `src/api.js`.
@@ -22,7 +22,7 @@ Para desarrollar, con recarga automática y el gateway levantado:
 cd frontend
 npm install
 npm run dev     # http://localhost:5173
-npm test        # lógica del carrito, de la sesión y de la compra
+npm test        # lógica sin React: carrito, sesión, compra, panel e ilustraciones
 ```
 
 ## Carpetas

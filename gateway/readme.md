@@ -24,7 +24,7 @@ docker compose up -d --build
 node gateway/pruebas/token.mjs
 ```
 
-Fabrica tokens falsos (sin firma, firmados con otra clave, con el rol cambiado, vencidos) y comprueba roles, "Mis compras" y el funcionamiento con Usuarios caído. Último resultado, el 04/11/2026: 42 de 42.
+Fabrica tokens falsos (sin firma, firmados con otra clave, con el rol cambiado, vencidos) y comprueba roles, "Mis compras" y el funcionamiento con Usuarios caído. Si el `.env` cambia `ADMIN_EMAIL`, `ADMIN_PASSWORD` o `CAPACIDAD_API_KEY`, hay que pasarlas como variables de entorno. Último resultado, el 11/11/2026: 42 de 42.
 
 ## Probar las rutas de la tienda
 
@@ -32,7 +32,7 @@ Fabrica tokens falsos (sin firma, firmados con otra clave, con el rol cambiado, 
 node gateway/pruebas/tienda.mjs
 ```
 
-Comprueba productos, filtros, paginación, promociones, unidades disponibles, que el resto siga protegido (también con `../`) y las caídas de Inventario y de Catálogo. Detiene y vuelve a levantar esos dos servicios, y deja datos de prueba en la base. Espera unos segundos después de reiniciar Inventario, por lo que explica [ADR-012](../docs/adr/ADR-012-balanceo.md), y hasta 10 s a que la búsqueda encuentre un producto recién publicado (retraso máximo de [ADR-006](../docs/adr/ADR-006-busqueda.md)). Último resultado, el 10/11/2026: 44 de 44.
+Comprueba productos, filtros, paginación, promociones, unidades disponibles, que el resto siga protegido (también con `../`) y las caídas de Inventario y de Catálogo. Detiene y vuelve a levantar esos dos servicios, y deja datos de prueba en la base. Espera unos segundos después de reiniciar Inventario, por lo que explica [ADR-012](../docs/adr/ADR-012-balanceo.md), y hasta 10 s a que la búsqueda encuentre un producto recién publicado (retraso máximo de [ADR-006](../docs/adr/ADR-006-busqueda.md)). Último resultado, el 11/11/2026: 44 de 44.
 
 ## Probar sus errores
 
@@ -40,6 +40,6 @@ Comprueba productos, filtros, paginación, promociones, unidades disponibles, qu
 node gateway/pruebas/errores.mjs
 ```
 
-Detiene y vuelve a levantar cada servicio. Último resultado, el 05/11/2026: 35 de 35. Decisión en [ADR-010](../docs/adr/ADR-010-resiliencia.md).
+Detiene y vuelve a levantar cada servicio. Si el `.env` cambia `CAPACIDAD_API_KEY`, hay que pasarla como variable de entorno. Último resultado, el 11/11/2026: 35 de 35. Decisión en [ADR-010](../docs/adr/ADR-010-resiliencia.md).
 
 [Arquitectura §6](../docs/ARCHITECTURE.md)

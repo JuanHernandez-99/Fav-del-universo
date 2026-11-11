@@ -37,7 +37,7 @@ Muestra el sistema como una caja y con quién interactúa.
 
 ![Diagrama de contexto: el comprador registrado, el comprador invitado y el administrador usan el Sistema FAV; el sistema crea pagos en Mercado Pago y recibe su aviso, envía mails mediante un proveedor de mail, le ofrece su catálogo y pedidos al grupo de proveedores y consume la capacidad del gimnasio.](diagrams/contexto.png)
 
-Fuente editable: [`diagrams/contexto.drawio`](diagrams/contexto.drawio). La línea punteada hacia el gimnasio indica que su contrato todavía no está definido.
+Fuente editable: [`diagrams/contexto.drawio`](diagrams/contexto.drawio). La línea hacia el gimnasio está punteada porque se dibujó antes de que existiera su contrato; hoy está definido ([ADR-018](adr/ADR-018-consumo-del-gimnasio-contrato-real.md)).
 
 ## 3. Diagrama de contenedores
 
@@ -65,14 +65,14 @@ Fuente editable: [`diagrams/contenedores.drawio`](diagrams/contenedores.drawio).
 | Ventas | Ventas online y del local, estados, pagos (Mercado Pago y transferencia) y envío de mails. Recibe los pedidos del grupo de proveedores. | Ventas (con el id y el email del comprador, o el grupo externo que compró), ítems, pagos, tareas pendientes hacia Inventario, registro de mails, mensajes procesados. |
 | Usuarios | Registro, inicio de sesión, emisión del token (id, email y rol) y roles. | Usuarios, hash de contraseña, rol |
 
-### Estilo interno de cada servicio (preliminar, D2)
+### Estilo interno de cada servicio (D2)
 
 | Servicio | Estilo | Por qué |
 |---|---|---|
 | Catálogo | **Capas**: Handler → Service → Repository | Pocas reglas: casi todo es alta, edición y lectura de productos por un solo administrador. La única regla con peso es el precio vigente con promociones, y entra en la capa de servicio. La carga de lectura se resuelve con caché e índice, no con la estructura interna. **[propuesta]** Lecturas servidas por el índice de búsqueda (CQRS liviano). |
-| Usuarios | **Capas** **[propuesta]** | Registro, inicio de sesión y emisión del token. El email único lo garantiza la base y no hay proveedores externos que puedan cambiar. Puertos y adaptadores agregarían piezas sin una variación que proteger. |
-| Ventas | **Hexagonal** **[propuesta]** | Tiene el ciclo de estados de la venta, con transiciones que no pueden saltearse ni repetirse (no cobrar dos veces). Depende de varios sistemas externos que pueden cambiar: Mercado Pago, el proveedor de mail (todavía sin elegir), RabbitMQ y las APIs de Catálogo e Inventario. Recibe pedidos por varias entradas: comprador, administrador, aviso de Mercado Pago y eventos. Los puertos permiten probar las reglas con adaptadores falsos y cambiar un proveedor sin tocar el núcleo. |
-| Inventario | **Hexagonal** **[propuesta]** | Tiene las reglas más críticas del sistema: no vender de más, reservar todo o nada, transferir sin dejar stock negativo y las transiciones de la reserva (activa, confirmada, liberada, vencida). Recibe pedidos por varias entradas: Ventas, el panel, el evento `VarianteCreada` y el proceso que vence reservas. Y consume la capacidad del gimnasio (D9), un proveedor cuyo contrato no controlamos. La carrera entre dos reservas la resuelve la base con una actualización condicional: el puerto del repositorio expresa la operación completa ("reservar si alcanza") y el adaptador de MySQL la hace atómica. El núcleo valida el resto de las reglas. |
+| Usuarios | **Capas** | Registro, inicio de sesión y emisión del token. El email único lo garantiza la base y no hay proveedores externos que puedan cambiar. Puertos y adaptadores agregarían piezas sin una variación que proteger. |
+| Ventas | **Hexagonal** | Tiene el ciclo de estados de la venta, con transiciones que no pueden saltearse ni repetirse (no cobrar dos veces). Depende de varios sistemas externos que pueden cambiar: Mercado Pago, el proveedor de mail (todavía sin elegir), RabbitMQ y las APIs de Catálogo e Inventario. Recibe pedidos por varias entradas: comprador, administrador, aviso de Mercado Pago y eventos. Los puertos permiten probar las reglas con adaptadores falsos y cambiar un proveedor sin tocar el núcleo. |
+| Inventario | **Hexagonal** | Tiene las reglas más críticas del sistema: no vender de más, reservar todo o nada, transferir sin dejar stock negativo y las transiciones de la reserva (activa, confirmada, liberada, vencida). Recibe pedidos por varias entradas: Ventas, el panel, el evento `VarianteCreada` y el proceso que vence reservas. Y consume la capacidad del gimnasio (D9), un proveedor cuyo contrato no controlamos. La carrera entre dos reservas la resuelve la base con una actualización condicional: el puerto del repositorio expresa la operación completa ("reservar si alcanza") y el adaptador de MySQL la hace atómica. El núcleo valida el resto de las reglas. |
 
 Con esto se cumplen las dos arquitecturas internas distintas que pide la consigna: **capas** (Catálogo y Usuarios) y **hexagonal** (Ventas e Inventario). El criterio sigue el apunte de estilos de backend: capas cuando hay pocas reglas y consultas sencillas; hexagonal cuando hay invariantes de negocio o el núcleo depende de proveedores externos que pueden cambiar.
 
@@ -221,20 +221,20 @@ El estado de una operación tiene que poder entenderse sin revisar cada componen
 - **Logs estructurados** en todos los servicios y en el gateway, con un identificador de correlación que viaja en cada llamada y en cada evento. Permite seguir una compra de punta a punta. El token nunca se escribe en los logs.
 - **Métricas** por servicio: pedidos por endpoint y código de estado (incluidos 4xx y 5xx), latencia, fallas de cada dependencia, mensajes en la DLQ, aciertos de caché y estado de cada réplica.
 - **Historial:** las métricas se conservan el tiempo suficiente para responder preguntas sobre el pasado, por ejemplo cuántos errores 404 hubo la semana pasada. **[propuesta]** al menos dos semanas.
-- **Seguimiento de una compra entre servicios** con el track id, en lugar de trazas con Jaeger (ADR-020).
+- **Seguimiento de una compra entre servicios** con el track id (ADR-020).
 - **Tablero** con el estado general del sistema y al menos una alerta.
 - **Herramientas:** MySQL con GORM para los logs (ADR-020), Prometheus, Grafana y Alertmanager (ADR-011).
 
-## 11. Pruebas de carga (previstas, guion validado con una corrida)
+## 11. Pruebas de carga
 
-Se simula un **pico de demanda** como los que describe el cliente (cambio de temporada, diciembre): muchos compradores navegando y buscando a la vez, y compras concurrentes sobre las mismas variantes. Se mide latencia, errores, reparto entre las réplicas de Catálogo y el comportamiento de las reservas. El volumen real es bajo (10 a 20 prendas por semana), así que el escenario de pico es una hipótesis que se documenta como tal (**[ADR-013](adr/ADR-013-capacidad-y-costos.md), D13**). El guion de k6 está en `loadtest/` y todavía no se ejecutó.
+Se simula un **pico de demanda** como los que describe el cliente (cambio de temporada, diciembre): muchos compradores navegando y buscando a la vez, y compras concurrentes sobre las mismas variantes. Se mide latencia, errores, reparto entre las réplicas de Catálogo y el comportamiento de las reservas. El volumen real es bajo (10 a 20 prendas por semana), así que el escenario de pico es una hipótesis que se documenta como tal (**[ADR-013](adr/ADR-013-capacidad-y-costos.md), D13**). Los guiones de k6 están en `loadtest/`; los resultados, el principal límite y los costos, en el ADR-013.
 
 ## 12. Distribución de los componentes
 
-- **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Catálogo con dos réplicas), MongoDB, tres MySQL y RabbitMQ. Memcached, el motor de búsqueda y las herramientas de observabilidad se suman cuando se incorporen. Los secretos van en un archivo `.env` que no se sube al repositorio, y las claves del token las genera `usuarios-init` en volúmenes de Docker (ADR-015).
+- **Local:** todo se levanta con un solo comando mediante Docker Compose, en cualquier computadora con Docker y sin configuración manual: frontend, gateway, los cuatro servicios (Inventario y Catálogo con dos réplicas), MongoDB, cuatro MySQL (Inventario, Ventas, Usuarios y logs), RabbitMQ, Memcached, Elasticsearch y las herramientas de observabilidad. Los secretos van en un archivo `.env` que no se sube al repositorio, y las claves del token las genera `usuarios-init` en volúmenes de Docker (ADR-015).
 - **Balanceo:** en la Entrega 2 el servicio replicado es **Inventario** (2 réplicas con `deploy.replicas`), detrás de un gateway nginx con round robin y verificación pasiva ([ADR-012](adr/ADR-012-balanceo.md), D12). Catálogo también tiene 2 réplicas, con el mismo mecanismo.
 - **Estado actual del Compose:** gateway, Inventario ×2 y su MySQL, Catálogo ×2 y su MongoDB (con `catalogo-init`, que prepara la base), Elasticsearch, Memcached, Ventas y su MySQL, RabbitMQ, Mailpit, Usuarios y su MySQL (con `usuarios-init`, que genera las claves del token), simulador de Mercado Pago, mock del gimnasio, `mysql-logs`, Prometheus, Alertmanager y Grafana.
-- **Nube:** para que el grupo de proveedores use la capacidad con una URL pública se despliegan el gateway, Catálogo, Ventas e Inventario con sus bases. **[?]** proveedor de nube.
+- **Nube:** una VM de Azure con el mismo Docker Compose, detrás de Caddy con HTTPS. Desde internet solo se llega a la tienda, el panel, la capacidad publicada y la página de pago simulada ([`desplegar/README.md`](../desplegar/README.md)).
 
 ## 13. Estructura del repositorio
 
@@ -329,7 +329,7 @@ services/inventario/            # hexagonal
 | [ADR-003](adr/ADR-003-persistencia.md)             | D3 · Persistencia                 | Aceptada (versión inicial) · Entrega 1               |
 | [ADR-005](adr/ADR-005-comunicacion.md)             | D5 · Comunicación entre servicios | Aceptada (versión inicial) · Entrega 1               |
 | [ADR-008](adr/ADR-008-contrato-propio.md) | D8 · Contrato propio | Aceptada · Entrega 2 |
-| [ADR-002](adr/ADR-002-arquitectura-interna.md)     | D2 · Arquitectura interna         | Aceptada · Entrega 2 (implementada en Inventario)    |
+| [ADR-002](adr/ADR-002-arquitectura-interna.md)     | D2 · Arquitectura interna         | Aceptada · implementada en los cuatro servicios      |
 | [ADR-004](adr/ADR-004-consistencia-y-concurrencia.md) | D4 · Consistencia y concurrencia | Aceptada · Entrega 2 (7 pruebas de integración)      |
 | [ADR-006](adr/ADR-006-busqueda.md)                 | D6 · Búsqueda                     | Aceptada e implementada                              |
 | [ADR-007](adr/ADR-007-cache.md)                    | D7 · Caché                        | Reemplazada en el motor por ADR-019                  |
@@ -338,9 +338,9 @@ services/inventario/            # hexagonal
 | [ADR-018](adr/ADR-018-consumo-del-gimnasio-contrato-real.md) | D9 · Consumo del gimnasio, contrato real | Aceptada · Presentación grupal |
 | [ADR-010](adr/ADR-010-resiliencia.md)              | D10 · Resiliencia                 | Aceptada · Entrega 2                                 |
 | [ADR-011](adr/ADR-011-observabilidad.md)           | D11 · Observabilidad              | Aceptada en métricas, tablero y alertas; trazas y logs reemplazados por ADR-020 |
-| [ADR-020](adr/ADR-020-logs-y-track-id-modelo-catedra.md) | D11 · Logs en MySQL y track id | Aceptada · implementada en local |
+| [ADR-020](adr/ADR-020-logs-y-track-id-modelo-catedra.md) | D11 · Logs en MySQL y track id | Aceptada · implementada en local y en la nube |
 | [ADR-012](adr/ADR-012-balanceo.md)        | D12 · Balanceo de carga           | Aceptada · Entrega 2                                 |
-| [ADR-013](adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | **Propuesta** · Entrega 2 (sin mediciones)           |
+| [ADR-013](adr/ADR-013-capacidad-y-costos.md)       | D13 · Capacidad y costos          | Aceptada con mediciones                              |
 
 ### Tecnologías respecto de las usadas en clase
 
@@ -371,12 +371,9 @@ La consigna establece qué condiciones cumplir y no cómo: "las decisiones de di
 
 | Tema                                                                                          | Dónde se resuelve                         |
 | --------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| Justificación de los estilos internos de cada servicio                                        | D2 (ADR-002)                              |
-| Tecnología del API Gateway: **resuelto, nginx** (ADR-012). Frontend: **resuelto, React con Vite** (ADR-017)                | D2 / D12                                  |
 | URL pública y clave del gimnasio; prueba conjunta | D9 (ADR-018) |
 | Cómo se entrega y se rota la clave de cada grupo consumidor, y el límite de pedidos por grupo | D8                                        |
 | Dónde se almacenan las fotos de los productos                                                 | D3                                        |
-| Proveedor de nube                                                                             | D13                                       |
 
 ## 16. Limitaciones conocidas y deuda técnica
 
@@ -392,6 +389,6 @@ Lo que sabemos que no está o no funciona del todo. Se declara para la presentac
 | Observabilidad | Alertas probadas solo en local, con aviso a Mailpit; una falla puede avisar varias veces. Sin tiempos por paso: el track id muestra qué pasó y en qué orden, no cuánto tardó cada llamada dentro de un pedido. El gateway no escribe en `app_logs` (su log queda en stdout). Bajo una carga mayor a la que se aguanta, o con `mysql-logs` caído, se descartan líneas de la tabla (quedan en stdout y se cuentan en `logs_descartados_total`). `app_logs` crece sin límite: la retención está pendiente | ADR-011, ADR-020 |
 | Búsqueda | Sin carga real: el retraso se midió con un administrador. Buscar pendientes recorre la colección | ADR-006 |
 | Caché | Medida en una sola máquina y con 19 productos: la latencia con la base sin límite no fue concluyente. Cualquier cambio vacía toda la caché | ADR-007, ADR-019 |
-| Capacidad y costos | Medida en una notebook, no en la VM: el objetivo se cumple hasta 800 pedidos/s. Medido con Jaeger, que guardaba las trazas en memoria sin límite y fue lo primero que degradó el sistema; ADR-020 lo saca. Falta confirmar el tamaño de la VM para cerrar los costos | ADR-013 |
+| Capacidad y costos | Medida en una notebook, no en la VM: el objetivo se cumple hasta 800 pedidos/s. Se midió con la observabilidad anterior a ADR-020; con la actual solo se repitió la corrida de 600 pedidos/s. Falta confirmar el tamaño de la VM para cerrar los costos | ADR-013 |
 | Núcleo de Inventario | Etiquetas `json` en `dominio`. Los tests de `aplicacion` (68 % de cobertura) usan dobles de los puertos: la atomicidad de la reserva se prueba contra MySQL real, en el adaptador | ADR-002 |
 | Resiliencia comprobada | Ensayo en local de 3 caídas de dependencias de Inventario, en [`POSTMORTEM.md`](POSTMORTEM.md). Falta la jornada con el gimnasio real y probar la compra desde la tienda durante una caída | ADR-010 |

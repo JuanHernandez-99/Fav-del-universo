@@ -2,7 +2,7 @@
 
 Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, categorías, precios base, promociones y publicación. Calcula el **precio vigente**.
 
-> Estado: **CRUD de productos y consulta por lote con precio vigente implementados**. También atiende la capacidad publicada (`GET /v1/productos`) y la gestión de promociones. Queda lo que se comunica con otros servicios (tablas de abajo). **[propuesta]** marca lo no confirmado.
+> Estado: **funcionando**. Productos, promociones, tienda, búsqueda, caché, consulta por lote con precio vigente y la capacidad publicada (`GET /v1/productos`). **[propuesta]** marca lo no confirmado.
 
 ## Qué hay hoy
 
@@ -21,7 +21,7 @@ Qué se vende y cómo se muestra: productos, variantes (talle y color), fotos, c
 
 Se levanta con el `docker-compose.yml` de la raíz: dos réplicas detrás del gateway, más `catalogo-init`, que prepara la base (`DISENO.md`, sección 8). Desde afuera se entra por el gateway, en `/catalogo/`, con el token de administrador; la tienda no lo necesita. Ventas usa la entrada interna `http://gateway:8081/catalogo/`. Tests: `go test ./...`.
 
-Carpetas: `api/` (OpenAPI), `db/` (scripts, datos de ejemplo y consultas de MongoDB) y `pruebas/` (concurrencia y esquema).
+Carpetas: `api/` (OpenAPI), `db/` (scripts, datos de ejemplo y consultas de MongoDB) y `pruebas/` (concurrencia, esquema, búsqueda, caché y comparación con Solr).
 
 | | |
 |---|---|
@@ -37,7 +37,7 @@ No sabe cuántas unidades hay: la disponibilidad es de [Inventario](../inventari
 
 | Con | Cómo | Para qué |
 |---|---|---|
-| Ventas → Catálogo | HTTP | Precio vigente al comprar **[propuesta]** |
+| Ventas → Catálogo | HTTP (`GET /v1/variantes`) | Precio vigente al comprar |
 | Catálogo → Inventario | Evento `VarianteCreada` **[propuesta]** | Registrar la variante con stock 0 |
 | Catálogo → índice de búsqueda | Evento `ProductoCambiado` | Mantener la búsqueda actualizada (ADR-006) |
 | Catálogo → Memcached | Caché de lecturas | Ficha, listados y promociones para mostrar (ADR-019) |

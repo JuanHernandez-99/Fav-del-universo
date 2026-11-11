@@ -153,7 +153,7 @@ Cada pedido lleva un identificador de correlación (`X-Correlation-Id`). Si no v
 - Un mensaje que falla siempre termina en la DLQ y aparece en las métricas.
 - Con RabbitMQ detenido se puede comprar; al volver, los eventos del outbox se publican.
 - Con Inventario lento (por encima de 2 s), Ventas reintenta, no duplica la reserva y, agotados los intentos, muestra un error claro.
-- Las trazas de una compra muestran el mismo identificador de correlación en todos los servicios.
+- Los logs de una compra muestran el mismo identificador de correlación en todos los servicios.
 
 ## Validación (Entrega 2)
 
