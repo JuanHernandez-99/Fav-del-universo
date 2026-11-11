@@ -53,6 +53,7 @@ check('Catálogo vuelve', await volver('/catalogo/v1/tienda/productos?tamano=1')
 console.log('\n--- Ventas caído ---');
 dc('stop ventas');
 esNoDisponible('POST /v1/pedidos, del contrato', await pedir('POST', '/v1/pedidos', { headers: { ...GRUPO, 'Idempotency-Key': randomUUID() }, body: pedido }));
+esNoDisponible('GET /v1/pedidos/{id}, del contrato', await pedir('GET', `/v1/pedidos/${randomUUID()}`, { headers: GRUPO }));
 esNoDisponible('compra', await pedir('POST', '/ventas/v1/compras', { headers: { 'Idempotency-Key': randomUUID() }, body: { email: 'ana@example.com', medioPago: 'TRANSFERENCIA', ...pedido } }));
 esNoDisponible('panel', await pedir('GET', '/ventas/v1/admin/ventas', { headers: ADMIN }));
 dc('start ventas');

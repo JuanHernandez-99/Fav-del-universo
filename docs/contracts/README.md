@@ -1,6 +1,6 @@
 # Capacidad publicada por FAV · Catálogo y pedidos
 
-> **Versión vigente: 1.2.0** · 09/11/2026
+> **Versión vigente: 1.3.0** · 11/11/2026 · Compatible con la 1.2.0: agrega la consulta de un pedido.
 >
 > Convenciones: **[?]** pendiente de definir · **[propuesta]** sugerido por FAV, sin confirmar.
 
@@ -10,7 +10,10 @@ FAV es una tienda de ropa. Esta capacidad le permite a otros grupos **ver el cat
 
 1. **Ver el catálogo:** productos publicados, sus variantes (talle y color) y el precio vigente.
 2. **Consultar la disponibilidad:** cuántas unidades de cada variante se pueden apartar.
-3. **Hacer un pedido:** FAV aparta el stock y registra la venta, que queda **pendiente de pago por transferencia**. La clave del gimnasio no habilita esta operación.
+3. **Hacer un pedido:** FAV aparta el stock y registra la venta, que queda **pendiente de pago por transferencia**.
+4. **Consultar un pedido:** su estado vigente (pendiente, pagado, vencido o a verificar).
+
+La clave del gimnasio no habilita las operaciones de pedidos (3 y 4).
 
 El pedido lo hace el grupo para sí mismo: no se envían datos de clientes finales.
 
@@ -29,6 +32,7 @@ El pedido lo hace el grupo para sí mismo: no se envían datos de clientes final
 | Ver el catálogo | `GET /v1/productos` | Devuelve todos los productos publicados con sus variantes y el precio vigente. |
 | Consultar la disponibilidad | `GET /v1/disponibilidad?variantes=a,b` | Unidades disponibles de cada variante. No aparta nada. |
 | Hacer un pedido | `POST /v1/pedidos` | Aparta el stock y registra la venta, pendiente de pago por transferencia. Todo o nada. |
+| Consultar un pedido | `GET /v1/pedidos/{pedidoId}` | Devuelve el pedido con su estado vigente. Desde la 1.3.0. |
 
 ### Ver el catálogo
 
@@ -50,21 +54,52 @@ El pedido lo hace el grupo para sí mismo: no se envían datos de clientes final
 - Se envían `items` (hasta 20 variantes, sin repetir) con `varianteId` y `cantidad` (de 1 a 10), y opcionalmente una `referenciaExterna` (el número de pedido en su sistema).
 - **Todo o nada:** si una variante no alcanza, no se aparta ninguna.
 - **El precio lo calcula FAV** al momento del pedido y se devuelve en la respuesta.
-- El pedido queda `PENDIENTE_DE_PAGO`. La respuesta incluye el total, los datos para transferir y `pago.venceEn`: el stock queda apartado **48 horas**.
+- El pedido queda `PENDIENTE_DE_PAGO`. La respuesta incluye el `pedidoId`, el total, los datos para transferir y `pago.venceEn`: el stock queda apartado **48 horas**.
+- **Guardar el `pedidoId`:** es el que se usa para consultar el pedido.
+- La respuesta del alta siempre dice `PENDIENTE_DE_PAGO`, también si se repite con la misma `Idempotency-Key` después de pagado: la idempotencia devuelve la misma respuesta. El estado vigente sale de la consulta.
 
-### Qué pasa después del pedido (fuera de la API)
+### Consultar un pedido
+
+- `GET /v1/pedidos/{pedidoId}` devuelve el mismo esquema que el alta; lo que cambia con el tiempo es `estado`.
+- Es una lectura: no lleva `Idempotency-Key` y se puede repetir sin riesgo.
+- Solo responde pedidos hechos con esta API. Un id que no existe, o que corresponde a otra venta de FAV, da `404 PEDIDO_INEXISTENTE`.
+- Las consultas cuentan para el límite de uso del grupo (§2).
+
+### Estados del pedido
+
+| `estado` | Qué significa | ¿Puede cambiar? |
+|---|---|---|
+| `PENDIENTE_DE_PAGO` | El stock está apartado hasta `pago.venceEn`, esperando que FAV verifique la transferencia. Así se crea siempre. | Sí: a `PAGADO`, `VENCIDO` o `A_VERIFICAR`. |
+| `PAGADO` | FAV verificó la transferencia y el stock se descontó. La entrega se coordina por el contacto (§7). | No. |
+| `VENCIDO` | Pasaron las 48 horas sin que FAV verifique el pago; el stock se liberó. Para volver a comprar, hacer un pedido nuevo con otra `Idempotency-Key`. | Solo a `A_VERIFICAR`, si FAV recibe una transferencia tardía. |
+| `A_VERIFICAR` | FAV recibió el pago con el pedido ya vencido. Lo revisa a mano y se comunica por el contacto **[?]** (reintegro o nueva reserva). | No por la API. |
+
+- **Pueden agregarse estados en una versión menor.** Un estado que el consumidor no conoce se trata como "en revisión": no tomar ninguna acción automática y consultar por el contacto.
+- FAV no envía avisos: el grupo se entera consultando.
+
+### Cómo seguir un pedido (para el grupo consumidor)
 
 ```
-POST /v1/pedidos ──► PENDIENTE_DE_PAGO ──(FAV verifica la transferencia)──► pagado: el stock se descuenta
-                            │
-                            └──(pasan 48 horas sin pago)──► vencido: el stock se libera
+POST /v1/pedidos ──► guardar pedidoId ──► transferir el total
+                                                │
+          GET /v1/pedidos/{pedidoId} cada tanto ◄┘   mientras esté PENDIENTE_DE_PAGO
+                       │
+                       ├─ PAGADO      → marcar la orden como pagada y dejar de consultar
+                       ├─ VENCIDO     → la orden no se concretó; si sigue haciendo falta, pedido nuevo
+                       └─ A_VERIFICAR u otro → "en revisión": consultar por el contacto
 ```
 
-1. El grupo transfiere el total a los datos de `pago.datosTransferencia`.
-2. FAV verifica la transferencia: la venta pasa a pagada y el stock se descuenta definitivamente.
-3. Si no llega en 48 horas, el pedido vence y el stock se libera.
+Se sugiere consultar no más de una vez por minuto por pedido **[propuesta]**. Pasado `pago.venceEn`, una consulta más alcanza para ver el resultado.
 
-Consultar el estado de un pedido no está en la v1. Para saber si se acreditó un pago, usar el contacto (§7).
+### Qué hace FAV de su lado
+
+| Paso | Quién | Estado que ve el grupo |
+|---|---|---|
+| Llega el pedido | Ventas aparta el stock online en Inventario y avisa por mail al administrador ("transferencia pendiente"). | `PENDIENTE_DE_PAGO` |
+| Llega la transferencia | El administrador la confirma en el panel (*Confirmar transferencia*). Inventario descuenta el stock en segundo plano; mientras tanto el pedido sigue pendiente. | `PAGADO` (unos segundos después) |
+| Pasan 48 horas sin confirmar | Inventario vence la reserva y avisa a Ventas por RabbitMQ. | `VENCIDO` |
+| Se confirma una transferencia con la reserva vencida | La venta queda *A verificar* y se avisa al administrador. | `A_VERIFICAR` |
+| El administrador despacha o entrega | La venta avanza en el panel (*Entregada al correo*, *Entregada*). | Sigue `PAGADO` |
 
 Los datos para transferir son los de FAV: alias `FAV.ALIAS`, titular `Cielo Stellantis`.
 
@@ -104,8 +139,9 @@ Todos los errores usan **Problem Details** (RFC 9457) con un campo `codigo` esta
 |---|---|---|---|---|
 | 400 | `PEDIDO_INVALIDO` | Pedido, disponibilidad | Falta un header obligatorio, o el cuerpo o `variantes` no cumplen el contrato. `errores` indica los campos. | No. Corregir. |
 | 400 | `VARIANTE_INEXISTENTE` | Pedido | Una variante no existe o su producto no está publicado. `variantes` indica cuáles. | No. Corregir. |
-| 401 | `NO_AUTENTICADO` | Todas | Falta la clave, no es válida o no habilita la operación (la del gimnasio, en un pedido). | No. |
-| 404 | `NO_ENCONTRADO` | Todas | La ruta no existe, o FAV apagó temporalmente la operación (`GET /v1/disponibilidad`). | No. |
+| 401 | `NO_AUTENTICADO` | Todas | Falta la clave, no es válida o no habilita la operación (la del gimnasio, en pedidos). | No. |
+| 404 | `NO_ENCONTRADO` | Todas | La ruta no existe, o FAV apagó temporalmente la operación (`GET /v1/disponibilidad`, `GET /v1/pedidos/{pedidoId}`). | No. |
+| 404 | `PEDIDO_INEXISTENTE` | Consulta de pedido | No hay un pedido con ese `pedidoId`. | No. |
 | 409 | `STOCK_INSUFICIENTE` | Pedido | Al menos una variante no alcanza. No se apartó nada. `faltantes` indica cuáles. | No con las mismas cantidades. |
 | 409 | `CLAVE_IDEMPOTENCIA_REUTILIZADA` | Pedido | La clave ya se usó con otro cuerpo. | No. Usar otra clave. |
 | 429 | `LIMITE_EXCEDIDO` | Todas | Demasiados pedidos del grupo. | Sí, después de `Retry-After`. |
@@ -146,7 +182,17 @@ curl -X POST http://localhost:8090/v1/pedidos \
 #         "pago": { "medio": "TRANSFERENCIA", "venceEn": "2026-10-18T15:00:00Z",
 #                   "datosTransferencia": { "alias": "FAV.ALIAS", "titular": "Cielo Stellantis" } }, … }
 
-# 3. Ver un error en el mock (stock insuficiente)
+# 3. Consultar el pedido (servicios reales; el pedidoId es el que devolvió el alta)
+curl http://localhost:8080/v1/pedidos/7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f \
+  -H "X-API-Key: clave-grupo-proveedores"
+# → 200 { "pedidoId": "7d9f2c1e-…", "estado": "PAGADO", "total": 87000, … }
+# → 404 { "codigo": "PEDIDO_INEXISTENTE" } si el id no es de un pedido
+
+# En el mock: ver el pedido pagado
+curl http://localhost:8090/v1/pedidos/7d9f2c1e-4b3a-4e8f-9c2d-1a0b3c4d5e6f \
+  -H "X-API-Key: clave-de-prueba" -H "Prefer: example=pagado"
+
+# 4. Ver un error en el mock (stock insuficiente)
 curl -X POST http://localhost:8090/v1/pedidos \
   -H "Prefer: code=409" \
   -H "X-API-Key: clave-de-prueba" -H "Content-Type: application/json" \
@@ -160,10 +206,10 @@ curl -X POST http://localhost:8090/v1/pedidos \
 ## 5. Versionado y compatibilidad
 
 - La versión mayor va en la ruta (`/v1/...`) y la completa en `info.version` del contrato (versionado semántico).
-- **Cambios compatibles** (suben la versión menor, misma ruta): operaciones nuevas, campos opcionales nuevos en los pedidos, campos nuevos en las respuestas, valores nuevos de `codigo`. **El consumidor debe ignorar los campos que no conoce.**
+- **Cambios compatibles** (suben la versión menor, misma ruta): operaciones nuevas, campos opcionales nuevos en los pedidos, campos nuevos en las respuestas, valores nuevos de `codigo` y estados nuevos del pedido. **El consumidor debe ignorar los campos que no conoce y tratar un estado desconocido como "en revisión".**
 - **Cambios incompatibles** (nueva versión mayor, `/v2/...`): quitar o renombrar campos u operaciones, volver obligatorio un campo opcional, cambiar el significado de un estado o de un código.
 - Si sale una `v2`, la `v1` sigue operativa hasta el fin de la evaluación.
-- Posibles agregados compatibles a futuro: paginación opcional (sin parámetros seguiría devolviendo el catálogo completo) y consulta del estado de un pedido.
+- Posibles agregados compatibles a futuro: paginación opcional (sin parámetros seguiría devolviendo el catálogo completo) y avisos por webhook cuando cambia el estado de un pedido.
 
 ## 6. Entornos
 
@@ -175,12 +221,15 @@ curl -X POST http://localhost:8090/v1/pedidos \
 
 ## 7. Contacto
 
-Para reportar problemas, pedir cambios o consultar el estado de un pago: 2212370@ucc.edu.ar.
+Para reportar problemas, pedir cambios o resolver un pedido *A verificar*: 2212370@ucc.edu.ar.
 
 ## 8. Historial de versiones
 
 | Versión | Fecha | Cambios |
 |---|---|---|
+| 1.3.0 | 11/11/2026 | Agrega `GET /v1/pedidos/{pedidoId}`, los estados `PAGADO`, `VENCIDO` y `A_VERIFICAR`, y el código `PEDIDO_INEXISTENTE`. Declara en el OpenAPI el `404 NO_ENCONTRADO` de `GET /v1/disponibilidad`, que ya figuraba en este README. Compatible con la 1.2.0. |
 | 1.2.0 | 09/11/2026 | Documenta el código `NO_ENCONTRADO` (404), que el gateway ya devolvía. Define la URL pública, el contacto y cómo se entrega la clave. Compatible con la 1.1.0. |
 | 1.1.0 | 08/11/2026 | Agrega `GET /v1/disponibilidad`, compatible con la 1.0.0, y una clave para el grupo del gimnasio. |
 | 1.0.0 | 14/10/2026 | Primera versión: catálogo y pedidos. Reemplaza las propuestas de la Entrega 1 (reserva de cupos y envío de emails), descartadas al asignarse el grupo consumidor (ADR-008). |
+
+**Aclaración sobre el archivo "1.1.0" del 15/10/2026.** Ese día se entregó un contrato también rotulado 1.1.0 que agregaba la consulta de un pedido, los estados `PAGADO`, `VENCIDO` y `A_VERIFICAR`, y avisos por webhook (`notificacionUrl` y `pedidoActualizado`, firmados con HMAC). Solo existió en ese archivo y en un mock propio: **el servicio real nunca lo implementó**. Se perdió del repositorio en un merge del 23/10, sin una decisión explícita, y el número 1.1.0 se volvió a usar el 08/11 para la disponibilidad. Por eso la 1.2.0 no tenía esas operaciones. La 1.3.0 reincorpora solo la consulta, con los mismos nombres de estados y de código de error que aquel archivo, para que lo ya programado contra el mock siga sirviendo. Los avisos por webhook y su firma quedan fuera por ahora. Las versiones ya publicadas no se renumeran.

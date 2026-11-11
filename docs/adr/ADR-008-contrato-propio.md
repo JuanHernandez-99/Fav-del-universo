@@ -12,6 +12,8 @@
 
 > **Actualización 08/11/2026 (contrato 1.1.0):** el equipo confirmó que, por la consigna, el grupo del gimnasio también consume a FAV: el catálogo y la disponibilidad. Se suma `GET /v1/disponibilidad`, un cambio compatible. Inventario la responde, por lo que Catálogo sigue sin depender de Inventario y `GET /v1/productos` sigue sin informar stock. El gimnasio tiene su propia clave (`CAPACIDAD_API_KEY_GIMNASIO`), con el mismo límite de uso, y no puede hacer pedidos. Devuelve el stock **online**, el mismo que aparta un pedido; las reposiciones al gimnasio salen del físico. **[?]** Falta confirmar con el grupo del gimnasio que es lo que necesitan. Como la tienda usa la misma ruta interna de Inventario, esta operación se apaga en el gateway con `CAPACIDAD_PUBLICA_ACTIVA=false`.
 
+> **Actualización 11/11/2026 (contrato 1.3.0):** el grupo de proveedores reportó que, tras `POST /v1/pedidos`, no tiene forma de saber si el pedido se pagó o venció: Ventas no le manda mails (no deja email) y su orden queda "solicitada" a mano. Además, el 15/10 se les había entregado un archivo rotulado 1.1.0 con consulta de estado y webhook, que nunca se implementó en el servicio y se perdió en el merge del 23/10; la 1.2.0 salió sin esas operaciones. Se suma `GET /v1/pedidos/{pedidoId}`, un cambio compatible, con los nombres de estados (`PAGADO`, `VENCIDO`, `A_VERIFICAR`) y de error (`PEDIDO_INEXISTENTE`) de aquel archivo. Ventas traduce el estado de la venta: despachada y entregada se informan como `PAGADO`, porque la entrega al grupo se coordina por el contacto. Solo devuelve ventas con canal *grupo externo*; cualquier otra responde el mismo 404. Usa el mismo apagado y el mismo límite que el pedido. **Se descarta por ahora el webhook:** obliga a FAV a guardar una URL por pedido, firmar y reintentar envíos (una migración y un proceso nuevo), y la consulta resuelve el problema hoy. Queda como posible 1.4.0. **Limitación:** la venta no guarda qué grupo la creó; hoy solo una clave puede pedir, así que no hace falta. Si se suma otro grupo que pida, habrá que guardarlo para que cada uno vea solo sus pedidos.
+
 ## Contexto
 
 La consigna (sección 4) pide publicar una capacidad para que la use otro grupo:
@@ -82,7 +84,7 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 - **Cambios compatibles** (suben la versión menor, misma ruta): operaciones nuevas, campos opcionales nuevos en los pedidos, campos nuevos en las respuestas, valores nuevos de `codigo`. **El consumidor debe ignorar los campos que no conoce.**
 - **Cambios incompatibles** (nueva versión mayor, `/v2/...`): quitar o renombrar campos u operaciones, volver obligatorio un campo opcional, cambiar el significado de un estado o de un código.
 - Si sale una `v2`, **la `v1` sigue operativa** hasta el fin de la evaluación.
-- Agregados compatibles previstos si el consumidor los necesita: disponibilidad en el catálogo, paginación opcional (sin parámetros sigue devolviendo todo) y consulta del estado de un pedido.
+- Agregados compatibles previstos si el consumidor los necesita: disponibilidad en el catálogo, paginación opcional (sin parámetros sigue devolviendo todo) y avisos por webhook. Los estados nuevos de un pedido también son compatibles: el consumidor trata uno desconocido como "en revisión".
 - Cada cambio se registra en el historial del README de contratos y en este ADR.
 
 ## Alternativas consideradas
@@ -96,7 +98,8 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 | **Disponibilidad en el catálogo** | Agrega una dependencia de Catálogo con Inventario (llamada o copia por eventos) sin un beneficio claro hoy. Se puede agregar después sin romper el contrato. |
 | **Paginación en el servidor** | El catálogo es chico; el consumidor pagina de su lado si quiere. |
 | **Compra pagada al instante** (venta registrada como pagada) | El pago no ocurre en el sistema. Dejarla pendiente de pago por transferencia reutiliza un flujo existente y no registra cobros que no ocurrieron. |
-| **Consultar el estado del pedido** | El consumidor no lo pidió. Se agrega como operación nueva si hace falta, sin romper el contrato. |
+| **Consultar el estado del pedido** | Descartada el 14/10 porque el consumidor no lo había pedido. Se agregó en la 1.3.0 (ver la actualización del 11/11/2026). |
+| **Avisos por webhook** | Ver la actualización del 11/11/2026: más piezas que la consulta para el mismo problema. |
 | **JWT con credenciales de cliente** | Más piezas para los dos lados (emitir, renovar y vencer tokens) sin ganancia clara frente a una clave por grupo. |
 | **Servicio propio para la capacidad** | Suma un servicio, una base y casos de falla para algo que existe por la materia (ADR-001). |
 
@@ -113,7 +116,7 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 
 - **Toca tres servicios:** Catálogo para el catálogo, Ventas para el pedido e Inventario para el stock. Para la URL pública hay que desplegar el gateway y los tres servicios con sus bases.
 - **El consumidor no sabe si hay stock** hasta que hace el pedido.
-- **El consumidor no se entera por la API** de si el pago se acreditó o el pedido venció. Lo coordina por el canal de contacto.
+- **El consumidor no recibe avisos:** se entera de si el pago se acreditó o el pedido venció consultando el pedido (desde la 1.3.0).
 - **Un pico del consumidor puede afectar a la tienda,** porque comparte servicios. Se acota con el límite por grupo.
 
 ## Pendientes
@@ -133,3 +136,5 @@ Además, FAV es un sistema para un cliente real. La capacidad existe por la mate
 |---|---|---|
 | 09/10/2026 | Propuesta (Entrega 1) | Sin consumidor asignado, se propusieron dos capacidades independientes del dominio de FAV: **A**, reserva de cupos con vencimiento (Inventario), y **B**, envío de emails (Ventas), con un contrato y un mock cada una. Se iba a publicar una sola según el consumidor. |
 | 14/10/2026 | Aceptada | La cátedra asignó como consumidor al grupo de proveedores, que compra ropa. Se descartan A y B (ver *Alternativas consideradas*) y se publica **catálogo y pedidos**. Los contratos y mocks de A y B se retiraron del repositorio; quedan en el historial de git. |
+| 15/10/2026 | Contrato "1.1.0" sin implementar | Se entregó un contrato con consulta de estado y webhook firmado, con un mock propio (commit `cf78ee1`). El servicio nunca lo implementó y el merge `e0d69e2` (23/10) lo dejó afuera sin una decisión explícita. |
+| 11/11/2026 | Contrato 1.3.0 | Se reincorpora solo la consulta del pedido, implementada en Ventas. |

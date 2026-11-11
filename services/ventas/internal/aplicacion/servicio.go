@@ -395,6 +395,19 @@ func (s *Servicio) ListarVentas(ctx context.Context, f puertos.FiltroVentas) ([]
 	return s.repo.ListarVentas(ctx, f)
 }
 
+// PedidoExterno devuelve un pedido de grupo externo (contrato catalogo-pedidos-v1 1.3.0). Una venta de otro
+// canal responde igual que una inexistente, para no revelar que existe.
+func (s *Servicio) PedidoExterno(ctx context.Context, id string) (dominio.Venta, error) {
+	v, err := s.repo.ObtenerVenta(ctx, id)
+	if err != nil {
+		return dominio.Venta{}, err
+	}
+	if v.Canal != dominio.CanalGrupoExterno {
+		return dominio.Venta{}, dominio.ErrVentaNoEncontrada
+	}
+	return v, nil
+}
+
 // CompraDe devuelve una compra solo si es del comprador (HU-14.1).
 func (s *Servicio) CompraDe(ctx context.Context, id, compradorID string) (dominio.Venta, error) {
 	v, err := s.repo.ObtenerVenta(ctx, id)
