@@ -129,6 +129,62 @@
   },
   "panels": [
     {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Logs por servicio",
+      "datasource": {
+        "type": "mysql",
+        "uid": "mysql-logs"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 7
+      },
+      "description": "Todas las líneas por minuto, de cada servicio y nivel elegidos. Muestra que los servicios están escribiendo aunque no haya advertencias ni errores.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "mysql",
+            "uid": "mysql-logs"
+          },
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "rawSql": "SELECT $__timeGroupAlias(created_at, $__interval, 0), stage AS metric, COUNT(*) AS value\nFROM app_logs\nWHERE $__timeFilter(created_at) AND stage IN (${servicio:sqlstring}) AND level IN (${nivel:sqlstring})\nGROUP BY 1, 2\nORDER BY 1"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            },
+            "lineWidth": 1
+          },
+          "unit": "short",
+          "decimals": 0,
+          "noValue": "Sin logs en este rango"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "id": 1,
       "type": "timeseries",
       "title": "Advertencias y errores por servicio",
@@ -138,7 +194,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 0,
+        "y": 7,
         "w": 24,
         "h": 7
       },
@@ -167,7 +223,8 @@
             "lineWidth": 1
           },
           "unit": "short",
-          "decimals": 0
+          "decimals": 0,
+          "noValue": "Sin advertencias ni errores"
         },
         "overrides": []
       },
@@ -193,7 +250,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 7,
+        "y": 14,
         "w": 24,
         "h": 20
       },
